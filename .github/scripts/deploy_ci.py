@@ -5,9 +5,9 @@ Uses paramiko so it works with older cPanel SSH key exchange algorithms.
 """
 import os, time, paramiko
 
-HOST     = os.environ["SSH_HOST"]
-USER     = os.environ["SSH_USER"]
-KEY_PATH = os.environ.get("SSH_KEY_PATH", "/tmp/id_rsa")  # passphrase already stripped
+HOST     = os.environ["SSH_HOST"].strip()
+USER     = os.environ["SSH_USER"].strip()
+KEY_PATH = os.environ.get("SSH_KEY_PATH", "/tmp/ci_key").strip()
 
 HOME_REMOTE  = "/home1/a1751tyi"
 WEB          = f"{HOME_REMOTE}/public_html"
