@@ -3,20 +3,19 @@ CI deploy script — runs inside GitHub Actions.
 Reads SSH credentials from environment variables (GitHub Secrets).
 Uses paramiko so it works with older cPanel SSH key exchange algorithms.
 """
-import os, io, time, paramiko
+import os, time, paramiko
 
-HOST       = os.environ["SSH_HOST"]
-USER       = os.environ["SSH_USER"]
-PASSPHRASE = os.environ["SSH_PASSPHRASE"].encode()
-KEY_DATA   = os.environ["SSH_KEY"]          # full private key content
+HOST     = os.environ["SSH_HOST"]
+USER     = os.environ["SSH_USER"]
+KEY_PATH = os.environ.get("SSH_KEY_PATH", "/tmp/id_rsa")  # passphrase already stripped
 
 HOME_REMOTE  = "/home1/a1751tyi"
 WEB          = f"{HOME_REMOTE}/public_html"
 DIST_REMOTE  = f"{WEB}/client/dist"
 APP          = f"{WEB}/server"
 
-# ── Load private key from env string ──────────────────────────────────────────
-key = paramiko.RSAKey.from_private_key(io.StringIO(KEY_DATA), password=PASSPHRASE)
+# ── Load private key from file (no passphrase — stripped in workflow) ─────────
+key = paramiko.RSAKey.from_private_key_file(KEY_PATH)
 
 # ── Connect ────────────────────────────────────────────────────────────────────
 print(f"Connecting to {HOST}...")
