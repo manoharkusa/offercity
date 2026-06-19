@@ -191,4 +191,23 @@ async function runCampaign(campaignId) {
   delete activeCamps[campaignId];
 }
 
-module.exports = { connect, disconnect, getStatus, getContacts, sendWAMessage, runCampaign, activeCamps };
+async function requestPairingCode(ownerId, phone) {
+  // Start connection if not already started
+  if (!['connecting', 'waiting_scan'].includes(connStatus[ownerId])) {
+    connect(ownerId);
+  }
+  // Wait up to 8s for socket to initialise
+  let waited = 0;
+  while (!sockets[ownerId] && waited < 8000) {
+    await new Promise(r => setTimeout(r, 400));
+    waited += 400;
+  }
+  const sock = sockets[ownerId];
+  if (!sock) throw new Error('WhatsApp not ready — click Connect first, wait a moment, then try again.');
+  const cleanPhone = phone.replace(/\D/g, '');
+  if (!cleanPhone || cleanPhone.length < 10) throw new Error('Enter a valid phone number with country code (e.g. 919876543210)');
+  const code = await sock.requestPairingCode(cleanPhone);
+  return code;
+}
+
+module.exports = { connect, disconnect, getStatus, getContacts, sendWAMessage, runCampaign, activeCamps, requestPairingCode };

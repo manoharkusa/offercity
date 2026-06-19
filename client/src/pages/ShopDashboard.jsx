@@ -82,6 +82,12 @@ export default function ShopDashboard() {
   const waTimer   = useRef(null);
   const campTimer = useRef(null);
 
+  // Pairing code state (connect WhatsApp on same phone without scanning QR)
+  const [showPairInput, setShowPairInput] = useState(false);
+  const [pairPhone, setPairPhone]         = useState('');
+  const [pairingCode, setPairingCode]     = useState('');
+  const [pairLoading, setPairLoading]     = useState(false);
+
   useEffect(() => {
     api.get('/shops/owner/mine').then(r => setShops(r.data)).catch(() => {});
   }, []);
@@ -135,6 +141,23 @@ export default function ShopDashboard() {
   }, [activeCampaign?.id, activeCampaign?.status]);
 
   const flash = (m, type = 'ok') => { setMsg(m); setMsgType(type); setTimeout(() => setMsg(''), 5000); };
+
+  // Reset pairing state when WhatsApp connects successfully
+  useEffect(() => {
+    if (waStatus.status === 'connected') {
+      setPairingCode(''); setShowPairInput(false); setPairPhone('');
+    }
+  }, [waStatus.status]);
+
+  const getPairingCode = async () => {
+    setPairLoading(true);
+    try {
+      const { data } = await api.post('/campaigns/whatsapp/pairing-code', { phone: pairPhone.replace(/\D/g, '') });
+      setPairingCode(data.code);
+    } catch (err) {
+      flash(err.response?.data?.message || 'Could not get pairing code', 'err');
+    } finally { setPairLoading(false); }
+  };
 
   const resetOffer = () => {
     const defaultShopId = shops.length > 0 ? String(shops[0].id) : '';
@@ -868,6 +891,42 @@ export default function ShopDashboard() {
                     <p style={{ color:'#555', marginBottom:8 }}>Open WhatsApp → ⋮ → Linked Devices → Link a Device → Scan this code</p>
                     <img src={waStatus.qr} alt="WhatsApp QR" className="wa-qr-img" />
                     <p style={{ color:'#aaa', fontSize:12, marginTop:6 }}>QR refreshes every 30 seconds</p>
+                  </div>
+                )}
+
+                {/* Pairing code — for mobile users on the same phone */}
+                {['waiting_scan', 'connecting'].includes(waStatus.status) && (
+                  <div className="wa-pair-section">
+                    {!pairingCode ? (
+                      <>
+                        <div className="wa-pair-divider"><span>or connect on this phone</span></div>
+                        {!showPairInput ? (
+                          <button className="wa-pair-btn" onClick={() => setShowPairInput(true)}>
+                            📱 Use Pairing Code (same phone)
+                          </button>
+                        ) : (
+                          <div className="wa-pair-input-row">
+                            <input value={pairPhone} onChange={e => setPairPhone(e.target.value)}
+                              placeholder="Phone with country code e.g. 919876543210" type="tel" />
+                            <button onClick={getPairingCode} disabled={pairLoading || !pairPhone.trim()}>
+                              {pairLoading ? '…' : 'Get Code'}
+                            </button>
+                          </div>
+                        )}
+                      </>
+                    ) : (
+                      <div className="wa-pair-code-box">
+                        <p>Enter this code in WhatsApp:</p>
+                        <div className="wa-pair-code">{pairingCode}</div>
+                        <p className="wa-pair-steps">
+                          WhatsApp → ⋮ → Linked Devices → Link a Device<br/>
+                          → <strong>"Link with phone number instead"</strong> → enter the code above
+                        </p>
+                        <button onClick={() => { setPairingCode(''); setShowPairInput(false); setPairPhone(''); }}>
+                          ✕ Try again
+                        </button>
+                      </div>
+                    )}
                   </div>
                 )}
               </div>

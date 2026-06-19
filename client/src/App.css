@@ -969,4 +969,93 @@ a { text-decoration: none; color: inherit; }
     width: 7px; height: 7px; background: #25D366;
     border-radius: 50%; border: 1.5px solid #fff;
   }
+
+  /* ── Campaign tab mobile fixes ─────── */
+  .wa-connect-card { padding: 14px 12px; }
+  .wa-status-row   { flex-wrap: wrap; gap: 8px; }
+  /* Force connect/disconnect button to its own full-width row */
+  .wa-status-row > div:last-child {
+    flex-basis: 100%;
+    margin-left: 0 !important;
+  }
+  .wa-btn-connect, .wa-btn-disconnect { width: 100%; text-align: center; }
+  .camp-launch-card  { padding: 14px 12px; }
+  .camp-progress-card { padding: 14px 12px; }
+
+  /* Pairing input stacks on narrow screens */
+  .wa-pair-input-row { flex-direction: column; }
+  .wa-pair-input-row button { width: 100%; }
+  .wa-pair-code { font-size: 30px; letter-spacing: 6px; }
+}
+
+/* ══════════════════════════════════════════
+   WHATSAPP PAIRING CODE UI
+══════════════════════════════════════════ */
+.wa-pair-section {
+  margin-top: 16px;
+  padding-top: 16px;
+  border-top: 1px dashed #c8e6c9;
+}
+.wa-pair-divider {
+  text-align: center;
+  position: relative;
+  margin-bottom: 12px;
+}
+.wa-pair-divider::before {
+  content: '';
+  position: absolute;
+  top: 50%; left: 0; right: 0;
+  height: 1px; background: #e0e0e0;
+}
+.wa-pair-divider span {
+  position: relative;
+  background: #fff;
+  padding: 0 12px;
+  font-size: 12px; color: #aaa;
+}
+.wa-pair-btn {
+  width: 100%; padding: 10px 16px;
+  background: #e3f2fd; border: 1.5px solid #90caf9;
+  color: #1565c0; border-radius: 8px; cursor: pointer;
+  font-size: 14px; font-weight: 600; font-family: inherit;
+  transition: background .15s;
+}
+.wa-pair-btn:hover { background: #bbdefb; }
+.wa-pair-input-row {
+  display: flex; gap: 8px;
+}
+.wa-pair-input-row input {
+  flex: 1; padding: 10px 12px;
+  border: 1.5px solid #90caf9; border-radius: 8px;
+  font-size: 14px; font-family: inherit; outline: none;
+}
+.wa-pair-input-row input:focus { border-color: #1565c0; }
+.wa-pair-input-row button {
+  padding: 10px 16px; background: #1565c0; color: #fff;
+  border: none; border-radius: 8px; cursor: pointer;
+  font-weight: 700; font-size: 14px; white-space: nowrap;
+  font-family: inherit;
+}
+.wa-pair-input-row button:disabled { opacity: .6; cursor: default; }
+.wa-pair-code-box {
+  text-align: center; padding: 18px 16px;
+  background: #e3f2fd; border: 2px solid #1565c0;
+  border-radius: 12px;
+}
+.wa-pair-code-box > p:first-child {
+  color: #555; font-size: 13px; margin-bottom: 6px;
+}
+.wa-pair-code {
+  font-size: 38px; font-weight: 900; letter-spacing: 10px;
+  color: #1565c0; font-family: 'Courier New', monospace;
+  margin: 6px 0 10px;
+}
+.wa-pair-steps {
+  color: #666; font-size: 12px; line-height: 1.7; margin-bottom: 12px;
+}
+.wa-pair-code-box > button:last-child {
+  padding: 6px 16px; background: none;
+  border: 1px solid #90caf9; color: #1565c0;
+  border-radius: 6px; cursor: pointer;
+  font-size: 13px; font-family: inherit;
 }

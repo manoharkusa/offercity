@@ -31,6 +31,18 @@ router.post('/whatsapp/disconnect', protect, requireRole('shop_owner', 'admin'),
   res.json({ message: 'Disconnected' });
 });
 
+// POST /api/campaigns/whatsapp/pairing-code  — alternative to QR for same-device use
+router.post('/whatsapp/pairing-code', protect, requireRole('shop_owner', 'admin'), async (req, res) => {
+  const { phone } = req.body;
+  if (!phone) return res.status(400).json({ message: 'Phone number is required' });
+  try {
+    const code = await wa.requestPairingCode(req.user.id, phone);
+    res.json({ code });
+  } catch (err) {
+    res.status(500).json({ message: err.message });
+  }
+});
+
 // GET /api/campaigns/whatsapp/contacts
 router.get('/whatsapp/contacts', protect, requireRole('shop_owner', 'admin'), (req, res) => {
   const list = wa.getContacts(req.user.id);
