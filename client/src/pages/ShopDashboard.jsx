@@ -87,6 +87,7 @@ export default function ShopDashboard() {
   const [pairPhone, setPairPhone]         = useState('');
   const [pairingCode, setPairingCode]     = useState('');
   const [pairLoading, setPairLoading]     = useState(false);
+  const [pairCountdown, setPairCountdown] = useState(0);
 
   useEffect(() => {
     api.get('/shops/owner/mine').then(r => setShops(r.data)).catch(() => {});
@@ -154,10 +155,18 @@ export default function ShopDashboard() {
     try {
       const { data } = await api.post('/campaigns/whatsapp/pairing-code', { phone: pairPhone.replace(/\D/g, '') });
       setPairingCode(data.code);
+      setPairCountdown(60);
     } catch (err) {
       flash(err.response?.data?.message || 'Could not get pairing code', 'err');
     } finally { setPairLoading(false); }
   };
+
+  // 60-second countdown after pairing code is received
+  useEffect(() => {
+    if (!pairingCode || pairCountdown <= 0) return;
+    const t = setTimeout(() => setPairCountdown(c => c - 1), 1000);
+    return () => clearTimeout(t);
+  }, [pairingCode, pairCountdown]);
 
   const resetOffer = () => {
     const defaultShopId = shops.length > 0 ? String(shops[0].id) : '';
@@ -916,15 +925,30 @@ export default function ShopDashboard() {
                       </>
                     ) : (
                       <div className="wa-pair-code-box">
-                        <p>Enter this code in WhatsApp:</p>
+                        <p>Enter this code in WhatsApp <strong>right now:</strong></p>
                         <div className="wa-pair-code">{pairingCode}</div>
+
+                        {/* Countdown */}
+                        <div className="wa-pair-timer" style={{ color: pairCountdown < 15 ? '#c62828' : '#f57c00' }}>
+                          {pairCountdown > 0
+                            ? `⏱ Expires in ${pairCountdown}s — be quick!`
+                            : '⚠️ Code expired — get a new one below'
+                          }
+                        </div>
+
                         <p className="wa-pair-steps">
                           WhatsApp → ⋮ → Linked Devices → Link a Device<br/>
                           → <strong>"Link with phone number instead"</strong> → enter the code above
                         </p>
-                        <button onClick={() => { setPairingCode(''); setShowPairInput(false); setPairPhone(''); }}>
-                          ✕ Try again
-                        </button>
+
+                        {pairCountdown === 0
+                          ? <button className="wa-pair-regen-btn" onClick={getPairingCode} disabled={pairLoading}>
+                              {pairLoading ? '…' : '🔄 Get New Code'}
+                            </button>
+                          : <button onClick={() => { setPairingCode(''); setPairCountdown(0); setShowPairInput(true); }}>
+                              ✕ Try a different number
+                            </button>
+                        }
                       </div>
                     )}
                   </div>

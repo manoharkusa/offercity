@@ -1053,9 +1053,19 @@ a { text-decoration: none; color: inherit; }
 .wa-pair-steps {
   color: #666; font-size: 12px; line-height: 1.7; margin-bottom: 12px;
 }
+.wa-pair-timer {
+  font-size: 13px; font-weight: 700;
+  margin: 6px 0 10px;
+}
 .wa-pair-code-box > button:last-child {
   padding: 6px 16px; background: none;
   border: 1px solid #90caf9; color: #1565c0;
   border-radius: 6px; cursor: pointer;
   font-size: 13px; font-family: inherit;
 }
+.wa-pair-regen-btn {
+  padding: 10px 20px; background: #1565c0; color: #fff;
+  border: none; border-radius: 8px; cursor: pointer;
+  font-size: 14px; font-weight: 700; font-family: inherit;
+}
+.wa-pair-regen-btn:disabled { opacity: .6; cursor: default; }
