@@ -727,6 +727,7 @@ a { text-decoration: none; color: inherit; }
   align-items: center;
   gap: 14px;
 }
+.wa-connect-btn-wrap { margin-left: auto; }
 .wa-icon { font-size: 32px; }
 .wa-status-label { font-size: 15px; font-weight: 700; }
 .wa-contacts-count { font-size: 13px; color: #555; margin-top: 2px; }
@@ -971,21 +972,47 @@ a { text-decoration: none; color: inherit; }
   }
 
   /* ── Campaign tab mobile fixes ─────── */
-  .wa-connect-card { padding: 14px 12px; }
-  .wa-status-row   { flex-wrap: wrap; gap: 8px; }
-  /* Force connect/disconnect button to its own full-width row */
-  .wa-status-row > div:last-child {
+  /* ── Campaign tab — full mobile overhaul ── */
+
+  /* Prevent horizontal overflow on the page */
+  .sd-pg { overflow-x: hidden; }
+  .dashboard, .panel { width: 100%; max-width: 100%; }
+
+  /* Tighten all campaign cards */
+  .wa-connect-card,
+  .camp-launch-card,
+  .camp-progress-card,
+  .camp-done-card    { padding: 12px 10px; border-radius: 12px; }
+
+  /* Status row: icon + text on one line, button below full-width */
+  .wa-status-row { flex-wrap: wrap; gap: 8px; align-items: center; }
+  .wa-connect-btn-wrap {
     flex-basis: 100%;
     margin-left: 0 !important;
   }
-  .wa-btn-connect, .wa-btn-disconnect { width: 100%; text-align: center; }
-  .camp-launch-card  { padding: 14px 12px; }
-  .camp-progress-card { padding: 14px 12px; }
+  .wa-btn-connect, .wa-btn-disconnect { width: 100%; text-align: center; font-size: 14px; }
+  .wa-icon { font-size: 26px; }
+  .wa-status-label { font-size: 14px; }
 
-  /* Pairing input stacks on narrow screens */
+  /* QR image smaller on mobile */
+  .wa-qr-img { width: 180px; height: 180px; }
+
+  /* Pairing input — stack vertically */
   .wa-pair-input-row { flex-direction: column; }
+  .wa-pair-input-row input  { width: 100%; }
   .wa-pair-input-row button { width: 100%; }
-  .wa-pair-code { font-size: 30px; letter-spacing: 6px; }
+  .wa-pair-code { font-size: 28px; letter-spacing: 5px; }
+
+  /* Campaign counts & eta */
+  .camp-counts { flex-wrap: wrap; gap: 8px; font-size: 13px; }
+  .camp-eta    { font-size: 11px; }
+  .camp-btn-pause, .camp-btn-resume, .camp-btn-stop { flex: 1; }
+
+  /* Recipient info smaller */
+  .camp-recipient-info { font-size: 11px; line-height: 1.5; }
+
+  /* Panel h2 tighter */
+  .panel h2 { font-size: 17px; margin-bottom: 12px; }
 }
 
 /* ══════════════════════════════════════════

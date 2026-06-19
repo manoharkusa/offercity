@@ -83,7 +83,6 @@ export default function ShopDashboard() {
   const campTimer = useRef(null);
 
   // Pairing code state (connect WhatsApp on same phone without scanning QR)
-  const [showPairInput, setShowPairInput] = useState(false);
   const [pairPhone, setPairPhone]         = useState('');
   const [pairingCode, setPairingCode]     = useState('');
   const [pairLoading, setPairLoading]     = useState(false);
@@ -143,17 +142,19 @@ export default function ShopDashboard() {
 
   const flash = (m, type = 'ok') => { setMsg(m); setMsgType(type); setTimeout(() => setMsg(''), 5000); };
 
-  // Reset pairing state when WhatsApp connects successfully
+  // Reset pairing state when WhatsApp connects or disconnects
   useEffect(() => {
-    if (waStatus.status === 'connected') {
-      setPairingCode(''); setShowPairInput(false); setPairPhone('');
+    if (waStatus.status === 'connected' || waStatus.status === 'disconnected') {
+      setPairingCode(''); setPairPhone(''); setPairCountdown(0);
     }
   }, [waStatus.status]);
 
   const getPairingCode = async () => {
     setPairLoading(true);
+    setPairingCode('');
+    setPairCountdown(0);
     try {
-      const { data } = await api.post('/campaigns/whatsapp/pairing-code', { phone: pairPhone.replace(/\D/g, '') });
+      const { data } = await api.post('/campaigns/whatsapp/connect-pairing', { phone: pairPhone.replace(/\D/g, '') });
       setPairingCode(data.code);
       setPairCountdown(60);
     } catch (err) {
@@ -875,27 +876,34 @@ export default function ShopDashboard() {
 
               {/* WhatsApp Connection Card */}
               <div className="wa-connect-card">
+
+                {/* Status + action row */}
                 <div className="wa-status-row">
                   <span className="wa-icon">💬</span>
                   <div>
                     <div className="wa-status-label" style={{ color: WA_STATUS_COLOR[waStatus.status] || '#888' }}>
-                      {WA_STATUS_LABEL[waStatus.status] || waStatus.status}
+                      {pairLoading ? 'Connecting…' : (WA_STATUS_LABEL[waStatus.status] || waStatus.status)}
                     </div>
                     {waStatus.contacts > 0 && (
                       <div className="wa-contacts-count">👥 {waStatus.contacts} contacts ready</div>
                     )}
                   </div>
-                  <div style={{ marginLeft:'auto' }}>
+                  <div className="wa-connect-btn-wrap">
                     {waStatus.status === 'connected'
                       ? <button className="wa-btn-disconnect" onClick={() => api.post('/campaigns/whatsapp/disconnect').then(() => setWaStatus({ status:'disconnected', qr:null, contacts:0 }))}>Disconnect</button>
-                      : <button className="wa-btn-connect" onClick={() => api.post('/campaigns/whatsapp/connect').catch(() => {})} disabled={['connecting','waiting_scan','reconnecting'].includes(waStatus.status)}>
-                          {waStatus.status === 'waiting_scan' ? 'Scan QR…' : waStatus.status === 'connecting' ? 'Connecting…' : '🔗 Connect WhatsApp'}
-                        </button>
+                      : !pairLoading && !pairingCode && (
+                          <button className="wa-btn-connect"
+                            onClick={() => api.post('/campaigns/whatsapp/connect').catch(() => {})}
+                            disabled={['connecting','waiting_scan','reconnecting'].includes(waStatus.status)}>
+                            {waStatus.status === 'waiting_scan' ? 'Scan QR…' : waStatus.status === 'connecting' ? 'Connecting…' : '🔗 Connect WhatsApp'}
+                          </button>
+                        )
                     }
                   </div>
                 </div>
 
-                {waStatus.qr && (
+                {/* QR code — hide when pairing code flow is active */}
+                {waStatus.qr && !pairLoading && !pairingCode && (
                   <div className="wa-qr-wrap">
                     <p style={{ color:'#555', marginBottom:8 }}>Open WhatsApp → ⋮ → Linked Devices → Link a Device → Scan this code</p>
                     <img src={waStatus.qr} alt="WhatsApp QR" className="wa-qr-img" />
@@ -903,49 +911,49 @@ export default function ShopDashboard() {
                   </div>
                 )}
 
-                {/* Pairing code — for mobile users on the same phone */}
-                {['waiting_scan', 'connecting'].includes(waStatus.status) && (
+                {/* Pairing code section — always visible when not connected */}
+                {waStatus.status !== 'connected' && (
                   <div className="wa-pair-section">
-                    {!pairingCode ? (
+
+                    {/* Input — shown when no active code and not loading */}
+                    {!pairLoading && !pairingCode && (
                       <>
                         <div className="wa-pair-divider"><span>or connect on this phone</span></div>
-                        {!showPairInput ? (
-                          <button className="wa-pair-btn" onClick={() => setShowPairInput(true)}>
-                            📱 Use Pairing Code (same phone)
-                          </button>
-                        ) : (
-                          <div className="wa-pair-input-row">
-                            <input value={pairPhone} onChange={e => setPairPhone(e.target.value)}
-                              placeholder="Phone with country code e.g. 919876543210" type="tel" />
-                            <button onClick={getPairingCode} disabled={pairLoading || !pairPhone.trim()}>
-                              {pairLoading ? '…' : 'Get Code'}
-                            </button>
-                          </div>
-                        )}
+                        <div className="wa-pair-input-row">
+                          <input value={pairPhone} onChange={e => setPairPhone(e.target.value)}
+                            placeholder="Your WhatsApp number (e.g. 919876543210)" type="tel" />
+                          <button onClick={getPairingCode} disabled={!pairPhone.trim()}>Connect →</button>
+                        </div>
                       </>
-                    ) : (
+                    )}
+
+                    {/* Loading spinner */}
+                    {pairLoading && (
+                      <div style={{ textAlign:'center', padding:'20px 0' }}>
+                        <div className="opt-spinner" style={{ margin:'0 auto 10px' }} />
+                        <p style={{ color:'#666', fontSize:13 }}>Generating your pairing code…</p>
+                      </div>
+                    )}
+
+                    {/* Code ready */}
+                    {pairingCode && (
                       <div className="wa-pair-code-box">
                         <p>Enter this code in WhatsApp <strong>right now:</strong></p>
-                        <div className="wa-pair-code">{pairingCode}</div>
-
-                        {/* Countdown */}
-                        <div className="wa-pair-timer" style={{ color: pairCountdown < 15 ? '#c62828' : '#f57c00' }}>
-                          {pairCountdown > 0
-                            ? `⏱ Expires in ${pairCountdown}s — be quick!`
-                            : '⚠️ Code expired — get a new one below'
-                          }
+                        <div className="wa-pair-code">
+                          {pairingCode.length === 8 ? `${pairingCode.slice(0,4)}-${pairingCode.slice(4)}` : pairingCode}
                         </div>
-
+                        <div className="wa-pair-timer" style={{ color: pairCountdown < 15 ? '#c62828' : '#f57c00' }}>
+                          {pairCountdown > 0 ? `⏱ Expires in ${pairCountdown}s` : '⚠️ Code expired'}
+                        </div>
                         <p className="wa-pair-steps">
-                          WhatsApp → ⋮ → Linked Devices → Link a Device<br/>
-                          → <strong>"Link with phone number instead"</strong> → enter the code above
+                          WhatsApp → ⋮ Menu → <strong>Linked Devices</strong> → Link a Device<br/>
+                          → tap <strong>"Link with phone number instead"</strong> → enter the code
                         </p>
-
                         {pairCountdown === 0
                           ? <button className="wa-pair-regen-btn" onClick={getPairingCode} disabled={pairLoading}>
                               {pairLoading ? '…' : '🔄 Get New Code'}
                             </button>
-                          : <button onClick={() => { setPairingCode(''); setPairCountdown(0); setShowPairInput(true); }}>
+                          : <button onClick={() => { setPairingCode(''); setPairCountdown(0); }}>
                               ✕ Try a different number
                             </button>
                         }

@@ -191,23 +191,100 @@ async function runCampaign(campaignId) {
   delete activeCamps[campaignId];
 }
 
-async function requestPairingCode(ownerId, phone) {
-  // Start connection if not already started
-  if (!['connecting', 'waiting_scan'].includes(connStatus[ownerId])) {
-    connect(ownerId);
-  }
-  // Wait up to 8s for socket to initialise
-  let waited = 0;
-  while (!sockets[ownerId] && waited < 8000) {
-    await new Promise(r => setTimeout(r, 400));
-    waited += 400;
-  }
-  const sock = sockets[ownerId];
-  if (!sock) throw new Error('WhatsApp not ready — click Connect first, wait a moment, then try again.');
+// connectWithPairingCode — creates a fresh socket and requests a pairing code
+// right when the QR event fires. This is the only reliable timing for requestPairingCode().
+async function connectWithPairingCode(ownerId, phone) {
   const cleanPhone = phone.replace(/\D/g, '');
-  if (!cleanPhone || cleanPhone.length < 10) throw new Error('Enter a valid phone number with country code (e.g. 919876543210)');
-  const code = await sock.requestPairingCode(cleanPhone);
-  return code;
+  if (!cleanPhone || cleanPhone.length < 10)
+    throw new Error('Enter a valid phone number with country code (e.g. 919876543210)');
+
+  // Close any existing socket so we start fresh
+  if (sockets[ownerId]) {
+    try { sockets[ownerId].ws?.close(); } catch {}
+    delete sockets[ownerId];
+    delete qrCodes[ownerId];
+  }
+
+  const sessionDir = path.join(SESSION_BASE, String(ownerId));
+  fs.mkdirSync(sessionDir, { recursive: true });
+  loadSavedContacts(ownerId);
+
+  let mod;
+  try { mod = await import('@whiskeysockets/baileys'); }
+  catch { connStatus[ownerId] = 'unavailable'; throw new Error('WhatsApp module not available on this server'); }
+
+  const makeWASocket = mod.makeWASocket || mod.default;
+  const { useMultiFileAuthState, DisconnectReason } = mod;
+  const { state, saveCreds } = await useMultiFileAuthState(sessionDir);
+
+  connStatus[ownerId] = 'connecting';
+
+  const sock = makeWASocket({
+    auth: state,
+    printQRInTerminal: false,
+    browser: ['OfferCity', 'Chrome', '120.0'],
+    syncFullHistory: false,
+    getMessage: async () => undefined,
+  });
+
+  sockets[ownerId] = sock;
+  sock.ev.on('creds.update', saveCreds);
+
+  const ai = require('./aichatbot');
+  sock.ev.on('messages.upsert', async ({ messages, type }) => {
+    if (type !== 'notify') return;
+    for (const msg of messages) {
+      if (msg.key.fromMe || msg.key.remoteJid?.endsWith('@g.us')) continue;
+      const age = Date.now() / 1000 - (msg.messageTimestamp || 0);
+      if (age > 60) continue;
+      const text = msg.message?.conversation || msg.message?.extendedTextMessage?.text || msg.message?.imageMessage?.caption || '';
+      if (!text.trim()) continue;
+      await new Promise(r => setTimeout(r, 1000 + Math.random() * 1000));
+      const reply = await ai.handleIncoming(ownerId, msg.key.remoteJid, text, msg.pushName || '');
+      if (reply) await sock.sendMessage(msg.key.remoteJid, { text: reply });
+    }
+  });
+  sock.ev.on('contacts.set',      ({ contacts }) => mergeContacts(ownerId, contacts));
+  sock.ev.on('contacts.update',   upd => mergeContacts(ownerId, upd));
+  sock.ev.on('messaging-history.set', ({ contacts: c }) => { if (c?.length) mergeContacts(ownerId, c); });
+
+  // Return a Promise that resolves with the pairing code or rejects on timeout/error
+  return new Promise((resolve, reject) => {
+    const timeout = setTimeout(() => reject(new Error('Timed out waiting for QR — try again')), 16000);
+
+    sock.ev.on('connection.update', async ({ qr, connection, lastDisconnect }) => {
+      if (qr) {
+        // QR event is the correct moment to call requestPairingCode
+        connStatus[ownerId] = 'waiting_scan';
+        try {
+          const code = await sock.requestPairingCode(cleanPhone);
+          clearTimeout(timeout);
+          resolve(code);
+        } catch (e) {
+          clearTimeout(timeout);
+          connStatus[ownerId] = 'error';
+          reject(new Error('Could not generate pairing code: ' + e.message));
+        }
+      }
+      if (connection === 'open') {
+        connStatus[ownerId] = 'connected';
+        delete qrCodes[ownerId];
+        clearTimeout(timeout);
+      }
+      if (connection === 'close') {
+        const code = lastDisconnect?.error?.output?.statusCode;
+        delete sockets[ownerId];
+        if (code === DisconnectReason?.loggedOut) {
+          connStatus[ownerId] = 'disconnected';
+          contactMap[ownerId] = [];
+          fs.rmSync(sessionDir, { recursive: true, force: true });
+        } else {
+          connStatus[ownerId] = 'reconnecting';
+          setTimeout(() => connect(ownerId), 6000);
+        }
+      }
+    });
+  });
 }
 
-module.exports = { connect, disconnect, getStatus, getContacts, sendWAMessage, runCampaign, activeCamps, requestPairingCode };
+module.exports = { connect, disconnect, getStatus, getContacts, sendWAMessage, runCampaign, activeCamps, connectWithPairingCode };
