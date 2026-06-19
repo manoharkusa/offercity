@@ -51,6 +51,26 @@ export default function ShopDashboard() {
 
   const cameraRef  = useRef();
   const galleryRef = useRef();
+  const [cameraMsg, setCameraMsg] = useState('');
+
+  const openCamera = async () => {
+    setCameraMsg('');
+    if (!navigator.mediaDevices || !navigator.mediaDevices.enumerateDevices) {
+      setCameraMsg('Camera not supported in this browser. Please use Gallery.');
+      return;
+    }
+    try {
+      const devices = await navigator.mediaDevices.enumerateDevices();
+      const hasCamera = devices.some(d => d.kind === 'videoinput');
+      if (!hasCamera) {
+        setCameraMsg('No camera found on this device. Please use Gallery to upload a photo.');
+        return;
+      }
+      cameraRef.current?.click();
+    } catch {
+      setCameraMsg('Could not access camera. Please use Gallery.');
+    }
+  };
 
   // Campaign / WhatsApp state
   const [waStatus, setWaStatus]           = useState({ status: 'disconnected', qr: null, contacts: 0 });
@@ -547,13 +567,18 @@ export default function ShopDashboard() {
                     <p>Offers with photos get <strong>3× more views</strong></p>
                   </div>
                   <div className="photo-pick-btns">
-                    <button className="photo-btn camera" onClick={() => cameraRef.current?.click()}>
+                    <button className="photo-btn camera" onClick={openCamera}>
                       <span>📷</span><strong>Take Photo</strong><small>Open camera</small>
                     </button>
-                    <button className="photo-btn gallery" onClick={() => galleryRef.current?.click()}>
+                    <button className="photo-btn gallery" onClick={() => { setCameraMsg(''); galleryRef.current?.click(); }}>
                       <span>🖼</span><strong>Gallery</strong><small>Choose existing</small>
                     </button>
                   </div>
+                  {cameraMsg && (
+                    <div style={{ margin:'10px auto', padding:'10px 16px', background:'#fff3cd', border:'1px solid #ffc107', borderRadius:8, color:'#7a5700', fontSize:13, maxWidth:340, textAlign:'center' }}>
+                      ⚠️ {cameraMsg}
+                    </div>
+                  )}
                   <input ref={cameraRef}  type="file" accept="image/*" capture="environment" style={{ display:'none' }} onChange={e => handleImage(e.target.files[0])} />
                   <input ref={galleryRef} type="file" accept="image/*"                        style={{ display:'none' }} onChange={e => handleImage(e.target.files[0])} />
                   <button className="photo-skip-btn" onClick={() => setPhotoStep('details')}>Skip photo, just add details →</button>
