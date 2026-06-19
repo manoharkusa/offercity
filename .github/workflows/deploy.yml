@@ -25,59 +25,13 @@ jobs:
       - name: Build React app
         run: cd client && npm run build
 
-      - name: Copy sw.js into dist
-        run: cp client/public/sw.js client/dist/sw.js
+      - name: Install paramiko
+        run: pip install paramiko
 
-      - name: Package client dist
-        run: tar czf client-dist.tar.gz -C client dist
-
-      - name: Package server files
-        run: |
-          tar czf server-files.tar.gz \
-            server/server.js \
-            server/config \
-            server/middleware \
-            server/routes \
-            server/services
-
-      - name: Upload packages to server
-        uses: appleboy/scp-action@v0.1.7
-        with:
-          host: ${{ secrets.SSH_HOST }}
-          username: ${{ secrets.SSH_USER }}
-          key: ${{ secrets.SSH_PRIVATE_KEY }}
-          passphrase: ${{ secrets.SSH_PASSPHRASE }}
-          source: "client-dist.tar.gz,server-files.tar.gz"
-          target: "/home1/a1751tyi/"
-
-      - name: Extract files and restart Node
-        uses: appleboy/ssh-action@v1.0.3
-        with:
-          host: ${{ secrets.SSH_HOST }}
-          username: ${{ secrets.SSH_USER }}
-          key: ${{ secrets.SSH_PRIVATE_KEY }}
-          passphrase: ${{ secrets.SSH_PASSPHRASE }}
-          script: |
-            set -e
-
-            # Extract client → public_html/client/dist/
-            mkdir -p ~/public_html/client
-            tar xzf ~/client-dist.tar.gz -C ~/public_html/client
-
-            # Extract server → public_html/server/ (strips leading "server/")
-            tar xzf ~/server-files.tar.gz -C ~/public_html/server --strip-components=1
-
-            # Clean up
-            rm -f ~/client-dist.tar.gz ~/server-files.tar.gz
-
-            # Restart Node
-            pkill -f 'node.*server.js' 2>/dev/null || true
-            sleep 2
-            source ~/.nvm/nvm.sh && nvm use 16
-            nohup bash ~/start_node.sh >> ~/node.log 2>&1 &
-            sleep 6
-
-            # Health check
-            PORT=$(cat ~/node_port.txt 2>/dev/null)
-            echo "Node running on port: $PORT"
-            curl -s http://127.0.0.1:$PORT/api/health || echo "WARNING: health check failed"
+      - name: Deploy to cPanel via SSH/SFTP
+        env:
+          SSH_HOST:       ${{ secrets.SSH_HOST }}
+          SSH_USER:       ${{ secrets.SSH_USER }}
+          SSH_KEY:        ${{ secrets.SSH_PRIVATE_KEY }}
+          SSH_PASSPHRASE: ${{ secrets.SSH_PASSPHRASE }}
+        run: python .github/scripts/deploy_ci.py
