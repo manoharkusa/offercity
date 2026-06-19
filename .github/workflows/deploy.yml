@@ -1,0 +1,83 @@
+name: Deploy to Production
+
+on:
+  push:
+    branches: [main]
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '18'
+          cache: 'npm'
+          cache-dependency-path: client/package-lock.json
+
+      - name: Install client dependencies
+        run: cd client && npm ci
+
+      - name: Build React app
+        run: cd client && npm run build
+
+      - name: Copy sw.js into dist
+        run: cp client/public/sw.js client/dist/sw.js
+
+      - name: Package client dist
+        run: tar czf client-dist.tar.gz -C client dist
+
+      - name: Package server files
+        run: |
+          tar czf server-files.tar.gz \
+            server/server.js \
+            server/config \
+            server/middleware \
+            server/routes \
+            server/services
+
+      - name: Upload packages to server
+        uses: appleboy/scp-action@v0.1.7
+        with:
+          host: ${{ secrets.SSH_HOST }}
+          username: ${{ secrets.SSH_USER }}
+          key: ${{ secrets.SSH_PRIVATE_KEY }}
+          passphrase: ${{ secrets.SSH_PASSPHRASE }}
+          source: "client-dist.tar.gz,server-files.tar.gz"
+          target: "/home1/a1751tyi/"
+
+      - name: Extract files and restart Node
+        uses: appleboy/ssh-action@v1.0.3
+        with:
+          host: ${{ secrets.SSH_HOST }}
+          username: ${{ secrets.SSH_USER }}
+          key: ${{ secrets.SSH_PRIVATE_KEY }}
+          passphrase: ${{ secrets.SSH_PASSPHRASE }}
+          script: |
+            set -e
+
+            # Extract client → public_html/client/dist/
+            mkdir -p ~/public_html/client
+            tar xzf ~/client-dist.tar.gz -C ~/public_html/client
+
+            # Extract server → public_html/server/ (strips leading "server/")
+            tar xzf ~/server-files.tar.gz -C ~/public_html/server --strip-components=1
+
+            # Clean up
+            rm -f ~/client-dist.tar.gz ~/server-files.tar.gz
+
+            # Restart Node
+            pkill -f 'node.*server.js' 2>/dev/null || true
+            sleep 2
+            source ~/.nvm/nvm.sh && nvm use 16
+            nohup bash ~/start_node.sh >> ~/node.log 2>&1 &
+            sleep 6
+
+            # Health check
+            PORT=$(cat ~/node_port.txt 2>/dev/null)
+            echo "Node running on port: $PORT"
+            curl -s http://127.0.0.1:$PORT/api/health || echo "WARNING: health check failed"
