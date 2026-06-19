@@ -27,9 +27,8 @@ jobs:
 
       - name: Write SSH key
         run: |
-          mkdir -p ~/.ssh
-          printf '%s\n' "$SSH_CI_KEY" > ~/.ssh/ci_key
-          chmod 600 ~/.ssh/ci_key
+          printf '%s\n' "$SSH_CI_KEY" > /tmp/ci_key
+          chmod 600 /tmp/ci_key
         env:
           SSH_CI_KEY: ${{ secrets.SSH_CI_KEY }}
 
@@ -40,5 +39,5 @@ jobs:
         env:
           SSH_HOST:     ${{ secrets.SSH_HOST }}
           SSH_USER:     ${{ secrets.SSH_USER }}
-          SSH_KEY_PATH: /root/.ssh/ci_key
+          SSH_KEY_PATH: /tmp/ci_key
         run: python .github/scripts/deploy_ci.py
