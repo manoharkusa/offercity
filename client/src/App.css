@@ -837,3 +837,136 @@ a { text-decoration: none; color: inherit; }
   .wa-status-row { flex-wrap: wrap; }
   .camp-counts { flex-wrap: wrap; gap: 8px; }
 }
+
+/* ══════════════════════════════════════════
+   SHOP DASHBOARD — MOBILE-FIRST REDESIGN
+══════════════════════════════════════════ */
+
+/* Compact page header (replaces big h1) */
+.sd-header {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin-bottom: 20px;
+  padding: 4px 0;
+}
+.sd-header-icon { font-size: 30px; line-height: 1; }
+.sd-header-name { font-size: 21px; font-weight: 800; color: #e65100; line-height: 1.15; }
+.sd-header-sub  { font-size: 12px; color: #bbb; margin-top: 1px; }
+
+/* Mobile offer cards & bottom nav — hidden on desktop */
+.sd-offer-cards { display: none; }
+.sd-bottom-nav  { display: none; }
+
+/* ── Mobile breakpoint (≤ 680px) ─────── */
+@media (max-width: 680px) {
+
+  /* Extra bottom padding so content clears the bottom nav */
+  .sd-pg { padding-bottom: 76px !important; }
+
+  /* Header tighter on mobile */
+  .sd-header { margin-bottom: 4px; }
+  .sd-header-name { font-size: 18px; }
+
+  /* Hide desktop sidebar — bottom nav replaces it */
+  .sidebar { display: none !important; }
+  .dashboard { grid-template-columns: 1fr !important; gap: 0 !important; }
+
+  /* Panel: edge-to-edge native feel */
+  .panel {
+    border-radius: 0 !important;
+    box-shadow: none !important;
+    border-top: 1px solid #f5ede3;
+    padding: 16px 14px !important;
+  }
+
+  /* ── Offer mobile cards ─────────────── */
+  .sd-offers-table { display: none !important; }
+  .sd-offer-cards  { display: flex; flex-direction: column; gap: 10px; }
+
+  .sd-oc {
+    display: flex; align-items: stretch;
+    background: #fff; border-radius: 14px;
+    border: 1px solid #f0e6d6; overflow: hidden;
+    box-shadow: 0 1px 4px rgba(0,0,0,.05);
+    min-height: 80px;
+  }
+  .sd-oc-img {
+    width: 80px; flex-shrink: 0; position: relative;
+    background: linear-gradient(135deg, #ffe0b2, #ffcc80);
+    display: flex; align-items: center; justify-content: center;
+    font-size: 26px; overflow: hidden;
+  }
+  .sd-oc-img img {
+    position: absolute; inset: 0;
+    width: 100%; height: 100%; object-fit: cover; display: block;
+  }
+  .sd-oc-badge {
+    position: absolute; bottom: 4px; left: 4px;
+    font-size: 9px; font-weight: 800;
+    padding: 2px 6px; border-radius: 6px;
+    text-transform: uppercase; letter-spacing: .3px;
+  }
+  .sd-oc-badge.live { background: #e8f5e9; color: #2e7d32; }
+  .sd-oc-badge.off  { background: #fce4ec; color: #c62828; }
+  .sd-oc-body {
+    flex: 1; min-width: 0; padding: 10px 12px;
+    display: flex; flex-direction: column;
+    justify-content: center; gap: 3px;
+  }
+  .sd-oc-title {
+    font-size: 14px; font-weight: 600; color: #1a1a1a;
+    white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+  }
+  .sd-oc-price-row { display: flex; align-items: center; gap: 6px; flex-wrap: wrap; }
+  .sd-oc-pct   { font-size: 13px; font-weight: 700; color: #e65100; }
+  .sd-oc-final { font-size: 13px; font-weight: 700; color: #2e7d32; }
+  .sd-oc-orig  { font-size: 11px; color: #bbb; text-decoration: line-through; }
+  .sd-oc-foot  { font-size: 11px; color: #bbb; }
+  .sd-oc-acts {
+    display: flex; flex-direction: column;
+    border-left: 1px solid #f5ede3; min-width: 44px;
+  }
+  .sd-oc-acts button {
+    flex: 1; border: none; background: none;
+    font-size: 17px; cursor: pointer; padding: 0; line-height: 1;
+    display: flex; align-items: center; justify-content: center;
+    transition: background .15s; min-height: 26px;
+  }
+  .sd-oc-acts button:hover     { background: #f9f5f0; }
+  .sd-oc-acts button.sd-del:hover { background: #fce4ec; }
+  .sd-oc-acts button + button  { border-top: 1px solid #f5ede3; }
+
+  /* ── Bottom Navigation Bar ─────────── */
+  .sd-bottom-nav {
+    display: flex;
+    position: fixed; bottom: 0; left: 0; right: 0;
+    height: 60px; background: #fff;
+    border-top: 1.5px solid #f0e6d6;
+    box-shadow: 0 -4px 20px rgba(0,0,0,.08);
+    z-index: 900;
+    padding-bottom: env(safe-area-inset-bottom, 0px);
+  }
+  .sd-btab {
+    flex: 1; display: flex; flex-direction: column;
+    align-items: center; justify-content: center; gap: 2px;
+    border: none; background: none; cursor: pointer;
+    padding: 4px 2px 6px; position: relative;
+    font-family: inherit; -webkit-tap-highlight-color: transparent;
+  }
+  .sd-btab-icon { font-size: 20px; line-height: 1; }
+  .sd-btab-lbl  { font-size: 9px; color: #bbb; font-weight: 500; letter-spacing: .2px; line-height: 1; }
+  .sd-btab.active .sd-btab-lbl { color: #e65100; font-weight: 700; }
+  .sd-btab::before {
+    content: ''; position: absolute;
+    top: 0; left: 20%; right: 20%;
+    height: 2.5px; background: transparent;
+    border-radius: 0 0 4px 4px; transition: background .2s;
+  }
+  .sd-btab.active::before { background: #e65100; }
+  .sd-btab-dot {
+    position: absolute; top: 6px; right: calc(50% - 18px);
+    width: 7px; height: 7px; background: #25D366;
+    border-radius: 50%; border: 1.5px solid #fff;
+  }
+}

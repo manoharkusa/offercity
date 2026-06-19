@@ -322,8 +322,14 @@ export default function ShopDashboard() {
   const WA_STATUS_COLOR = { disconnected:'#888', connecting:'#f57c00', waiting_scan:'#1565c0', connected:'#2e7d32', reconnecting:'#f57c00', unavailable:'#c62828', error:'#c62828' };
 
   return (
-    <div className="page">
-      <h1 style={{ color:'#e65100', marginBottom:24 }}>🏪 Shop Owner Dashboard</h1>
+    <div className="page sd-pg">
+      <div className="sd-header">
+        <span className="sd-header-icon">🏪</span>
+        <div>
+          <div className="sd-header-name">Shop Dashboard</div>
+          <div className="sd-header-sub">{shops.length} shop{shops.length !== 1 ? 's' : ''}</div>
+        </div>
+      </div>
       <div className="dashboard">
 
         <aside className="sidebar">
@@ -509,32 +515,71 @@ export default function ShopDashboard() {
                 </select>
               </div>
               {!selectedShop ? <p style={{ color:'#888' }}>Select a shop to see offers.</p>
-                : offers.length === 0 ? <p style={{ color:'#888' }}>No offers yet.</p>
+                : offers.length === 0 ? (
+                  <div style={{ textAlign:'center', padding:'32px 16px' }}>
+                    <div style={{ fontSize:40, marginBottom:8 }}>🏷</div>
+                    <p style={{ fontSize:15, color:'#888', marginBottom:4 }}>No offers yet</p>
+                    <p style={{ fontSize:13, color:'#bbb' }}>Tap <strong>Add Offer</strong> to post your first deal</p>
+                  </div>
+                )
                 : (
-                  <div className="table-scroll"><table className="data-table">
-                    <thead><tr><th>Photo</th><th>Title</th><th>Discount</th><th>Price</th><th>Valid</th><th>Status</th><th>Views</th><th></th></tr></thead>
-                    <tbody>
+                  <>
+                    {/* Desktop table */}
+                    <div className="table-scroll sd-offers-table"><table className="data-table">
+                      <thead><tr><th>Photo</th><th>Title</th><th>Discount</th><th>Price</th><th>Valid</th><th>Status</th><th>Views</th><th></th></tr></thead>
+                      <tbody>
+                        {offers.map(o => (
+                          <tr key={o.id}>
+                            <td>{o.image ? <img src={o.image} alt="" style={{ width:44, height:38, objectFit:'cover', borderRadius:6 }} /> : <span>📷</span>}</td>
+                            <td><strong>{o.title}</strong></td>
+                            <td style={{ color:'#e65100', fontWeight:700 }}>{o.discount}% OFF</td>
+                            <td>
+                              {o.original_price && <span style={{ textDecoration:'line-through', color:'#aaa', fontSize:12 }}>₹{fmt(o.original_price)}</span>}
+                              {o.offer_price && <span style={{ color:'#2e7d32', fontWeight:600, marginLeft:4 }}>₹{fmt(o.offer_price)}</span>}
+                            </td>
+                            <td style={{ fontSize:12 }}>{o.valid_until ? new Date(o.valid_until).toLocaleDateString('en-IN') : '—'}</td>
+                            <td><span className={`tag ${o.is_active ? 'green' : 'red'}`}>{o.is_active ? 'Active' : 'Off'}</span></td>
+                            <td>👁 {o.views||0}</td>
+                            <td style={{ whiteSpace:'nowrap' }}>
+                              <button onClick={() => startEdit(o)} style={{ color:'#1565c0', background:'none', border:'none', cursor:'pointer', marginRight:6 }}>✏️</button>
+                              <button onClick={() => toggleActive(o)} style={{ color: o.is_active?'#e65100':'#2e7d32', background:'none', border:'none', cursor:'pointer', marginRight:6 }}>{o.is_active?'⏸':'▶️'}</button>
+                              <button onClick={() => deleteOffer(o.id)} style={{ color:'#c62828', background:'none', border:'none', cursor:'pointer' }}>🗑</button>
+                            </td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table></div>
+
+                    {/* Mobile cards */}
+                    <div className="sd-offer-cards">
                       {offers.map(o => (
-                        <tr key={o.id}>
-                          <td>{o.image ? <img src={o.image} alt="" style={{ width:44, height:38, objectFit:'cover', borderRadius:6 }} /> : <span>📷</span>}</td>
-                          <td><strong>{o.title}</strong></td>
-                          <td style={{ color:'#e65100', fontWeight:700 }}>{o.discount}% OFF</td>
-                          <td>
-                            {o.original_price && <span style={{ textDecoration:'line-through', color:'#aaa', fontSize:12 }}>₹{fmt(o.original_price)}</span>}
-                            {o.offer_price && <span style={{ color:'#2e7d32', fontWeight:600, marginLeft:4 }}>₹{fmt(o.offer_price)}</span>}
-                          </td>
-                          <td style={{ fontSize:12 }}>{o.valid_until ? new Date(o.valid_until).toLocaleDateString('en-IN') : '—'}</td>
-                          <td><span className={`tag ${o.is_active ? 'green' : 'red'}`}>{o.is_active ? 'Active' : 'Off'}</span></td>
-                          <td>👁 {o.views||0}</td>
-                          <td style={{ whiteSpace:'nowrap' }}>
-                            <button onClick={() => startEdit(o)} style={{ color:'#1565c0', background:'none', border:'none', cursor:'pointer', marginRight:6 }}>✏️</button>
-                            <button onClick={() => toggleActive(o)} style={{ color: o.is_active?'#e65100':'#2e7d32', background:'none', border:'none', cursor:'pointer', marginRight:6 }}>{o.is_active?'⏸':'▶️'}</button>
-                            <button onClick={() => deleteOffer(o.id)} style={{ color:'#c62828', background:'none', border:'none', cursor:'pointer' }}>🗑</button>
-                          </td>
-                        </tr>
+                        <div key={o.id} className="sd-oc">
+                          <div className="sd-oc-img">
+                            {o.image ? <img src={o.image} alt="" /> : <span>📷</span>}
+                            <span className={`sd-oc-badge ${o.is_active ? 'live' : 'off'}`}>
+                              {o.is_active ? 'Live' : 'Off'}
+                            </span>
+                          </div>
+                          <div className="sd-oc-body">
+                            <div className="sd-oc-title">{o.title}</div>
+                            <div className="sd-oc-price-row">
+                              <span className="sd-oc-pct">{o.discount}% OFF</span>
+                              {o.offer_price && <span className="sd-oc-final">₹{fmt(o.offer_price)}</span>}
+                              {o.original_price && <span className="sd-oc-orig">₹{fmt(o.original_price)}</span>}
+                            </div>
+                            <div className="sd-oc-foot">
+                              {o.valid_until ? `⏰ Till ${new Date(o.valid_until).toLocaleDateString('en-IN',{day:'numeric',month:'short'})}` : ''}&nbsp;· 👁 {o.views||0}
+                            </div>
+                          </div>
+                          <div className="sd-oc-acts">
+                            <button onClick={() => startEdit(o)} title="Edit">✏️</button>
+                            <button onClick={() => toggleActive(o)} title={o.is_active?'Deactivate':'Activate'}>{o.is_active?'⏸':'▶️'}</button>
+                            <button onClick={() => deleteOffer(o.id)} className="sd-del" title="Delete">🗑</button>
+                          </div>
+                        </div>
                       ))}
-                    </tbody>
-                  </table></div>
+                    </div>
+                  </>
                 )
               }
             </>
@@ -1068,6 +1113,27 @@ export default function ShopDashboard() {
           )}
         </div>
       </div>
+
+      {/* ── Mobile Bottom Navigation ── */}
+      <nav className="sd-bottom-nav">
+        {[
+          ['shops',     '🏪', 'My Shops'],
+          ['add-shop',  '➕', 'Add Shop'],
+          ['offers',    '🏷', 'Offers'],
+          ['add-offer', '✨', editingOffer ? 'Edit' : 'Add Offer'],
+          ['campaign',  '📣', 'Campaign'],
+        ].map(([t, icon, label]) => (
+          <button key={t}
+            className={`sd-btab${tab === t ? ' active' : ''}`}
+            onClick={() => { if (t !== 'add-offer') resetOffer(); setTab(t); }}>
+            <span className="sd-btab-icon">{icon}</span>
+            <span className="sd-btab-lbl">{label}</span>
+            {t === 'campaign' && waStatus.status === 'connected' && (
+              <span className="sd-btab-dot" />
+            )}
+          </button>
+        ))}
+      </nav>
     </div>
   );
 }
