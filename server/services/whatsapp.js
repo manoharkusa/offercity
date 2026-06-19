@@ -34,7 +34,17 @@ function mergeContacts(ownerId, incoming) {
 }
 
 async function connect(ownerId) {
-  if (['connecting', 'waiting_scan', 'connected'].includes(connStatus[ownerId])) return;
+  if (connStatus[ownerId] === 'connected') return;
+  if (connStatus[ownerId] === 'connecting') return;
+  // Only skip waiting_scan if we actually have a QR shown — not if stuck from pairing mode
+  if (connStatus[ownerId] === 'waiting_scan' && qrCodes[ownerId]) return;
+
+  // Close any leftover socket (e.g. from a pairing code attempt)
+  if (sockets[ownerId]) {
+    try { sockets[ownerId].ws?.close(); } catch {}
+    delete sockets[ownerId];
+    delete qrCodes[ownerId];
+  }
 
   const sessionDir = path.join(SESSION_BASE, String(ownerId));
   fs.mkdirSync(sessionDir, { recursive: true });
@@ -207,6 +217,14 @@ async function connectWithPairingCode(ownerId, phone) {
 
   const sessionDir = path.join(SESSION_BASE, String(ownerId));
   fs.mkdirSync(sessionDir, { recursive: true });
+
+  // Clear saved Baileys auth so it always generates a fresh QR — required for requestPairingCode
+  try {
+    for (const f of fs.readdirSync(sessionDir)) {
+      if (f !== 'contacts.json') fs.rmSync(path.join(sessionDir, f), { force: true, recursive: true });
+    }
+  } catch {}
+
   loadSavedContacts(ownerId);
 
   let mod;

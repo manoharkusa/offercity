@@ -971,48 +971,60 @@ a { text-decoration: none; color: inherit; }
     border-radius: 50%; border: 1.5px solid #fff;
   }
 
-  /* ── Campaign tab mobile fixes ─────── */
-  /* ── Campaign tab — full mobile overhaul ── */
+  /* ── Campaign tab — aggressive mobile size reduction ── */
 
-  /* Prevent horizontal overflow on the page */
-  .sd-pg { overflow-x: hidden; }
-  .dashboard, .panel { width: 100%; max-width: 100%; }
+  /* Prevent any horizontal overflow */
+  .sd-pg, .dashboard, .panel { overflow-x: hidden; box-sizing: border-box; }
+  .panel { padding: 10px 8px !important; }
+  .panel h2 { font-size: 14px !important; margin-bottom: 8px !important; padding-bottom: 6px !important; }
 
   /* Tighten all campaign cards */
   .wa-connect-card,
   .camp-launch-card,
   .camp-progress-card,
-  .camp-done-card    { padding: 12px 10px; border-radius: 12px; }
+  .camp-done-card { padding: 10px 8px !important; border-radius: 10px; margin-bottom: 10px; }
 
-  /* Status row: icon + text on one line, button below full-width */
-  .wa-status-row { flex-wrap: wrap; gap: 8px; align-items: center; }
-  .wa-connect-btn-wrap {
-    flex-basis: 100%;
-    margin-left: 0 !important;
-  }
-  .wa-btn-connect, .wa-btn-disconnect { width: 100%; text-align: center; font-size: 14px; }
-  .wa-icon { font-size: 26px; }
-  .wa-status-label { font-size: 14px; }
+  /* Status row: icon + text line 1, button line 2 */
+  .wa-status-row { flex-wrap: wrap; gap: 6px; align-items: center; }
+  .wa-icon { font-size: 22px !important; }
+  .wa-status-label { font-size: 13px !important; }
+  .wa-contacts-count { font-size: 11px !important; }
+  .wa-connect-btn-wrap { flex-basis: 100%; margin-left: 0 !important; }
+  .wa-btn-connect, .wa-btn-disconnect { width: 100%; font-size: 13px; padding: 8px; }
 
-  /* QR image smaller on mobile */
-  .wa-qr-img { width: 180px; height: 180px; }
+  /* QR image */
+  .wa-qr-wrap { padding: 8px !important; }
+  .wa-qr-img { width: 150px !important; height: 150px !important; }
+  .wa-qr-wrap p { font-size: 11px !important; }
 
-  /* Pairing input — stack vertically */
-  .wa-pair-input-row { flex-direction: column; }
-  .wa-pair-input-row input  { width: 100%; }
-  .wa-pair-input-row button { width: 100%; }
-  .wa-pair-code { font-size: 28px; letter-spacing: 5px; }
+  /* Pairing section */
+  .wa-pair-section { margin-top: 8px; padding-top: 8px; }
+  .wa-pair-divider span { font-size: 11px; }
+  .wa-pair-input-row { flex-direction: column; gap: 6px; }
+  .wa-pair-input-row input  { width: 100%; font-size: 13px !important; padding: 8px 10px !important; }
+  .wa-pair-input-row button { width: 100%; font-size: 13px !important; padding: 8px !important; }
+  .wa-pair-code-box { padding: 10px 8px !important; }
+  .wa-pair-code { font-size: 24px !important; letter-spacing: 4px !important; margin: 4px 0 8px !important; }
+  .wa-pair-timer { font-size: 12px !important; }
+  .wa-pair-steps { font-size: 11px !important; }
+  .wa-pair-regen-btn { font-size: 13px !important; padding: 8px !important; }
 
-  /* Campaign counts & eta */
-  .camp-counts { flex-wrap: wrap; gap: 8px; font-size: 13px; }
-  .camp-eta    { font-size: 11px; }
-  .camp-btn-pause, .camp-btn-resume, .camp-btn-stop { flex: 1; }
+  /* AI chatbot card */
+  .wa-ai-card { padding: 10px 8px !important; margin-bottom: 10px !important; border-radius: 10px !important; }
+  .wa-ai-top  { gap: 8px !important; }
+  .wa-ai-top > div:first-child { font-size: 26px !important; }
+  .wa-ai-top > div:nth-child(2) > div:first-child { font-size: 13px !important; }
+  .wa-ai-top > div:nth-child(2) > div:last-child  { font-size: 11px !important; }
 
-  /* Recipient info smaller */
-  .camp-recipient-info { font-size: 11px; line-height: 1.5; }
-
-  /* Panel h2 tighter */
-  .panel h2 { font-size: 17px; margin-bottom: 12px; }
+  /* Campaign launch/progress */
+  .camp-counts { flex-wrap: wrap; gap: 6px; font-size: 12px; }
+  .camp-eta    { font-size: 10px !important; }
+  .camp-recipient-info { font-size: 11px !important; padding: 6px 8px !important; margin-bottom: 8px !important; }
+  .camp-hint { padding: 8px !important; font-size: 11px !important; }
+  .camp-btn-pause, .camp-btn-resume, .camp-btn-stop { flex: 1; font-size: 12px; padding: 7px 8px; }
+  .camp-launch-card textarea { font-size: 13px !important; padding: 8px !important; }
+  .camp-launch-card button[type="submit"],
+  .camp-launch-card .send-btn { font-size: 13px !important; padding: 10px !important; }
 }
 
 /* ══════════════════════════════════════════

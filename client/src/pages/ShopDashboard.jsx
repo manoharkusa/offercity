@@ -965,12 +965,12 @@ export default function ShopDashboard() {
 
               {/* ── AI Chatbot Card ── */}
               {waStatus.status === 'connected' && (
-                <div style={{
+                <div className="wa-ai-card" style={{
                   background: waStatus.chatbot ? 'linear-gradient(135deg,#e8f5e9,#f1f8e9)' : '#fafafa',
                   border: `2px solid ${waStatus.chatbot ? '#66bb6a' : '#e0e0e0'}`,
                   borderRadius: 14, padding: '18px 20px', marginBottom: 20
                 }}>
-                  <div style={{ display:'flex', alignItems:'center', gap:14 }}>
+                  <div className="wa-ai-top" style={{ display:'flex', alignItems:'center', gap:14 }}>
                     <div style={{ fontSize: 36 }}>🤖</div>
                     <div style={{ flex: 1 }}>
                       <div style={{ fontWeight: 700, fontSize: 16, color: waStatus.chatbot ? '#2e7d32' : '#333' }}>
