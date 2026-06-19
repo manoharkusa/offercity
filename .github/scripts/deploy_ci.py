@@ -14,8 +14,8 @@ WEB          = f"{HOME_REMOTE}/public_html"
 DIST_REMOTE  = f"{WEB}/client/dist"
 APP          = f"{WEB}/server"
 
-# ── Load private key from file (no passphrase — stripped in workflow) ─────────
-key = paramiko.RSAKey.from_private_key_file(KEY_PATH)
+# ── Load private key from file (Ed25519, no passphrase) ───────────────────────
+key = paramiko.Ed25519Key.from_private_key_file(KEY_PATH)
 
 # ── Connect ────────────────────────────────────────────────────────────────────
 print(f"Connecting to {HOST}...")

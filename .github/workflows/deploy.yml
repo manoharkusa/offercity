@@ -25,14 +25,13 @@ jobs:
       - name: Build React app
         run: cd client && npm run build
 
-      - name: Prepare SSH key (strip passphrase for CI use)
-        env:
-          SSH_KEY:        ${{ secrets.SSH_PRIVATE_KEY }}
-          SSH_PASSPHRASE: ${{ secrets.SSH_PASSPHRASE }}
+      - name: Write SSH key
         run: |
-          printf '%s' "$SSH_KEY" > /tmp/id_rsa
-          chmod 600 /tmp/id_rsa
-          ssh-keygen -p -N "" -P "$SSH_PASSPHRASE" -f /tmp/id_rsa
+          mkdir -p ~/.ssh
+          printf '%s\n' "$SSH_CI_KEY" > ~/.ssh/ci_key
+          chmod 600 ~/.ssh/ci_key
+        env:
+          SSH_CI_KEY: ${{ secrets.SSH_CI_KEY }}
 
       - name: Install paramiko
         run: pip install paramiko
@@ -41,5 +40,5 @@ jobs:
         env:
           SSH_HOST:     ${{ secrets.SSH_HOST }}
           SSH_USER:     ${{ secrets.SSH_USER }}
-          SSH_KEY_PATH: /tmp/id_rsa
+          SSH_KEY_PATH: /root/.ssh/ci_key
         run: python .github/scripts/deploy_ci.py
