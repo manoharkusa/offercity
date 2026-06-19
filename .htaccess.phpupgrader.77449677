@@ -1,0 +1,14 @@
+##Start Redirection Code## 
+
+Header always set Content-Security-Policy "upgrade-insecure-requests;"
+RewriteEngine On
+
+# Redirect to login.html if root URL is accessed and user not logged in
+RewriteCond %{REQUEST_URI} ^/$
+RewriteCond %{QUERY_STRING} !city=
+RewriteCond %{HTTP_COOKIE} !loggedin
+RewriteRule ^$ /login.html [R=302,L]
+
+RewriteCond %{HTTPS} off
+RewriteRule ^(.*)$ https://%{HTTP_HOST}%{REQUEST_URI} [L,R=301]
+##End Redirection Code

@@ -1,0 +1,77 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>OffersCity Login</title>
+  <style>
+    body {
+      font-family: Arial, sans-serif;
+      background-color: #fffaf0;
+      margin: 0;
+      padding: 0;
+    }
+
+    .container {
+      max-width: 400px;
+      margin: 60px auto;
+      padding: 20px;
+      background: #fff;
+      border: 2px solid #ffd699;
+      border-radius: 10px;
+      box-shadow: 0 0 10px rgba(255,165,0,0.2);
+    }
+
+    h2 {
+      text-align: center;
+      color: #ff8c00;
+    }
+
+    input, select, button {
+      width: 100%;
+      padding: 12px;
+      margin: 10px 0;
+      box-sizing: border-box;
+      border-radius: 5px;
+      border: 1px solid #ccc;
+      font-size: 16px;
+    }
+
+    button {
+      background-color: #ffa726;
+      color: white;
+      border: none;
+      cursor: pointer;
+    }
+
+    button:hover {
+      background-color: #fb8c00;
+    }
+
+    @media (max-width: 500px) {
+      .container {
+        margin: 20px;
+        padding: 15px;
+      }
+    }
+  </style>
+</head>
+<body>
+
+  <div class="container">
+    <h2>Login to OffersCity</h2>
+    <form method="POST" action="send_otp.php">
+      <input type="text" name="mobile" placeholder="Enter Mobile Number" required>
+      <input type="email" name="email" placeholder="Enter Email" required>
+      <select name="city" required>
+        <option value="">Select Your City</option>
+        <option value="Sirsilla">Sirsilla</option>
+        <option value="Karimnagar">Karimnagar</option>
+        <option value="Hyderabad">Hyderabad</option>
+      </select>
+      <button type="submit">Login</button>
+    </form>
+  </div>
+
+</body>
+</html>

@@ -1,0 +1,42 @@
+# Dependencies
+node_modules/
+client/node_modules/
+server/node_modules/
+
+# Build output
+client/dist/
+
+# Environment / secrets
+.env
+server/.env
+server/.env.production
+client/.env
+*.env
+
+# Uploaded files (large binaries)
+uploads/
+server/uploads/
+
+# WhatsApp session files (contain auth keys)
+server/baileys_auth/
+
+# Logs
+*.log
+error_log
+server/node.log
+
+# Claude AI session data
+.claude/
+
+# OS files
+.DS_Store
+Thumbs.db
+desktop.ini
+
+# Editor
+.vscode/
+*.swp
+
+# Misc
+*.zip
+node_port.txt

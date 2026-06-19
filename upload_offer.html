@@ -1,0 +1,14 @@
+<!DOCTYPE html>
+<html>
+<head><title>Upload Offer</title></head>
+<body>
+  <h2>Upload New Offer</h2>
+  <form action="upload_offer.php" method="POST" enctype="multipart/form-data">
+    City Name: <input type="text" name="city_name" required><br><br>
+    Offer Description: <textarea name="description" required></textarea><br><br>
+    Scroll Days: <input type="number" name="display_days" value="7"><br><br>
+    Offer Image: <input type="file" name="offer_image" required><br><br>
+    <input type="submit" value="Upload Offer">
+  </form>
+</body>
+</html>

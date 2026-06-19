@@ -1,0 +1,118 @@
+/* Make the overlay cover the entire screen with a semi-transparent background */
+#popup-overlay {
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  background: rgba(0, 0, 0, 0.5);
+  display: none;  /* Hidden by default */
+  z-index: 9999;  /* Ensure overlay is on top of other content */
+}
+
+/* Container for the popup (white box) */
+#popup-container {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  background: #fff;
+  width: 300px;
+  padding: 20px;
+  border-radius: 5px;
+  box-shadow: 0 0 10px rgba(0, 0, 0, 0.3);
+}
+
+/* Heading inside the popup */
+#popup-container h2 {
+  margin-top: 0;
+  font-size: 1.2em;
+  text-align: center;
+}
+
+/* Form labels as block to stack inputs */
+#popup-container label {
+  display: block;
+  margin: 0.5em 0;
+  font-weight: bold;
+}
+
+/* Form inputs styling */
+#popup-container input {
+  width: 100%;
+  padding: 0.4em;
+  margin-top: 0.2em;
+  box-sizing: border-box;
+}
+
+/* Submit button styling */
+#popup-container button[type="submit"] {
+  display: block;
+  width: 100%;
+  padding: 0.6em;
+  margin-top: 0.8em;
+  font-size: 1em;
+  cursor: pointer;
+}
+
+/* Close "X" button styling */
+#popup-close {
+  position: absolute;
+  top: 5px;
+  right: 10px;
+  cursor: pointer;
+  font-size: 18px;
+  font-weight: bold;
+  background: #ccc;
+  color: #000;
+  border: none;
+  border-radius: 50%;
+  width: 24px;
+  height: 24px;
+  text-align: center;
+  line-height: 22px;
+}
+/* Responsive layout tweaks */
+@media (max-width: 768px) {
+  header, nav, .user-info {
+    flex-direction: column;
+    align-items: flex-start;
+  }
+
+  header h1 {
+    font-size: 18px;
+  }
+
+  nav a {
+    display: block;
+    margin: 8px 0;
+  }
+
+  .user-info {
+    font-size: 13px;
+    margin-top: 10px;
+  }
+
+  main {
+    padding: 10px;
+  }
+
+  .city-selector {
+    font-size: 16px;
+  }
+
+  .marquee-content span {
+    font-size: 14px;
+  }
+
+  footer {
+    font-size: 11px;
+  }
+
+  input, select, button {
+    width: 100%;
+    box-sizing: border-box;
+    padding: 12px;
+    margin-bottom: 10px;
+  }
+}

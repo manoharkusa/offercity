@@ -1,0 +1,10 @@
+PassengerEnabled on
+PassengerAppRoot /home1/a1751tyi/public_html/server
+PassengerAppType node
+PassengerStartupFile server.js
+
+<IfModule mod_rewrite.c>
+    RewriteEngine On
+    RewriteCond %{REQUEST_FILENAME} !-f
+    RewriteRule ^(.*)$ / [L]
+</IfModule>
