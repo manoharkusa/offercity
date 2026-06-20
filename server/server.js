@@ -47,7 +47,7 @@ app.use('/api/leads',     require('./routes/leads'));
 app.use('/api/campaigns', require('./routes/campaigns'));
 app.use('/api/push',      require('./routes/push'));
 
-app.get('/api/health', (req, res) => res.json({ status: 'OfferCity API running', port: process.env.PORT || 5000 }));
+app.get('/api/health', (req, res) => res.json({ status: 'OfferCity API running', port: process.env.PORT || 5000, v: '20260620-B' }));
 
 // Last 100 log lines — useful for diagnosing production crashes
 app.get('/api/logs', (req, res) => {
