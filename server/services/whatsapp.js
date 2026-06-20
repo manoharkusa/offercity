@@ -9,6 +9,7 @@ const sockets       = {};   // ownerId → sock
 const connStatus    = {};   // ownerId → string
 const qrCodes       = {};   // ownerId → { dataUrl, ts }
 const contactMap    = {};   // ownerId → [{jid, phone, name}]
+const lidToPhone    = {};   // ownerId → { lidJid → phoneJid } — resolves WA internal IDs
 const activeCamps   = {};   // campaignId → { running: bool }
 const keepAlive     = {};   // ownerId → intervalId
 const reconnectTry  = {};   // ownerId → attempt count (for backoff)
@@ -69,14 +70,37 @@ function persistContacts(ownerId) {
 
 function mergeContacts(ownerId, incoming) {
   if (!contactMap[ownerId]) contactMap[ownerId] = [];
+  if (!lidToPhone[ownerId]) lidToPhone[ownerId] = {};
   for (const c of incoming) {
-    if (!c.id?.endsWith('@s.whatsapp.net')) continue;
-    const entry = { jid: c.id, phone: c.id.replace('@s.whatsapp.net', ''), name: c.name || c.pushName || '' };
+    if (!c.id) continue;
+    // pn = actual phone number provided by newer Baileys for LID-based contacts
+    if (c.pn) {
+      const phone = String(c.pn).replace(/\D/g, '');
+      const lid   = c.id.split('@')[0];
+      if (phone) lidToPhone[ownerId][lid] = phone;
+    }
+    if (!c.id.endsWith('@s.whatsapp.net')) continue;
+    const phone = (c.pn ? String(c.pn).replace(/\D/g, '') : null) || c.id.replace('@s.whatsapp.net', '');
+    const entry = { jid: c.id, phone, name: c.name || c.notify || c.pushName || '' };
     const idx = contactMap[ownerId].findIndex(x => x.jid === c.id);
     if (idx >= 0) Object.assign(contactMap[ownerId][idx], entry);
     else contactMap[ownerId].push(entry);
   }
   persistContacts(ownerId);
+}
+
+// Resolve a LID JID (WhatsApp internal ID) to the real phone JID for reliable delivery
+function resolvePhoneJid(ownerId, jid) {
+  if (!jid) return jid;
+  const user = jid.split('@')[0];
+  if (/^\d{7,15}$/.test(user)) return jid; // already a phone number
+  // Look up LID → phone from contacts sync
+  const phone = lidToPhone[ownerId]?.[user];
+  if (phone) { console.log(`[WA] Resolved LID ${user} → ${phone}`); return `${phone}@s.whatsapp.net`; }
+  // Fallback: scan contactMap for a stored pn
+  const contact = (contactMap[ownerId] || []).find(c => c.jid === jid);
+  if (contact?.phone && /^\d{7,15}$/.test(contact.phone)) return `${contact.phone}@s.whatsapp.net`;
+  return jid; // unknown LID — send anyway, may or may not deliver
 }
 
 async function connect(ownerId) {
@@ -211,12 +235,13 @@ async function connect(ownerId) {
           || msg.message?.extendedTextMessage?.text
           || msg.message?.imageMessage?.caption
           || '';
-        console.log(`[WA MSG] jid=${remoteJid} name="${msg.pushName || ''}" age=${Math.round(age)}s text="${text.slice(0, 40)}"`);
+        const replyJid = resolvePhoneJid(ownerId, remoteJid);
+        console.log(`[WA MSG] jid=${remoteJid} replyJid=${replyJid} name="${msg.pushName || ''}" age=${Math.round(age)}s text="${text.slice(0, 40)}"`);
         if (age > 300) continue;
         if (!text.trim()) continue;
         await new Promise(r => setTimeout(r, 1000 + Math.random() * 1000));
-        const reply = await ai.handleIncoming(ownerId, remoteJid, text, msg.pushName || '');
-        if (reply) await sock.sendMessage(remoteJid, { text: reply });
+        const reply = await ai.handleIncoming(ownerId, replyJid, text, msg.pushName || '');
+        if (reply) await sock.sendMessage(replyJid, { text: reply });
       } catch (e) { console.error('[WA] message handler error:', e.message); }
     }
   });
