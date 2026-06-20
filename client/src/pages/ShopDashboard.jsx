@@ -80,6 +80,7 @@ export default function ShopDashboard() {
   const [campOfferId, setCampOfferId]     = useState('');
   const [campLoading, setCampLoading]     = useState(false);
   const [campOffers, setCampOffers]       = useState([]);
+  const [campShopId, setCampShopId]       = useState('');
   const [sendMode, setSendMode]           = useState('all');
   const [allContacts, setAllContacts]     = useState([]);
   const [selectedPhones, setSelectedPhones] = useState(new Set());
@@ -1026,7 +1027,7 @@ export default function ShopDashboard() {
               </div>
 
               {/* ══ CAMPAIGN HUB ══ */}
-              {waStatus.status === 'connected' && (
+              {(waStatus.status === 'connected' || waStatus.contacts > 0) && (
                 <div className="camp-hub">
 
                   {/* ── LIVE: sending ── */}
@@ -1071,7 +1072,7 @@ export default function ShopDashboard() {
                   )}
 
                   {/* ── SETUP ── */}
-                  {(!activeCampaign || ['completed','stopped'].includes(activeCampaign.status)) && (
+                  {!activeCampaign && (
                     <div className="camp-setup">
 
                       {/* Row: Contacts */}
@@ -1112,7 +1113,23 @@ export default function ShopDashboard() {
                         </div>
                       </div>
 
-                      {/* Row: Offer dropdown */}
+                      {/* Row: Shop selector */}
+                      <div className="camp-row camp-row-col">
+                        <span className="camp-row-icon">🏪</span>
+                        <div className="camp-row-body">
+                          <div className="camp-row-title">Select Shop</div>
+                        </div>
+                        <select className="camp-offer-select" value={campShopId} onChange={e => {
+                          setCampShopId(e.target.value);
+                          setCampOfferId('');
+                          setCampMsg('');
+                        }}>
+                          <option value="">— All shops —</option>
+                          {shops.map(s => <option key={s.id} value={String(s.id)}>{s.name}</option>)}
+                        </select>
+                      </div>
+
+                      {/* Row: Offer dropdown (filtered by shop) */}
                       <div className="camp-row camp-row-col">
                         <span className="camp-row-icon">🏷️</span>
                         <div className="camp-row-body">
@@ -1126,9 +1143,11 @@ export default function ShopDashboard() {
                           } else { setCampMsg(''); }
                         }}>
                           <option value="">— Custom message —</option>
-                          {campOffers.map(o => (
-                            <option key={o.id} value={o.id}>{o.shop_name} · {o.title} — {o.discount}% OFF</option>
-                          ))}
+                          {campOffers
+                            .filter(o => !campShopId || String(o.shop_id) === campShopId)
+                            .map(o => (
+                              <option key={o.id} value={o.id}>{o.title} — {o.discount}% OFF</option>
+                            ))}
                         </select>
                       </div>
 
@@ -1216,7 +1235,7 @@ export default function ShopDashboard() {
                 </div>
               )}
 
-              {waStatus.status !== 'connected' && waStatus.status !== 'waiting_scan' && (
+              {waStatus.status !== 'connected' && waStatus.contacts === 0 && (
                 <div className="camp-hint">
                   <p>Connect your WhatsApp above to broadcast offers to your customers.</p>
                   <p style={{ color:'#aaa', fontSize:13 }}>Messages are sent at 2–3 per minute to stay safe.</p>
