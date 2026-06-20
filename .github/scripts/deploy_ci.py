@@ -126,7 +126,10 @@ if groq_key:
 else:
     print("=== GROQ_API_KEY secret not set — skipping ===")
 
-# ── 5. Restart app ────────────────────────────────────────────────────────────
+# ── 5. Verify upload & restart ────────────────────────────────────────────────
+print("=== Verifying uploaded server.js ===")
+sh(f"grep -c 'deploy-restart' {APP}/server.js && echo 'server.js has new endpoint' || echo 'server.js NOT updated'", "verify")
+
 # Call /api/deploy-restart on the running server — it calls process.exit(0)
 # and Passenger immediately spawns a fresh worker from the new files on disk.
 DEPLOY_SECRET = os.environ.get("DEPLOY_SECRET", "offerscity-deploy-2025")
@@ -134,7 +137,7 @@ print("=== Restarting via /api/deploy-restart ===")
 sh(
     f"curl -s -X POST https://offerscity.co.in/api/deploy-restart "
     f"-H 'x-deploy-secret: {DEPLOY_SECRET}' "
-    f"-H 'Content-Type: application/json' || echo 'restart endpoint not yet available'",
+    f"-H 'Content-Type: application/json' || echo 'restart endpoint not yet available (manual cPanel restart needed)'",
     "deploy-restart"
 )
 time.sleep(25)
