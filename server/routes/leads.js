@@ -27,25 +27,29 @@ function pushToSheets(params) {
   } catch (_) {}
 }
 
-// POST /api/leads
+// POST /api/leads  (name and email are both optional for guest captures)
 router.post('/', async (req, res) => {
   const { name, phone, email } = req.body;
-  if (!name) return res.status(400).json({ message: 'Name is required' });
+  if (!name && !email) return res.status(400).json({ message: 'Name or email required' });
+
+  const safeName  = name?.trim()  || 'Guest';
+  const safePhone = phone?.trim() || '';
+  const safeEmail = email?.trim() || null;
 
   try {
     const pool = getPool();
     await pool.query(
       'INSERT INTO leads (name, phone, email) VALUES (?,?,?)',
-      [name.trim(), phone?.trim() || '', email?.trim() || null]
+      [safeName, safePhone, safeEmail]
     );
   } catch (err) {
     console.error('Lead DB error:', err.message);
   }
 
   pushToSheets({
-    name: name.trim(),
-    phone: phone?.trim() || '',
-    email: email?.trim() || '',
+    name: safeName,
+    phone: safePhone,
+    email: safeEmail || '',
     source: 'OfferCity',
     time: new Date().toLocaleString('en-IN')
   });

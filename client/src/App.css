@@ -1658,6 +1658,18 @@ a { text-decoration: none; color: inherit; }
   margin-bottom: 14px;
 }
 
+.nudge-email {
+  width: 100%;
+  padding: 11px 14px;
+  border: 1.5px solid #e0e0e0;
+  border-radius: 10px;
+  font-size: 14px;
+  margin-bottom: 12px;
+  outline: none;
+  transition: border-color .18s;
+}
+.nudge-email:focus { border-color: #e65100; }
+
 .nudge-cookie {
   font-size: 12px;
   color: #aaa;

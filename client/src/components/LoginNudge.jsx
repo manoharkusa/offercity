@@ -1,83 +1,81 @@
 import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
+import api from '../services/api';
 
 const COOKIE_KEY  = 'oc_cookies_accepted';
-const NUDGE_DELAY = 2 * 60 * 1000; // 2 minutes
-
-export function useCookiesAccepted() {
-  return localStorage.getItem(COOKIE_KEY) === 'true';
-}
+const NUDGE_DELAY = 15 * 1000; // 15 seconds after page load
 
 export function acceptCookies() {
   localStorage.setItem(COOKIE_KEY, 'true');
 }
 
+async function saveLead(email) {
+  if (!email || !email.includes('@')) return;
+  try {
+    await api.post('/leads', { name: 'Guest', email: email.trim(), phone: '' });
+  } catch (_) {}
+}
+
 export default function LoginNudge() {
-  const { user } = useAuth();
+  const { user }  = useAuth();
   const navigate  = useNavigate();
-  const [show, setShow] = useState(false);
+  const [show, setShow]   = useState(false);
+  const [email, setEmail] = useState('');
 
   useEffect(() => {
-    // Already accepted or logged in → mark accepted, never show
-    if (localStorage.getItem(COOKIE_KEY) === 'true' || user) {
-      acceptCookies();
-      return;
-    }
+    // If already logged in — accept cookies silently, never show modal
+    if (user) { acceptCookies(); return; }
 
-    const timer = setTimeout(() => setShow(true), NUDGE_DELAY);
-    return () => clearTimeout(timer);
+    // Already accepted (enrolled or skipped before) — skip modal
+    if (localStorage.getItem(COOKIE_KEY) === 'true') return;
+
+    const t = setTimeout(() => setShow(true), NUDGE_DELAY);
+    return () => clearTimeout(t);
   }, [user]);
 
-  // When user logs in mid-session, accept cookies and hide nudge
+  // If user logs in while modal is open — close it
   useEffect(() => {
-    if (user) {
-      acceptCookies();
-      setShow(false);
-    }
+    if (user) { acceptCookies(); setShow(false); }
   }, [user]);
 
-  const handleSkip = () => {
+  const dismiss = async (goLogin = false) => {
+    await saveLead(email);
     acceptCookies();
     setShow(false);
-  };
-
-  const handleLogin = () => {
-    acceptCookies();
-    setShow(false);
-    navigate('/login');
+    if (goLogin) navigate('/login');
   };
 
   if (!show) return null;
 
   return (
     <>
-      {/* Backdrop */}
-      <div className="nudge-backdrop" onClick={handleSkip} />
+      <div className="nudge-backdrop" onClick={() => dismiss(false)} />
 
-      {/* Modal */}
       <div className="nudge-modal" role="dialog" aria-modal="true" aria-labelledby="nudge-title">
-        {/* Close */}
-        <button className="nudge-close" onClick={handleSkip} aria-label="Close">✕</button>
+        <button className="nudge-close" onClick={() => dismiss(false)} aria-label="Close">✕</button>
 
-        {/* Icon */}
         <div className="nudge-icon">🏪</div>
-
-        {/* Text */}
         <h2 className="nudge-title" id="nudge-title">Get the Best Deals Near You!</h2>
         <p className="nudge-body">
-          Sign in to save offers, get personalized deals, and never miss a discount near you.
+          Sign in to save offers and get personalised deals — or drop your email and we'll keep you posted.
         </p>
 
-        {/* Cookie note */}
-        <p className="nudge-cookie">
-          🍪 This site uses cookies to improve your experience.
-        </p>
+        {/* Email capture */}
+        <input
+          className="nudge-email"
+          type="email"
+          placeholder="Your email (optional)"
+          value={email}
+          onChange={e => setEmail(e.target.value)}
+          autoComplete="email"
+        />
 
-        {/* Actions */}
+        <p className="nudge-cookie">🍪 This site uses cookies to personalise your experience.</p>
+
         <div className="nudge-actions">
-          <button className="nudge-btn-login" onClick={handleLogin}>Login / Register</button>
-          <button className="nudge-btn-skip"  onClick={handleSkip}>Skip</button>
+          <button className="nudge-btn-login" onClick={() => dismiss(true)}>Login / Register</button>
+          <button className="nudge-btn-skip"  onClick={() => dismiss(false)}>Skip</button>
         </div>
       </div>
     </>

@@ -2,7 +2,6 @@ import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
 import { lazy, Suspense } from 'react';
 import { AuthProvider, useAuth } from './context/AuthContext';
 import Navbar from './components/Navbar';
-import LeadCapture from './components/LeadCapture';
 import LoginNudge from './components/LoginNudge';
 import Home from './pages/Home';
 import Login from './pages/Login';
@@ -37,7 +36,6 @@ export default function App() {
     <AuthProvider>
       <BrowserRouter>
         <Navbar />
-        <LeadCapture />
         <LoginNudge />
         <Suspense fallback={<PageLoader />}>
           <Routes>
