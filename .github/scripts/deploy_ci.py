@@ -116,7 +116,16 @@ for local, remote in server_files:
 sftp.close()
 print()
 
-# ── 4. Restart Node ────────────────────────────────────────────────────────────
+# ── 4. Inject GROQ_API_KEY into production .env ───────────────────────────────
+groq_key = os.environ.get("GROQ_API_KEY", "").strip()
+if groq_key:
+    print("=== Injecting GROQ_API_KEY into .env ===")
+    env_path = f"{HOME_REMOTE}/.env"
+    sh(f"""if grep -q '^GROQ_API_KEY=' {env_path} 2>/dev/null; then sed -i 's|^GROQ_API_KEY=.*|GROQ_API_KEY={groq_key}|' {env_path} && echo "Updated"; else echo "GROQ_API_KEY={groq_key}" >> {env_path} && echo "Added"; fi""", "update .env")
+else:
+    print("=== GROQ_API_KEY secret not set — skipping ===")
+
+# ── 5. Restart Node ────────────────────────────────────────────────────────────
 print("=== Restarting Node.js ===")
 sh("pkill -f 'node.*server.js' 2>/dev/null || true; sleep 2", "kill old node")
 sh(f"source ~/.nvm/nvm.sh && nvm use 16 && nohup bash {HOME_REMOTE}/start_node.sh >> {HOME_REMOTE}/node.log 2>&1 &",

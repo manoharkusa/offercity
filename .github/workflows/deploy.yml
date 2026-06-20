@@ -40,4 +40,5 @@ jobs:
           SSH_HOST:     ${{ secrets.SSH_HOST }}
           SSH_USER:     ${{ secrets.SSH_USER }}
           SSH_KEY_PATH: /tmp/ci_key
+          GROQ_API_KEY: ${{ secrets.GROQ_API_KEY }}
         run: python .github/scripts/deploy_ci.py
