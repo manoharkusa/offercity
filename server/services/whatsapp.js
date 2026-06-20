@@ -10,6 +10,7 @@ const connStatus    = {};   // ownerId → string
 const qrCodes       = {};   // ownerId → { dataUrl, ts }
 const contactMap    = {};   // ownerId → [{jid, phone, name}]
 const lidToPhone    = {};   // ownerId → { lidJid → phoneJid } — resolves WA internal IDs
+const waStores      = {};   // ownerId → Baileys makeInMemoryStore instance
 const activeCamps   = {};   // campaignId → { running: bool }
 const keepAlive     = {};   // ownerId → intervalId
 const reconnectTry  = {};   // ownerId → attempt count (for backoff)
@@ -101,18 +102,25 @@ function mergeContacts(ownerId, incoming) {
   persistContacts(ownerId);
 }
 
-// Resolve a LID JID (WhatsApp internal ID) to the real phone JID for reliable delivery
+// Resolve a LID JID (WhatsApp internal ID) to the real phone JID for reliable delivery.
+// LIDs are 14-15 digit internal WhatsApp identifiers; real phones are ≤13 digits in E.164.
 function resolvePhoneJid(ownerId, jid) {
   if (!jid) return jid;
   const user = jid.split('@')[0];
-  if (/^\d{7,15}$/.test(user)) return jid; // already a phone number
-  // Look up LID → phone from contacts sync
+  // Real phone: all digits, ≤13 chars (E.164 max minus 2). LIDs are typically 14-15 digits.
+  if (/^\d+$/.test(user) && user.length <= 13) return jid;
+  // Try Baileys in-memory store (most reliable — populated by contacts.set / contacts.upsert)
+  const storeC = waStores[ownerId]?.contacts?.[jid];
+  const pn = storeC?.pn || storeC?.phoneNumber;
+  if (pn) { const p = String(pn).replace(/\D/g,''); if (p) { console.log(`[WA] LID ${user} → ${p} (store)`); return `${p}@s.whatsapp.net`; } }
+  // Try lidToPhone built from contacts.set event (pn / lid fields)
   const phone = lidToPhone[ownerId]?.[user];
-  if (phone) { console.log(`[WA] Resolved LID ${user} → ${phone}`); return `${phone}@s.whatsapp.net`; }
-  // Fallback: scan contactMap for a stored pn
+  if (phone) { console.log(`[WA] LID ${user} → ${phone} (map)`); return `${phone}@s.whatsapp.net`; }
+  // Last resort: scan contactMap
   const contact = (contactMap[ownerId] || []).find(c => c.jid === jid);
-  if (contact?.phone && /^\d{7,15}$/.test(contact.phone)) return `${contact.phone}@s.whatsapp.net`;
-  return jid; // unknown LID — send anyway, may or may not deliver
+  if (contact?.phone && contact.phone.length <= 13) return `${contact.phone}@s.whatsapp.net`;
+  console.log(`[WA] LID ${user} unresolved — sending to original JID`);
+  return jid;
 }
 
 async function connect(ownerId) {
@@ -176,6 +184,15 @@ async function connect(ownerId) {
 
   sockets[ownerId] = sock;
   sock.ev.on('creds.update', saveCreds);
+
+  // Bind Baileys in-memory store — tracks contacts with LID→phone mapping
+  if (mod.makeInMemoryStore) {
+    try {
+      if (!waStores[ownerId]) waStores[ownerId] = mod.makeInMemoryStore({});
+      waStores[ownerId].bind(sock.ev);
+      console.log(`[WA] store bound for owner ${ownerId}`);
+    } catch (e) { console.log(`[WA] store unavailable: ${e.message}`); }
+  }
 
   sock.ev.on('connection.update', async ({ qr, connection, lastDisconnect }) => {
     if (qr && QRCode) {
