@@ -133,8 +133,10 @@ sh(
     f"FILE={APP}/server.js; "
     f"PID=$(cat {HOME_REMOTE}/node.pid 2>/dev/null); "
     f"CMD=$(cat /proc/$PID/cmdline 2>/dev/null | tr '\\0' ' '); "
+    f"ALLNODE=$(pgrep -a node 2>/dev/null || ps aux 2>/dev/null | grep '[n]ode' | awk '{{print $2,$11,$12}}'); "
     f"HAS=$(grep -c 'deploy-restart' $FILE 2>/dev/null || echo 0); "
-    f"echo \"[DEPLOY CHECK] pid=$PID file=$FILE has_endpoint=$HAS cmd=$CMD\" >> {HOME_REMOTE}/node.log",
+    f"echo \"[DEPLOY CHECK] pid=$PID file=$FILE has_endpoint=$HAS cmd=$CMD\" >> {HOME_REMOTE}/node.log; "
+    f"echo \"[DEPLOY PROCS] $ALLNODE\" >> {HOME_REMOTE}/node.log",
     "verify"
 )
 
