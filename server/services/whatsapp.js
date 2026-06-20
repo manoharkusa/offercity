@@ -275,7 +275,6 @@ async function connect(ownerId) {
 
   const sock = makeWASocket({
     auth: state,
-    logger: makeLidLogger(ownerId),
     printQRInTerminal: false,
     browser: ['OfferCity', 'Chrome', '120.0'],
     syncFullHistory:              false,
