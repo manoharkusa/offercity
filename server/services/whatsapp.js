@@ -249,6 +249,12 @@ async function connect(ownerId) {
           || msg.message?.imageMessage?.caption
           || '';
         const replyJid = resolvePhoneJid(ownerId, remoteJid);
+        // One-time: dump full msg keys so we can find sender_pn / participant_pn
+        if (text.trim() && !connect._msgLogged) {
+          connect._msgLogged = true;
+          console.log(`[WA MSGKEYS] ${Object.keys(msg).join(',')}`);
+          console.log(`[WA MSGKEY2] key=${JSON.stringify(msg.key)} verifiedBiz=${msg.verifiedBizName || ''}`);
+        }
         console.log(`[WA MSG] jid=${remoteJid} replyJid=${replyJid} name="${msg.pushName || ''}" age=${Math.round(age)}s text="${text.slice(0, 40)}"`);
         if (age > 300) continue;
         if (!text.trim()) continue;
