@@ -55,6 +55,21 @@ router.get('/', async (req, res) => {
   }
 });
 
+// GET /api/offers/mine  — all active offers for the logged-in owner (all shops)
+router.get('/mine', protect, requireRole('shop_owner', 'admin'), async (req, res) => {
+  try {
+    const pool = getPool();
+    const [rows] = await pool.query(
+      `SELECT o.*, s.name AS shop_name FROM offers o
+       JOIN shops s ON s.id = o.shop_id
+       WHERE s.owner_id = ? AND o.is_active = 1
+       ORDER BY s.name, o.title`,
+      [req.user.id]
+    );
+    res.json(rows);
+  } catch (err) { res.status(500).json({ message: err.message }); }
+});
+
 // GET /api/offers/:id
 router.get('/:id', async (req, res) => {
   try {

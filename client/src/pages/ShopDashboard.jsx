@@ -79,6 +79,7 @@ export default function ShopDashboard() {
   const [campMsg, setCampMsg]             = useState('');
   const [campOfferId, setCampOfferId]     = useState('');
   const [campLoading, setCampLoading]     = useState(false);
+  const [campOffers, setCampOffers]       = useState([]);
   const [sendMode, setSendMode]           = useState('all');
   const [allContacts, setAllContacts]     = useState([]);
   const [selectedPhones, setSelectedPhones] = useState(new Set());
@@ -112,6 +113,13 @@ export default function ShopDashboard() {
   useEffect(() => {
     if (selectedShop) api.get(`/offers/shop/${selectedShop}`).then(r => setOffers(r.data)).catch(() => {});
   }, [selectedShop]);
+
+  // Load all offers from all shops for the campaign offer dropdown
+  useEffect(() => {
+    if (tab === 'campaign') {
+      api.get('/offers/mine').then(r => setCampOffers(r.data)).catch(() => {});
+    }
+  }, [tab]);
 
   // Auto-select first shop and always refresh offers when tab opens
   useEffect(() => {
@@ -949,8 +957,8 @@ export default function ShopDashboard() {
                   </div>
                 )}
 
-                {/* Pairing code section — always visible when not connected */}
-                {waStatus.status !== 'connected' && (
+                {/* Pairing code section — hide when connected or auto-reconnecting */}
+                {!['connected','reconnecting'].includes(waStatus.status) && (
                   <div className="wa-pair-section">
 
                     {/* Input — shown when no active code and not loading */}
@@ -1113,13 +1121,13 @@ export default function ShopDashboard() {
                         <select className="camp-offer-select" value={campOfferId} onChange={e => {
                           setCampOfferId(e.target.value);
                           if (e.target.value) {
-                            const o = offers.find(x => String(x.id) === e.target.value);
+                            const o = campOffers.find(x => String(x.id) === e.target.value);
                             if (o) setCampMsg(buildWAMessage(o));
                           } else { setCampMsg(''); }
                         }}>
                           <option value="">— Custom message —</option>
-                          {offers.map(o => (
-                            <option key={o.id} value={o.id}>{o.title} — {o.discount}% OFF</option>
+                          {campOffers.map(o => (
+                            <option key={o.id} value={o.id}>{o.shop_name} · {o.title} — {o.discount}% OFF</option>
                           ))}
                         </select>
                       </div>
