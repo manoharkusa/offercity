@@ -126,13 +126,13 @@ if groq_key:
 else:
     print("=== GROQ_API_KEY secret not set — skipping ===")
 
-# ── 5. Restart via Phusion Passenger ─────────────────────────────────────────
-# The app is managed by cPanel's Application Manager (Phusion Passenger).
-# Passenger watches tmp/restart.txt — touching it triggers a clean restart
-# with exactly ONE process. No manual nohup, no kill commands needed.
-print("=== Restarting via Passenger (touch tmp/restart.txt) ===")
-sh(f"mkdir -p {APP}/tmp && touch {APP}/tmp/restart.txt", "passenger restart")
-time.sleep(8)
+# ── 5. Restart app ────────────────────────────────────────────────────────────
+# Kill the running Node process (PID is written by server.js to node.pid).
+# Phusion Passenger automatically restarts the worker after it dies.
+# Also touch restart.txt as belt-and-suspenders.
+print("=== Restarting Node process ===")
+sh(f"kill $(cat {HOME_REMOTE}/node.pid 2>/dev/null) 2>/dev/null; mkdir -p {APP}/tmp && touch {APP}/tmp/restart.txt; echo 'restart triggered'", "restart")
+time.sleep(15)
 sh(f"curl -s https://offerscity.co.in/api/health", "health check")
 
 c.close()
