@@ -129,16 +129,7 @@ else:
 # ── 5. Verify upload & restart ────────────────────────────────────────────────
 print("=== Verifying uploaded server.js ===")
 # Write diagnostics to node.log so we can read them via /api/logs
-# Find where cPanel is ACTUALLY running the app from
-sh(
-    f"ALT={HOME_REMOTE}/server/server.js; "
-    f"HAS_ALT=$(grep -c 'deploy-restart' $ALT 2>/dev/null || echo 0); "
-    f"LS1=$(ls -la {APP}/server.js 2>/dev/null | awk '{{print $1,$5,$9}}'); "
-    f"LS2=$(ls -la $ALT 2>/dev/null | awk '{{print $1,$5,$9}}'); "
-    f"echo \"[DEPLOY PATHS] public_html/server=$LS1 has=$HAS alt_server=$LS2 alt_has=$HAS_ALT\" >> {HOME_REMOTE}/node.log; "
-    f"ls {HOME_REMOTE}/ >> {HOME_REMOTE}/node.log 2>&1 || true",
-    "find-app-path"
-)
+pass  # diagnostics removed — cPanel runs Node.js as a separate OS user; only /api/deploy-restart can trigger reload
 
 # Call /api/deploy-restart on the running server — it calls process.exit(0)
 # and Passenger immediately spawns a fresh worker from the new files on disk.
