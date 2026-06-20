@@ -71,13 +71,25 @@ function persistContacts(ownerId) {
 function mergeContacts(ownerId, incoming) {
   if (!contactMap[ownerId]) contactMap[ownerId] = [];
   if (!lidToPhone[ownerId]) lidToPhone[ownerId] = {};
+  // Log first contact's fields once so we can see what Baileys provides
+  if (incoming.length && !mergeContacts._logged) {
+    mergeContacts._logged = true;
+    const sample = incoming[0];
+    console.log(`[WA CONTACT FIELDS] keys=${Object.keys(sample).join(',')} sample=${JSON.stringify(sample).slice(0, 200)}`);
+  }
   for (const c of incoming) {
     if (!c.id) continue;
-    // pn = actual phone number provided by newer Baileys for LID-based contacts
+    // pn = actual phone number (newer Baileys for LID contacts)
     if (c.pn) {
       const phone = String(c.pn).replace(/\D/g, '');
       const lid   = c.id.split('@')[0];
       if (phone) lidToPhone[ownerId][lid] = phone;
+    }
+    // lid field = LID when id is the phone JID (alternative Baileys format)
+    if (c.lid) {
+      const lid = String(c.lid).split('@')[0].replace(/\D/g, '');
+      const phone = c.id.split('@')[0];
+      if (lid && /^\d+$/.test(phone)) lidToPhone[ownerId][lid] = phone;
     }
     if (!c.id.endsWith('@s.whatsapp.net')) continue;
     const phone = (c.pn ? String(c.pn).replace(/\D/g, '') : null) || c.id.replace('@s.whatsapp.net', '');
