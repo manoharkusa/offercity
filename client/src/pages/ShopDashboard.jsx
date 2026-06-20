@@ -1159,42 +1159,42 @@ export default function ShopDashboard() {
                         </select>
                       </div>
 
-                      {/* Row: Shop selector */}
-                      <div className="camp-row camp-row-col">
-                        <span className="camp-row-icon">🏪</span>
-                        <div className="camp-row-body">
-                          <div className="camp-row-title">Select Shop</div>
+                      {/* Row: Shop + Offer selectors */}
+                      <div className="camp-row" style={{ borderBottom: 'none', paddingBottom: 0 }}>
+                        <div style={{ flex: 1, display: 'flex', gap: 12, flexWrap: 'wrap' }}>
+                          <div style={{ flex: '1 1 180px', minWidth: 0 }}>
+                            <div style={{ fontSize: 12, fontWeight: 700, color: '#555', marginBottom: 5 }}>
+                              🏪 Select Shop
+                            </div>
+                            <select className="camp-offer-select" style={{ marginTop: 0 }} value={campShopId} onChange={e => {
+                              setCampShopId(e.target.value);
+                              setCampOfferId('');
+                              setCampMsg('');
+                            }}>
+                              <option value="">— All shops —</option>
+                              {shops.map(s => <option key={s.id} value={String(s.id)}>{s.name}</option>)}
+                            </select>
+                          </div>
+                          <div style={{ flex: '2 1 240px', minWidth: 0 }}>
+                            <div style={{ fontSize: 12, fontWeight: 700, color: '#555', marginBottom: 5 }}>
+                              🏷️ Select Offer
+                            </div>
+                            <select className="camp-offer-select" style={{ marginTop: 0 }} value={campOfferId} onChange={e => {
+                              setCampOfferId(e.target.value);
+                              if (e.target.value) {
+                                const o = campOffers.find(x => String(x.id) === e.target.value);
+                                if (o) setCampMsg(buildWAMessage(o));
+                              } else { setCampMsg(''); }
+                            }}>
+                              <option value="">— Custom message —</option>
+                              {campOffers
+                                .filter(o => !campShopId || String(o.shop_id) === campShopId)
+                                .map(o => (
+                                  <option key={o.id} value={o.id}>{o.title} — {o.discount}% OFF</option>
+                                ))}
+                            </select>
+                          </div>
                         </div>
-                        <select className="camp-offer-select" value={campShopId} onChange={e => {
-                          setCampShopId(e.target.value);
-                          setCampOfferId('');
-                          setCampMsg('');
-                        }}>
-                          <option value="">— All shops —</option>
-                          {shops.map(s => <option key={s.id} value={String(s.id)}>{s.name}</option>)}
-                        </select>
-                      </div>
-
-                      {/* Row: Offer dropdown (filtered by shop) */}
-                      <div className="camp-row camp-row-col">
-                        <span className="camp-row-icon">🏷️</span>
-                        <div className="camp-row-body">
-                          <div className="camp-row-title">Select Offer</div>
-                        </div>
-                        <select className="camp-offer-select" value={campOfferId} onChange={e => {
-                          setCampOfferId(e.target.value);
-                          if (e.target.value) {
-                            const o = campOffers.find(x => String(x.id) === e.target.value);
-                            if (o) setCampMsg(buildWAMessage(o));
-                          } else { setCampMsg(''); }
-                        }}>
-                          <option value="">— Custom message —</option>
-                          {campOffers
-                            .filter(o => !campShopId || String(o.shop_id) === campShopId)
-                            .map(o => (
-                              <option key={o.id} value={o.id}>{o.title} — {o.discount}% OFF</option>
-                            ))}
-                        </select>
                       </div>
 
                       {/* Message */}
