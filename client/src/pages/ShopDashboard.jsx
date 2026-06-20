@@ -80,6 +80,7 @@ export default function ShopDashboard() {
   const [campOfferId, setCampOfferId]     = useState('');
   const [campLoading, setCampLoading]     = useState(false);
   const [campOffers, setCampOffers]       = useState([]);
+  const [campOffersLoading, setCampOffersLoading] = useState(false);
   const [campShopId, setCampShopId]       = useState('');
   const [sendMode, setSendMode]           = useState('all');
   const [allContacts, setAllContacts]     = useState([]);
@@ -116,12 +117,15 @@ export default function ShopDashboard() {
     if (selectedShop) api.get(`/offers/shop/${selectedShop}`).then(r => setOffers(r.data)).catch(() => {});
   }, [selectedShop]);
 
-  // Load all offers from all shops for the campaign offer dropdown
+  // Load offers for selected shop on demand
   useEffect(() => {
-    if (tab === 'campaign') {
-      api.get('/offers/mine').then(r => setCampOffers(r.data)).catch(() => {});
-    }
-  }, [tab]);
+    if (!campShopId) { setCampOffers([]); return; }
+    setCampOffersLoading(true);
+    api.get(`/offers/shop/${campShopId}`)
+      .then(r => setCampOffers(r.data))
+      .catch(() => setCampOffers([]))
+      .finally(() => setCampOffersLoading(false));
+  }, [campShopId]);
 
   // Auto-select first shop and always refresh offers when tab opens
   useEffect(() => {
@@ -1171,27 +1175,27 @@ export default function ShopDashboard() {
                               setCampOfferId('');
                               setCampMsg('');
                             }}>
-                              <option value="">— All shops —</option>
+                              <option value="">— Select a shop —</option>
                               {shops.map(s => <option key={s.id} value={String(s.id)}>{s.name}</option>)}
                             </select>
                           </div>
                           <div style={{ flex: '2 1 240px', minWidth: 0 }}>
                             <div style={{ fontSize: 12, fontWeight: 700, color: '#555', marginBottom: 5 }}>
-                              🏷️ Select Offer
+                              🏷️ Select Offer {campOffersLoading && <span style={{ fontWeight: 400, color: '#aaa' }}>Loading…</span>}
                             </div>
-                            <select className="camp-offer-select" style={{ marginTop: 0 }} value={campOfferId} onChange={e => {
-                              setCampOfferId(e.target.value);
-                              if (e.target.value) {
-                                const o = campOffers.find(x => String(x.id) === e.target.value);
-                                if (o) setCampMsg(buildWAMessage(o));
-                              } else { setCampMsg(''); }
-                            }}>
-                              <option value="">— Custom message —</option>
-                              {campOffers
-                                .filter(o => !campShopId || String(o.shop_id) === campShopId)
-                                .map(o => (
-                                  <option key={o.id} value={o.id}>{o.title} — {o.discount}% OFF</option>
-                                ))}
+                            <select className="camp-offer-select" style={{ marginTop: 0 }} value={campOfferId}
+                              disabled={!campShopId || campOffersLoading}
+                              onChange={e => {
+                                setCampOfferId(e.target.value);
+                                if (e.target.value) {
+                                  const o = campOffers.find(x => String(x.id) === e.target.value);
+                                  if (o) setCampMsg(buildWAMessage(o));
+                                } else { setCampMsg(''); }
+                              }}>
+                              <option value="">{campShopId ? (campOffersLoading ? 'Loading offers…' : campOffers.length ? '— Pick an offer —' : '— No offers found —') : '— Select a shop first —'}</option>
+                              {campOffers.map(o => (
+                                <option key={o.id} value={o.id}>{o.title} — {o.discount}% OFF</option>
+                              ))}
                             </select>
                           </div>
                         </div>
