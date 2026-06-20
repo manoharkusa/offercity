@@ -12,6 +12,49 @@ const contactMap    = {};   // ownerId → [{jid, phone, name}]
 const activeCamps   = {};   // campaignId → { running: bool }
 const keepAlive     = {};   // ownerId → intervalId
 const reconnectTry  = {};   // ownerId → attempt count (for backoff)
+const lockTimers    = {};   // ownerId → lock refresh intervalId
+
+const MY_PID = String(process.pid);
+
+// File-based lock so only ONE Node process connects to WhatsApp, even when
+// cPanel runs multiple zombie processes simultaneously (pid conflict 440 loop).
+function lockFile(ownerId) { return path.join(SESSION_BASE, String(ownerId), 'wa.lock'); }
+
+function checkLock(ownerId) {
+  try {
+    const f = lockFile(ownerId);
+    if (!fs.existsSync(f)) return false;
+    const [pid, ts] = fs.readFileSync(f, 'utf8').trim().split(':');
+    if (pid === MY_PID) return false;              // we own it
+    if (Date.now() - parseInt(ts) > 60_000) return false; // stale (holder died)
+    try { process.kill(parseInt(pid), 0); return true; }  // live process holds it
+    catch { return false; }                        // PID is dead, take over
+  } catch { return false; }
+}
+
+function acquireLock(ownerId) {
+  try { fs.writeFileSync(lockFile(ownerId), `${MY_PID}:${Date.now()}`); } catch {}
+}
+
+function releaseLock(ownerId) {
+  try {
+    const f = lockFile(ownerId);
+    const pid = fs.existsSync(f) ? fs.readFileSync(f, 'utf8').split(':')[0] : '';
+    if (pid === MY_PID) fs.rmSync(f, { force: true });
+  } catch {}
+}
+
+function startLockRefresh(ownerId) {
+  clearInterval(lockTimers[ownerId]);
+  lockTimers[ownerId] = setInterval(() => {
+    try { fs.writeFileSync(lockFile(ownerId), `${MY_PID}:${Date.now()}`); } catch {}
+  }, 15_000);
+}
+
+function stopLockRefresh(ownerId) {
+  clearInterval(lockTimers[ownerId]);
+  delete lockTimers[ownerId];
+}
 
 function loadSavedContacts(ownerId) {
   try {
@@ -41,6 +84,14 @@ async function connect(ownerId) {
   if (connStatus[ownerId] === 'connecting') return;
   // Only skip waiting_scan if we actually have a QR shown — not if stuck from pairing mode
   if (connStatus[ownerId] === 'waiting_scan' && qrCodes[ownerId]) return;
+
+  // If another live process already holds the lock, stand down — let it own WhatsApp
+  if (checkLock(ownerId)) {
+    console.log(`[WA] Owner ${ownerId} — pid ${MY_PID} standing down, another process holds the lock`);
+    connStatus[ownerId] = 'connected'; // show connected in UI (the other proc is handling it)
+    return;
+  }
+  acquireLock(ownerId);
 
   // Close any leftover socket (e.g. from a pairing code attempt)
   if (sockets[ownerId]) {
@@ -100,9 +151,11 @@ async function connect(ownerId) {
     }
     if (connection === 'open') {
       connStatus[ownerId] = 'connected';
-      reconnectTry[ownerId] = 0;   // reset backoff on success
+      reconnectTry[ownerId] = 0;
       delete qrCodes[ownerId];
-      console.log(`[WA] Owner ${ownerId} connected`);
+      console.log(`[WA] Owner ${ownerId} connected (pid ${MY_PID})`);
+
+      startLockRefresh(ownerId); // keep lock fresh every 15s so other pids stay out
 
       // Presence heartbeat every 30s — tells WhatsApp we're online
       clearInterval(keepAlive[ownerId]);
@@ -115,8 +168,10 @@ async function connect(ownerId) {
     if (connection === 'close') {
       const code = lastDisconnect?.error?.output?.statusCode;
       clearInterval(keepAlive[ownerId]);
+      stopLockRefresh(ownerId);
+      releaseLock(ownerId);
       delete sockets[ownerId];
-      console.log(`[WA] Owner ${ownerId} closed — code ${code}`);
+      console.log(`[WA] Owner ${ownerId} closed — code ${code} (pid ${MY_PID})`);
       if (code === DisconnectReason.loggedOut) {
         connStatus[ownerId] = 'disconnected';
         reconnectTry[ownerId] = 0;
@@ -168,6 +223,8 @@ async function connect(ownerId) {
 async function disconnect(ownerId) {
   clearInterval(keepAlive[ownerId]);
   delete keepAlive[ownerId];
+  stopLockRefresh(ownerId);
+  releaseLock(ownerId);
   reconnectTry[ownerId] = 0;
   try { if (sockets[ownerId]) await sockets[ownerId].logout(); } catch {}
   delete sockets[ownerId];

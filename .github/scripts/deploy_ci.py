@@ -127,11 +127,11 @@ else:
 
 # ── 5. Restart Node ────────────────────────────────────────────────────────────
 print("=== Restarting Node.js ===")
-# Hard-kill ALL node processes for this user. nohup isolates processes from
-# pkill (SIGTERM), so we use killall -9 (SIGKILL) which cannot be ignored.
-# This cleans up zombie start_node.sh restart-loops from previous deploys.
-sh("killall -9 node 2>/dev/null; killall -9 bash 2>/dev/null; sleep 4", "hard kill all node+bash")
-sh("pgrep -a node 2>/dev/null || echo 'no node processes — clean'", "verify clean")
+# Best-effort kill of old node processes. cPanel's process manager may
+# respawn them immediately — that's fine. The wa.lock file (added in
+# whatsapp.js) ensures only ONE process actually connects to WhatsApp
+# even when multiple Node.js instances run at the same time.
+sh("pkill -f start_node.sh 2>/dev/null; pkill -f 'node.*server.js' 2>/dev/null; sleep 3 || true", "kill old node")
 sh(f"source ~/.nvm/nvm.sh && nvm use 16 && nohup bash {HOME_REMOTE}/start_node.sh >> {HOME_REMOTE}/node.log 2>&1 &",
    "start node", timeout=15)
 time.sleep(8)
