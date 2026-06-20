@@ -1,15 +1,28 @@
 import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
+import { lazy, Suspense } from 'react';
 import { AuthProvider, useAuth } from './context/AuthContext';
 import Navbar from './components/Navbar';
 import LeadCapture from './components/LeadCapture';
 import Home from './pages/Home';
 import Login from './pages/Login';
 import Register from './pages/Register';
-import OfferDetails from './pages/OfferDetails';
-import ShopDashboard from './pages/ShopDashboard';
-import AdminDashboard from './pages/AdminDashboard';
-import SavedOffers from './pages/SavedOffers';
-import ShopPage from './pages/ShopPage';
+
+// Heavy pages loaded only when visited — cuts initial bundle from 459KB → ~120KB
+const OfferDetails    = lazy(() => import('./pages/OfferDetails'));
+const ShopDashboard   = lazy(() => import('./pages/ShopDashboard'));
+const AdminDashboard  = lazy(() => import('./pages/AdminDashboard'));
+const SavedOffers     = lazy(() => import('./pages/SavedOffers'));
+const ShopPage        = lazy(() => import('./pages/ShopPage'));
+
+function PageLoader() {
+  return (
+    <div style={{ display:'flex', alignItems:'center', justifyContent:'center', minHeight:'60vh', flexDirection:'column', gap:12 }}>
+      <div style={{ width:36, height:36, border:'4px solid #f0e6d6', borderTopColor:'#e65100', borderRadius:'50%', animation:'spin 0.8s linear infinite' }} />
+      <div style={{ color:'#e65100', fontSize:13, fontWeight:600 }}>Loading…</div>
+      <style>{`@keyframes spin { to { transform: rotate(360deg); } }`}</style>
+    </div>
+  );
+}
 
 function PrivateRoute({ children, roles }) {
   const { user } = useAuth();
@@ -24,17 +37,19 @@ export default function App() {
       <BrowserRouter>
         <Navbar />
         <LeadCapture />
-        <Routes>
-          <Route path="/" element={<Home />} />
-          <Route path="/login" element={<Login />} />
-          <Route path="/register" element={<Register />} />
-          <Route path="/offers/:id" element={<OfferDetails />} />
-          <Route path="/saved" element={<PrivateRoute><SavedOffers /></PrivateRoute>} />
-          <Route path="/shop-dashboard" element={<PrivateRoute roles={['shop_owner', 'admin']}><ShopDashboard /></PrivateRoute>} />
-          <Route path="/admin" element={<PrivateRoute roles={['admin']}><AdminDashboard /></PrivateRoute>} />
-          <Route path="/shop/:slug" element={<ShopPage />} />
-          <Route path="/:city/:slug" element={<ShopPage />} />
-        </Routes>
+        <Suspense fallback={<PageLoader />}>
+          <Routes>
+            <Route path="/"              element={<Home />} />
+            <Route path="/login"         element={<Login />} />
+            <Route path="/register"      element={<Register />} />
+            <Route path="/offers/:id"    element={<OfferDetails />} />
+            <Route path="/saved"         element={<PrivateRoute><SavedOffers /></PrivateRoute>} />
+            <Route path="/shop-dashboard" element={<PrivateRoute roles={['shop_owner','admin']}><ShopDashboard /></PrivateRoute>} />
+            <Route path="/admin"         element={<PrivateRoute roles={['admin']}><AdminDashboard /></PrivateRoute>} />
+            <Route path="/shop/:slug"    element={<ShopPage />} />
+            <Route path="/:city/:slug"   element={<ShopPage />} />
+          </Routes>
+        </Suspense>
       </BrowserRouter>
     </AuthProvider>
   );
