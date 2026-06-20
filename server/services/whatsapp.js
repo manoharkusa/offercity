@@ -4,6 +4,7 @@ const fs   = require('fs');
 const SESSION_BASE   = process.env.WA_SESSION_DIR
   || (process.platform === 'linux' ? '/home1/a1751tyi/whatsapp_sessions' : path.join(__dirname, '../whatsapp_sessions'));
 const contactsFile   = (id) => path.join(SESSION_BASE, String(id), 'contacts.json');
+const lidPhoneFile   = (id) => path.join(SESSION_BASE, String(id), 'lid_map.json');
 
 const sockets       = {};   // ownerId → sock
 const connStatus    = {};   // ownerId → string
@@ -62,6 +63,101 @@ function loadSavedContacts(ownerId) {
     const f = contactsFile(ownerId);
     if (fs.existsSync(f)) contactMap[ownerId] = JSON.parse(fs.readFileSync(f, 'utf8'));
   } catch {}
+}
+
+function loadLidMap(ownerId) {
+  try {
+    const f = lidPhoneFile(ownerId);
+    if (fs.existsSync(f)) {
+      const data = JSON.parse(fs.readFileSync(f, 'utf8'));
+      lidToPhone[ownerId] = Object.assign(lidToPhone[ownerId] || {}, data);
+      console.log(`[WA] Loaded ${Object.keys(data).length} LID→phone from disk for owner ${ownerId}`);
+    }
+  } catch {}
+}
+
+function saveLidMap(ownerId) {
+  try { fs.writeFileSync(lidPhoneFile(ownerId), JSON.stringify(lidToPhone[ownerId] || {})); } catch {}
+}
+
+function recordLidPhone(ownerId, lid, phone) {
+  if (!lid || !phone) return;
+  if (!lidToPhone[ownerId]) lidToPhone[ownerId] = {};
+  if (lidToPhone[ownerId][lid]) return;
+  console.log(`[WA] LID→phone: ${lid} → ${phone}`);
+  lidToPhone[ownerId][lid] = phone;
+  saveLidMap(ownerId);
+}
+
+// Custom Baileys logger — captures LID→phone mappings and provides debug visibility.
+// WhatsApp logs raw message node attrs when it can't decrypt a message; we mine
+// peer_recipient_pn / peer_sender_pn from those attrs to build the LID→phone map.
+function makeLidLogger(ownerId) {
+  const noop = () => {};
+  const self = {
+    level: 'info',
+    trace: noop, debug: noop, fatal: noop,
+    // Keep key connection/session messages visible in node.log
+    info: (obj, msg) => {
+      const m = typeof msg === 'string' ? msg : (typeof obj === 'string' ? obj : '');
+      if (m && /connect|open|close|session|cred|auth|qr/i.test(m)) {
+        console.log(`[WA-B info] ${m}`);
+      }
+    },
+    warn: (obj, msg) => {
+      const m = typeof msg === 'string' ? msg : (typeof obj === 'string' ? obj : '');
+      if (m) console.log(`[WA-B warn] ${m}`);
+    },
+    error: (obj, msg) => {
+      try {
+        const errMsg = obj?.err?.message || (typeof msg === 'string' ? msg : '');
+        const attrs  = obj?.err?.data?.attrs;
+
+        if (!attrs) {
+          // Non-node errors — log them so we can see real problems
+          if (errMsg) console.log(`[WA-B err] ${errMsg}`);
+          return;
+        }
+
+        // Log every raw attrs snapshot so we can see what fields WhatsApp sends
+        const attrKeys = Object.keys(attrs).join(',');
+        console.log(`[WA-B node] err="${errMsg}" attrKeys=${attrKeys}`);
+
+        let captured = false;
+
+        // Outgoing (primary phone → customer): recipient = customer LID, peer_recipient_pn = customer phone
+        if (attrs.peer_recipient_pn && attrs.recipient) {
+          const lid   = attrs.recipient.split('@')[0].replace(/_\d+$/, '');
+          const phone = attrs.peer_recipient_pn.split('@')[0];
+          console.log(`[WA-B] peer_recipient: lid=${lid} phone=${phone}`);
+          if (lid.length > 13 && /^\d{7,13}$/.test(phone)) {
+            recordLidPhone(ownerId, lid, phone);
+            captured = true;
+          }
+        }
+
+        // Incoming fan-out (customer → shop): from = customer LID, peer_sender_pn = customer phone
+        if (attrs.peer_sender_pn && attrs.from) {
+          const lid   = attrs.from.split('@')[0].replace(/_\d+$/, '');
+          const phone = attrs.peer_sender_pn.split('@')[0];
+          console.log(`[WA-B] peer_sender: lid=${lid} phone=${phone}`);
+          if (lid.length > 13 && /^\d{7,13}$/.test(phone)) {
+            recordLidPhone(ownerId, lid, phone);
+            captured = true;
+          }
+        }
+
+        if (!captured) {
+          // Log remaining attrs so we can discover new fields WhatsApp may provide
+          const interesting = ['from', 'recipient', 'notify', 'type'];
+          const snap = interesting.filter(k => attrs[k]).map(k => `${k}=${attrs[k]}`).join(' ');
+          if (snap) console.log(`[WA-B] no phone field — attrs: ${snap}`);
+        }
+      } catch {}
+    },
+    child: () => self,
+  };
+  return self;
 }
 
 function persistContacts(ownerId) {
@@ -155,6 +251,7 @@ async function connect(ownerId) {
   const sessionDir = path.join(SESSION_BASE, String(ownerId));
   fs.mkdirSync(sessionDir, { recursive: true });
   loadSavedContacts(ownerId);
+  loadLidMap(ownerId);
 
   let mod;
   try { mod = await import('@whiskeysockets/baileys'); }
@@ -178,13 +275,14 @@ async function connect(ownerId) {
 
   const sock = makeWASocket({
     auth: state,
+    logger: makeLidLogger(ownerId),
     printQRInTerminal: false,
     browser: ['OfferCity', 'Chrome', '120.0'],
     syncFullHistory:              false,
     getMessage:                   async () => undefined,
     keepAliveIntervalMs:            20_000,
-    connectTimeoutMs:               60_000,  // allow 60s to establish WS (was 30s)
-    defaultQueryTimeoutMs:          30_000,  // 30s — long enough for fetchProps, short enough to not hang LID sends
+    connectTimeoutMs:               60_000,
+    defaultQueryTimeoutMs:          90_000,  // 90s — gives fetchProps enough time on shared hosting
     retryRequestDelayMs:            2_000,
     generateHighQualityLinkPreview: false,
     markOnlineOnConnect:            false,
@@ -230,10 +328,12 @@ async function connect(ownerId) {
         contactMap[ownerId] = [];
         fs.rmSync(sessionDir, { recursive: true, force: true });
       } else if (code === 408) {
-        // Init query timeout — retry quickly, don't penalise with backoff
+        // Init query timeout — use backoff to avoid rapid crash loops
         connStatus[ownerId] = 'reconnecting';
-        console.log(`[WA] Owner ${ownerId} init timeout — retrying in 3s`);
-        setTimeout(() => connect(ownerId), 3000);
+        const attempt = ++(reconnectTry[ownerId]);
+        const delay = Math.min(15_000 * attempt, 120_000); // 15s, 30s, 45s … max 120s
+        console.log(`[WA] Owner ${ownerId} init timeout — retry #${attempt} in ${delay / 1000}s`);
+        setTimeout(() => connect(ownerId), delay);
       } else {
         connStatus[ownerId] = 'reconnecting';
         // Exponential backoff for other errors: 5s, 10s, 20s, 40s — max 60s
@@ -527,6 +627,7 @@ async function autoReconnectAll() {
       if (fs.existsSync(credsPath)) {
         connStatus[ownerId] = 'reconnecting';
         loadSavedContacts(ownerId);
+        loadLidMap(ownerId);
         // Restore chatbot toggle from disk so it survives server restarts
         require('./aichatbot').loadEnabled(ownerId);
         console.log(`[WA] Auto-reconnecting owner ${ownerId} from saved session`);
