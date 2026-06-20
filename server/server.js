@@ -47,7 +47,16 @@ app.use('/api/leads',     require('./routes/leads'));
 app.use('/api/campaigns', require('./routes/campaigns'));
 app.use('/api/push',      require('./routes/push'));
 
-app.get('/api/health', (req, res) => res.json({ status: 'OfferCity API running', port: process.env.PORT || 5000, v: '20260620-B' }));
+app.get('/api/health', (req, res) => res.json({ status: 'OfferCity API running', port: process.env.PORT || 5000 }));
+
+// Deploy restart — CI script calls this after uploading new files.
+// process.exit(0) causes Passenger to spawn a fresh worker that reads new code.
+app.post('/api/deploy-restart', (req, res) => {
+  const secret = process.env.DEPLOY_SECRET || 'offerscity-deploy-2025';
+  if (req.headers['x-deploy-secret'] !== secret) return res.status(403).json({ error: 'forbidden' });
+  res.json({ ok: true, pid: process.pid });
+  setTimeout(() => process.exit(0), 300);
+});
 
 // Last 100 log lines — useful for diagnosing production crashes
 app.get('/api/logs', (req, res) => {

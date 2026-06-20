@@ -127,20 +127,17 @@ else:
     print("=== GROQ_API_KEY secret not set — skipping ===")
 
 # ── 5. Restart app ────────────────────────────────────────────────────────────
-# cPanel's Passenger uses smart-spawning (parent pre-forks workers), so killing
-# the worker process alone doesn't reload code — we need a proper app restart.
-# Try three approaches in order:
-#   1. uapi NodeJS restart_app  — cPanel's official Node.js app restart
-#   2. passenger-config restart-app — direct Passenger CLI
-#   3. kill all node processes + touch restart.txt — last resort
-print("=== Restarting via cPanel uapi / Passenger ===")
+# Call /api/deploy-restart on the running server — it calls process.exit(0)
+# and Passenger immediately spawns a fresh worker from the new files on disk.
+DEPLOY_SECRET = os.environ.get("DEPLOY_SECRET", "offerscity-deploy-2025")
+print("=== Restarting via /api/deploy-restart ===")
 sh(
-    f"uapi NodeJS restart_app 2>/dev/null && echo 'uapi restart OK' "
-    f"|| (passenger-config restart-app {APP} 2>/dev/null && echo 'passenger restart OK') "
-    f"|| (pkill -f 'node.*server.js' 2>/dev/null; mkdir -p {APP}/tmp && touch {APP}/tmp/restart.txt && echo 'pkill+restart.txt fallback')",
-    "restart"
+    f"curl -s -X POST https://offerscity.co.in/api/deploy-restart "
+    f"-H 'x-deploy-secret: {DEPLOY_SECRET}' "
+    f"-H 'Content-Type: application/json' || echo 'restart endpoint not yet available'",
+    "deploy-restart"
 )
-time.sleep(20)
+time.sleep(25)
 sh(f"curl -s https://offerscity.co.in/api/health", "health check")
 
 c.close()
