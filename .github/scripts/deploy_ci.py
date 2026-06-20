@@ -128,7 +128,15 @@ else:
 
 # ── 5. Verify upload & restart ────────────────────────────────────────────────
 print("=== Verifying uploaded server.js ===")
-sh(f"grep -c 'deploy-restart' {APP}/server.js && echo 'server.js has new endpoint' || echo 'server.js NOT updated'", "verify")
+# Write diagnostics to node.log so we can read them via /api/logs
+sh(
+    f"FILE={APP}/server.js; "
+    f"PID=$(cat {HOME_REMOTE}/node.pid 2>/dev/null); "
+    f"CMD=$(cat /proc/$PID/cmdline 2>/dev/null | tr '\\0' ' '); "
+    f"HAS=$(grep -c 'deploy-restart' $FILE 2>/dev/null || echo 0); "
+    f"echo \"[DEPLOY CHECK] pid=$PID file=$FILE has_endpoint=$HAS cmd=$CMD\" >> {HOME_REMOTE}/node.log",
+    "verify"
+)
 
 # Call /api/deploy-restart on the running server — it calls process.exit(0)
 # and Passenger immediately spawns a fresh worker from the new files on disk.
