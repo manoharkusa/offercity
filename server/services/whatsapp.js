@@ -92,6 +92,7 @@ async function connect(ownerId) {
       connStatus[ownerId] = 'connected';
       delete qrCodes[ownerId];
       console.log(`[WA] Owner ${ownerId} connected`);
+      resumePendingCampaigns(ownerId);
     }
     if (connection === 'close') {
       const code = lastDisconnect?.error?.output?.statusCode;
@@ -155,11 +156,44 @@ function getStatus(ownerId) {
 
 function getContacts(ownerId) { return contactMap[ownerId] || []; }
 
+// Wait up to `ms` milliseconds for WhatsApp to reach 'connected' state
+function waitForConnected(ownerId, ms = 40000) {
+  return new Promise(resolve => {
+    if (connStatus[ownerId] === 'connected') return resolve(true);
+    const deadline = Date.now() + ms;
+    const t = setInterval(() => {
+      if (connStatus[ownerId] === 'connected') { clearInterval(t); resolve(true); }
+      else if (Date.now() >= deadline) { clearInterval(t); resolve(false); }
+    }, 1000);
+  });
+}
+
 async function sendWAMessage(ownerId, phone, text) {
+  // If reconnecting, wait up to 40 seconds instead of failing immediately
+  if (connStatus[ownerId] === 'reconnecting') {
+    const ok = await waitForConnected(ownerId, 40000);
+    if (!ok) throw new Error('WhatsApp reconnection timed out');
+  }
   const sock = sockets[ownerId];
   if (!sock || connStatus[ownerId] !== 'connected') throw new Error('WhatsApp not connected');
   const jid = phone.includes('@') ? phone : `${phone}@s.whatsapp.net`;
   await sock.sendMessage(jid, { text });
+}
+
+// Resume any campaigns left in 'running' state (e.g. after server restart)
+async function resumePendingCampaigns(ownerId) {
+  try {
+    const { getPool } = require('../config/db');
+    const [rows] = await getPool().query(
+      'SELECT id FROM campaigns WHERE owner_id = ? AND status = "running"', [ownerId]
+    );
+    for (const r of rows) {
+      if (!activeCamps[r.id]) {
+        console.log(`[WA] Resuming campaign ${r.id} for owner ${ownerId}`);
+        runCampaign(r.id);
+      }
+    }
+  } catch (e) { console.error('[WA] resumePendingCampaigns:', e.message); }
 }
 
 // 2-3 messages per minute: 1 msg every 20-30 sec with random jitter
@@ -181,11 +215,19 @@ async function runCampaign(campaignId) {
     const [[cur]] = await pool.query('SELECT status FROM campaigns WHERE id = ?', [campaignId]);
     if (!activeCamps[campaignId]?.running || cur.status !== 'running') break;
 
-    try {
-      await sendWAMessage(camp.owner_id, log.phone, camp.message);
-      await pool.query('UPDATE campaign_logs SET status="sent", sent_at=NOW() WHERE id=?', [log.id]);
-      await pool.query('UPDATE campaigns SET sent_count=sent_count+1, updated_at=NOW() WHERE id=?', [campaignId]);
-    } catch {
+    let sent = false;
+    for (let attempt = 0; attempt < 2 && !sent; attempt++) {
+      try {
+        await sendWAMessage(camp.owner_id, log.phone, camp.message);
+        await pool.query('UPDATE campaign_logs SET status="sent", sent_at=NOW() WHERE id=?', [log.id]);
+        await pool.query('UPDATE campaigns SET sent_count=sent_count+1, updated_at=NOW() WHERE id=?', [campaignId]);
+        sent = true;
+      } catch (e) {
+        console.error(`[Camp ${campaignId}] attempt ${attempt+1} failed for ${log.phone}:`, e.message);
+        if (attempt === 0) await new Promise(r => setTimeout(r, 5000)); // brief wait before retry
+      }
+    }
+    if (!sent) {
       await pool.query('UPDATE campaign_logs SET status="failed" WHERE id=?', [log.id]);
       await pool.query('UPDATE campaigns SET failed_count=failed_count+1, updated_at=NOW() WHERE id=?', [campaignId]);
     }
