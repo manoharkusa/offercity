@@ -127,14 +127,21 @@ else:
 
 # ── 5. Restart Node ────────────────────────────────────────────────────────────
 print("=== Restarting Node.js ===")
-sh("pkill -f 'node.*server.js' 2>/dev/null || true; sleep 2", "kill old node")
+# Kill ALL start_node.sh wrappers first (they restart node on crash in a loop),
+# then kill any remaining node processes.  Without killing the shell wrapper,
+# every deploy leaves a zombie start_node.sh that fights the new one over the
+# same WhatsApp session (Baileys conflict code 440 → endless disconnect loop).
+sh("pkill -f start_node.sh 2>/dev/null || true", "kill start_node.sh wrappers")
+sh("pkill -f 'node.*server.js' 2>/dev/null || true", "kill node processes")
+sh("sleep 3 && echo 'remaining node procs:' && pgrep -a -f 'node.*server' || echo none", "verify clean")
 sh(f"source ~/.nvm/nvm.sh && nvm use 16 && nohup bash {HOME_REMOTE}/start_node.sh >> {HOME_REMOTE}/node.log 2>&1 &",
    "start node", timeout=15)
-time.sleep(7)
+time.sleep(8)
 port = sh(f"cat {HOME_REMOTE}/node_port.txt 2>/dev/null", "active port").strip()
 if port:
     sh(f"curl -s http://127.0.0.1:{port}/api/health", "health check")
-sh(f"tail -5 {HOME_REMOTE}/node.log", "node log")
+sh(f"echo 'running node procs:' && pgrep -c -f 'node.*server' || echo 0", "process count")
+sh(f"tail -10 {HOME_REMOTE}/node.log", "node log")
 
 c.close()
 print("=== Deploy complete ===")
