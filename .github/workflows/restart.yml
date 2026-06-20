@@ -1,0 +1,102 @@
+name: Emergency Restart
+
+on:
+  workflow_dispatch:
+    inputs:
+      action:
+        description: 'What to do'
+        required: true
+        default: 'restart'
+        type: choice
+        options:
+          - restart
+          - status
+
+jobs:
+  restart:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Write SSH key
+        run: |
+          printf '%s\n' "$SSH_CI_KEY" > /tmp/ci_key
+          chmod 600 /tmp/ci_key
+        env:
+          SSH_CI_KEY: ${{ secrets.SSH_CI_KEY }}
+
+      - name: Install paramiko
+        run: pip install paramiko
+
+      - name: Run action via SSH
+        env:
+          SSH_HOST:     ${{ secrets.SSH_HOST }}
+          SSH_USER:     ${{ secrets.SSH_USER }}
+          SSH_KEY_PATH: /tmp/ci_key
+          DEPLOY_SECRET: ${{ secrets.DEPLOY_SECRET }}
+          ACTION: ${{ github.event.inputs.action }}
+        run: |
+          python - <<'PYEOF'
+          import os, time, paramiko
+
+          HOST     = os.environ["SSH_HOST"].strip()
+          USER     = os.environ["SSH_USER"].strip()
+          KEY_PATH = os.environ.get("SSH_KEY_PATH", "/tmp/ci_key").strip()
+          ACTION   = os.environ.get("ACTION", "restart")
+          SECRET   = os.environ.get("DEPLOY_SECRET", "offerscity-deploy-2025")
+          HOME     = "/home1/a1751tyi"
+          WEB      = f"{HOME}/public_html/server"
+
+          key = paramiko.Ed25519Key.from_private_key_file(KEY_PATH)
+          c = paramiko.SSHClient()
+          c.set_missing_host_key_policy(paramiko.AutoAddPolicy())
+          c.connect(hostname=HOST, username=USER, pkey=key, port=22, timeout=30)
+          print(f"Connected. Action={ACTION}")
+
+          def sh(cmd, label=""):
+              if label: print(f"\n--- {label} ---")
+              _, o, _ = c.exec_command(cmd, timeout=60)
+              o.channel.set_combine_stderr(True)
+              out = o.read().decode("utf-8", errors="replace").strip()
+              if out: print(out)
+              return out
+
+          if ACTION == "status":
+              sh("ps aux | grep -i node | grep -v grep", "node processes")
+              sh(f"tail -30 {HOME}/node.log 2>/dev/null || echo 'no log'", "last 30 log lines")
+              sh(f"curl -sf http://localhost:5008/api/health || curl -sf http://localhost:5000/api/health || echo 'no response on localhost'", "localhost health")
+              sh(f"curl -sf https://offerscity.co.in/api/health || echo '502 from public url'", "public health")
+
+          elif ACTION == "restart":
+              # 1. Try the soft endpoint first (if server happens to be alive)
+              sh(
+                  f"PORT=$(cat {HOME}/node_port.txt 2>/dev/null || echo 5008); "
+                  f"curl -sf -X POST http://localhost:$PORT/api/deploy-restart "
+                  f"  -H 'x-deploy-secret: {SECRET}' -H 'Content-Type: application/json' "
+                  f"&& echo 'soft restart OK' || echo 'soft restart not available'",
+                  "soft restart"
+              )
+              time.sleep(3)
+
+              # 2. Kill all node processes owned by this user (clears Passenger crash protection)
+              sh(f"pkill -u {USER} -f 'node.*server' && echo 'killed node server' || echo 'no node server process found'", "kill node")
+              sh(f"pkill -u {USER} node && echo 'killed node' || echo 'no node found'", "kill node (fallback)")
+              time.sleep(5)
+
+              # 3. Check log
+              sh(f"tail -10 {HOME}/node.log 2>/dev/null || echo 'no log yet'", "log after kill")
+
+              # 4. Poll health until up (max 60s)
+              print("\n--- waiting for Passenger to spawn fresh process ---")
+              for i in range(12):
+                  time.sleep(5)
+                  r = sh(f"curl -sf https://offerscity.co.in/api/health || echo 'still down'")
+                  if 'OfferCity' in r or 'running' in r:
+                      print(f"Server UP after {(i+1)*5}s")
+                      break
+                  print(f"  {(i+1)*5}s: still down")
+              else:
+                  print("Server did not come up within 60s — check cPanel manually")
+
+          c.close()
+          print("\nDone.")
+          PYEOF
