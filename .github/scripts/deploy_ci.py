@@ -127,12 +127,20 @@ else:
     print("=== GROQ_API_KEY secret not set — skipping ===")
 
 # ── 5. Restart app ────────────────────────────────────────────────────────────
-# Kill the running Node process (PID is written by server.js to node.pid).
-# Phusion Passenger automatically restarts the worker after it dies.
-# Also touch restart.txt as belt-and-suspenders.
-print("=== Restarting Node process ===")
-sh(f"kill $(cat {HOME_REMOTE}/node.pid 2>/dev/null) 2>/dev/null; mkdir -p {APP}/tmp && touch {APP}/tmp/restart.txt; echo 'restart triggered'", "restart")
-time.sleep(15)
+# cPanel's Passenger uses smart-spawning (parent pre-forks workers), so killing
+# the worker process alone doesn't reload code — we need a proper app restart.
+# Try three approaches in order:
+#   1. uapi NodeJS restart_app  — cPanel's official Node.js app restart
+#   2. passenger-config restart-app — direct Passenger CLI
+#   3. kill all node processes + touch restart.txt — last resort
+print("=== Restarting via cPanel uapi / Passenger ===")
+sh(
+    f"uapi NodeJS restart_app 2>/dev/null && echo 'uapi restart OK' "
+    f"|| (passenger-config restart-app {APP} 2>/dev/null && echo 'passenger restart OK') "
+    f"|| (pkill -f 'node.*server.js' 2>/dev/null; mkdir -p {APP}/tmp && touch {APP}/tmp/restart.txt && echo 'pkill+restart.txt fallback')",
+    "restart"
+)
+time.sleep(20)
 sh(f"curl -s https://offerscity.co.in/api/health", "health check")
 
 c.close()
