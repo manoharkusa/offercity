@@ -6,17 +6,25 @@ const { getPool } = require('../config/db');
 
 const router = express.Router();
 
-// GET /api/campaigns/whatsapp/status  — poll for QR + connection state + chatbot flag
+// GET /api/campaigns/whatsapp/status  — poll for QR + connection state + chatbot flag + language
 router.get('/whatsapp/status', protect, requireRole('shop_owner', 'admin'), (req, res) => {
-  res.json({ ...wa.getStatus(req.user.id), chatbot: ai.isEnabled(req.user.id) });
+  res.json({ ...wa.getStatus(req.user.id), chatbot: ai.isEnabled(req.user.id), chatbotLang: ai.getLang(req.user.id) });
 });
 
 // POST /api/campaigns/chatbot/toggle
 router.post('/chatbot/toggle', protect, requireRole('shop_owner', 'admin'), (req, res) => {
   const current = ai.isEnabled(req.user.id);
   ai.setEnabled(req.user.id, !current);
-  ai.invalidateCache(req.user.id); // force fresh shop context on next message
+  ai.invalidateCache(req.user.id);
   res.json({ chatbot: !current });
+});
+
+// POST /api/campaigns/chatbot/language  — set reply language
+router.post('/chatbot/language', protect, requireRole('shop_owner', 'admin'), (req, res) => {
+  const { lang } = req.body;
+  ai.setLang(req.user.id, lang);
+  ai.invalidateCache(req.user.id);
+  res.json({ chatbotLang: ai.getLang(req.user.id) });
 });
 
 // POST /api/campaigns/whatsapp/connect

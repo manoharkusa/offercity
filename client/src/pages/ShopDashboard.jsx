@@ -1131,6 +1131,34 @@ export default function ShopDashboard() {
                         </div>
                       </div>
 
+                      {/* Row: Reply Language */}
+                      <div className="camp-row" style={{ opacity: waStatus.chatbot ? 1 : 0.5 }}>
+                        <span className="camp-row-icon">🌐</span>
+                        <div className="camp-row-body">
+                          <div className="camp-row-title">Reply Language</div>
+                          <div className="camp-row-sub">Language the AI uses to reply to customers</div>
+                        </div>
+                        <select
+                          value={waStatus.chatbotLang || 'auto'}
+                          disabled={!waStatus.chatbot}
+                          onChange={async (e) => {
+                            const { data } = await api.post('/campaigns/chatbot/language', { lang: e.target.value });
+                            setWaStatus(s => ({ ...s, chatbotLang: data.chatbotLang }));
+                          }}
+                          style={{
+                            padding: '6px 10px', borderRadius: 8, border: '1.5px solid #1976d2',
+                            background: '#fff', color: '#1a237e', fontWeight: 600,
+                            fontSize: 13, cursor: waStatus.chatbot ? 'pointer' : 'not-allowed',
+                            minWidth: 110,
+                          }}
+                        >
+                          <option value="auto">Auto-detect</option>
+                          <option value="english">English</option>
+                          <option value="telugu">Telugu</option>
+                          <option value="hindi">Hindi</option>
+                        </select>
+                      </div>
+
                       {/* Row: Shop selector */}
                       <div className="camp-row camp-row-col">
                         <span className="camp-row-icon">🏪</span>

@@ -16,8 +16,34 @@ const RATE_LIMIT_MS = 30000; // 30 sec between replies to same contact
 // Per-owner toggle: ownerId → bool (in-memory mirror of the file)
 const chatbotEnabled = {};
 
+// Per-owner reply language: 'auto' | 'english' | 'telugu' | 'hindi'
+const chatbotLang = {};
+
 function enabledFile(ownerId) {
   return path.join(SESSION_BASE, String(ownerId), 'chatbot_enabled');
+}
+
+function langFile(ownerId) {
+  return path.join(SESSION_BASE, String(ownerId), 'chatbot_lang');
+}
+
+const VALID_LANGS = ['auto', 'english', 'telugu', 'hindi'];
+
+function setLang(ownerId, lang) {
+  const l = VALID_LANGS.includes(lang) ? lang : 'auto';
+  chatbotLang[ownerId] = l;
+  try {
+    fs.mkdirSync(path.join(SESSION_BASE, String(ownerId)), { recursive: true });
+    fs.writeFileSync(langFile(ownerId), l);
+  } catch {}
+}
+
+function getLang(ownerId) {
+  if (!chatbotLang[ownerId]) {
+    try { chatbotLang[ownerId] = fs.readFileSync(langFile(ownerId), 'utf8').trim() || 'auto'; }
+    catch { chatbotLang[ownerId] = 'auto'; }
+  }
+  return chatbotLang[ownerId];
 }
 
 function setEnabled(ownerId, val) {
@@ -75,7 +101,14 @@ async function getShopContext(ownerId) {
   return data;
 }
 
-function buildSystemPrompt(context) {
+const LANG_INSTRUCTIONS = {
+  auto:    'Reply in the SAME language the customer uses (Telugu, Hindi, English, etc.)',
+  english: 'Always reply in English only, regardless of what language the customer uses.',
+  telugu:  'Always reply in Telugu (తెలుగు) using Telugu script, regardless of what language the customer uses.',
+  hindi:   'Always reply in Hindi (हिंदी) using Devanagari script, regardless of what language the customer uses.',
+};
+
+function buildSystemPrompt(context, lang = 'auto') {
   const { shops, offers } = context;
   const primary = shops[0];
 
@@ -86,6 +119,8 @@ function buildSystemPrompt(context) {
   const shopList = shops.length > 1
     ? shops.map(s => `${s.name} (${s.city})`).join(', ')
     : `${primary.name}`;
+
+  const langRule = LANG_INSTRUCTIONS[lang] || LANG_INSTRUCTIONS.auto;
 
   return `You are a smart, friendly shop assistant for ${shopList}.
 
@@ -99,7 +134,7 @@ Active offers today:
 ${offerLines}
 
 Rules:
-- Reply in the SAME language the customer uses (Telugu, Hindi, English, etc.)
+- ${langRule}
 - Keep replies SHORT — 2 to 3 sentences maximum
 - Be warm and helpful, like a real shop assistant
 - If asked about something you don't know (stock, custom orders), say "Please call or visit the shop for this"
@@ -157,7 +192,8 @@ async function handleIncoming(ownerId, jid, messageText, senderName) {
     const context = await getShopContext(ownerId);
     if (!context) return null;
 
-    const systemPrompt = buildSystemPrompt(context);
+    const lang = getLang(ownerId);
+    const systemPrompt = buildSystemPrompt(context, lang);
     const greeting = senderName ? `(Customer name: ${senderName})\n` : '';
     const reply = await callAI(systemPrompt, greeting + messageText);
 
@@ -176,4 +212,4 @@ function invalidateCache(ownerId) {
   delete contextCache[ownerId];
 }
 
-module.exports = { handleIncoming, setEnabled, loadEnabled, isEnabled, invalidateCache };
+module.exports = { handleIncoming, setEnabled, loadEnabled, isEnabled, invalidateCache, setLang, getLang };
