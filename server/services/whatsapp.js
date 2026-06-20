@@ -79,9 +79,10 @@ async function connect(ownerId) {
     browser: ['OfferCity', 'Chrome', '120.0'],
     syncFullHistory: false,
     getMessage: async () => undefined,
-    keepAliveIntervalMs: 20_000,   // WS ping every 20s — prevents idle disconnect
-    connectTimeoutMs:    30_000,
-    retryRequestDelayMs: 2_000,
+    keepAliveIntervalMs:  20_000,   // WS ping every 20s — prevents idle disconnect
+    connectTimeoutMs:     30_000,
+    retryRequestDelayMs:  2_000,
+    minimizeFootprint:    true,     // don't buffer message history — saves ~150MB RAM on cPanel
   });
 
   sockets[ownerId] = sock;
@@ -101,11 +102,11 @@ async function connect(ownerId) {
       delete qrCodes[ownerId];
       console.log(`[WA] Owner ${ownerId} connected`);
 
-      // Presence heartbeat every 2 min — tells WhatsApp we're online
+      // Presence heartbeat every 30s — tells WhatsApp we're online
       clearInterval(keepAlive[ownerId]);
       keepAlive[ownerId] = setInterval(async () => {
         try { await sock.sendPresenceUpdate('available'); } catch {}
-      }, 120_000);
+      }, 30_000);
 
       resumePendingCampaigns(ownerId);
     }
@@ -395,4 +396,24 @@ async function autoReconnectAll() {
   }
 }
 
-module.exports = { connect, disconnect, getStatus, getContacts, sendWAMessage, runCampaign, activeCamps, connectWithPairingCode, autoReconnectAll };
+// Watchdog: every 3 min, reconnect any owner whose session file exists but socket dropped
+function startWatchdog() {
+  setInterval(() => {
+    try {
+      if (!fs.existsSync(SESSION_BASE)) return;
+      const entries = fs.readdirSync(SESSION_BASE, { withFileTypes: true });
+      for (const e of entries) {
+        if (!e.isDirectory()) continue;
+        const ownerId = e.name;
+        const status  = connStatus[ownerId];
+        const hasCreds = fs.existsSync(path.join(SESSION_BASE, ownerId, 'creds.json'));
+        if (hasCreds && status !== 'connected' && status !== 'connecting' && status !== 'reconnecting') {
+          console.log(`[WA] Watchdog: reconnecting owner ${ownerId} (was: ${status})`);
+          connect(ownerId).catch(() => {});
+        }
+      }
+    } catch {}
+  }, 3 * 60 * 1000);
+}
+
+module.exports = { connect, disconnect, getStatus, getContacts, sendWAMessage, runCampaign, activeCamps, connectWithPairingCode, autoReconnectAll, startWatchdog };

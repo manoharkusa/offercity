@@ -27,6 +27,7 @@ connectDB().then(seed).then(() => {
   push.init();
   const wa = require('./services/whatsapp');
   wa.autoReconnectAll();
+  wa.startWatchdog();
 }).catch(err => console.error('Startup error:', err.message));
 
 app.use(cors({ origin: process.env.CLIENT_URL || '*', credentials: true }));
