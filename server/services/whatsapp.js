@@ -5,11 +5,13 @@ const SESSION_BASE   = process.env.WA_SESSION_DIR
   || (process.platform === 'linux' ? '/home1/a1751tyi/whatsapp_sessions' : path.join(__dirname, '../whatsapp_sessions'));
 const contactsFile   = (id) => path.join(SESSION_BASE, String(id), 'contacts.json');
 
-const sockets     = {};   // ownerId → sock
-const connStatus  = {};   // ownerId → string
-const qrCodes     = {};   // ownerId → { dataUrl, ts }
-const contactMap  = {};   // ownerId → [{jid, phone, name}]
-const activeCamps = {};   // campaignId → { running: bool }
+const sockets       = {};   // ownerId → sock
+const connStatus    = {};   // ownerId → string
+const qrCodes       = {};   // ownerId → { dataUrl, ts }
+const contactMap    = {};   // ownerId → [{jid, phone, name}]
+const activeCamps   = {};   // campaignId → { running: bool }
+const keepAlive     = {};   // ownerId → intervalId
+const reconnectTry  = {};   // ownerId → attempt count (for backoff)
 
 function loadSavedContacts(ownerId) {
   try {
@@ -69,6 +71,7 @@ async function connect(ownerId) {
   const { state, saveCreds } = await useMultiFileAuthState(sessionDir);
 
   connStatus[ownerId] = 'connecting';
+  reconnectTry[ownerId] = reconnectTry[ownerId] || 0;
 
   const sock = makeWASocket({
     auth: state,
@@ -76,6 +79,9 @@ async function connect(ownerId) {
     browser: ['OfferCity', 'Chrome', '120.0'],
     syncFullHistory: false,
     getMessage: async () => undefined,
+    keepAliveIntervalMs: 20_000,   // WS ping every 20s — prevents idle disconnect
+    connectTimeoutMs:    30_000,
+    retryRequestDelayMs: 2_000,
   });
 
   sockets[ownerId] = sock;
@@ -91,20 +97,34 @@ async function connect(ownerId) {
     }
     if (connection === 'open') {
       connStatus[ownerId] = 'connected';
+      reconnectTry[ownerId] = 0;   // reset backoff on success
       delete qrCodes[ownerId];
       console.log(`[WA] Owner ${ownerId} connected`);
+
+      // Presence heartbeat every 2 min — tells WhatsApp we're online
+      clearInterval(keepAlive[ownerId]);
+      keepAlive[ownerId] = setInterval(async () => {
+        try { await sock.sendPresenceUpdate('available'); } catch {}
+      }, 120_000);
+
       resumePendingCampaigns(ownerId);
     }
     if (connection === 'close') {
       const code = lastDisconnect?.error?.output?.statusCode;
+      clearInterval(keepAlive[ownerId]);
       delete sockets[ownerId];
       if (code === DisconnectReason.loggedOut) {
         connStatus[ownerId] = 'disconnected';
+        reconnectTry[ownerId] = 0;
         contactMap[ownerId] = [];
         fs.rmSync(sessionDir, { recursive: true, force: true });
       } else {
         connStatus[ownerId] = 'reconnecting';
-        setTimeout(() => connect(ownerId), 6000);
+        // Exponential backoff: 5s, 10s, 20s, 40s — max 60s
+        const attempt = reconnectTry[ownerId]++ || 0;
+        const delay = Math.min(5000 * Math.pow(2, attempt), 60_000);
+        console.log(`[WA] Owner ${ownerId} disconnected (code ${code}) — retry #${attempt+1} in ${delay/1000}s`);
+        setTimeout(() => connect(ownerId), delay);
       }
     }
   });
@@ -116,29 +136,28 @@ async function connect(ownerId) {
   // AI chatbot: reply to incoming individual messages
   const ai = require('./aichatbot');
   sock.ev.on('messages.upsert', async ({ messages, type }) => {
-    if (type !== 'notify') return; // skip historical sync
+    if (type !== 'notify') return;
     for (const msg of messages) {
-      if (msg.key.fromMe) continue;                          // skip own messages
-      if (msg.key.remoteJid?.endsWith('@g.us')) continue;   // skip groups
+      if (msg.key.fromMe) continue;
+      if (msg.key.remoteJid?.endsWith('@g.us')) continue;
       const age = Date.now() / 1000 - (msg.messageTimestamp || 0);
-      if (age > 60) continue;                                // skip messages older than 60s
+      if (age > 60) continue;
       const text = msg.message?.conversation
         || msg.message?.extendedTextMessage?.text
         || msg.message?.imageMessage?.caption
         || '';
       if (!text.trim()) continue;
-
-      // Small human-like delay (1-2 sec)
       await new Promise(r => setTimeout(r, 1000 + Math.random() * 1000));
       const reply = await ai.handleIncoming(ownerId, msg.key.remoteJid, text, msg.pushName || '');
-      if (reply) {
-        await sock.sendMessage(msg.key.remoteJid, { text: reply });
-      }
+      if (reply) await sock.sendMessage(msg.key.remoteJid, { text: reply });
     }
   });
 }
 
 async function disconnect(ownerId) {
+  clearInterval(keepAlive[ownerId]);
+  delete keepAlive[ownerId];
+  reconnectTry[ownerId] = 0;
   try { if (sockets[ownerId]) await sockets[ownerId].logout(); } catch {}
   delete sockets[ownerId];
   delete qrCodes[ownerId];
@@ -158,7 +177,7 @@ function getStatus(ownerId) {
 function getContacts(ownerId) { return contactMap[ownerId] || []; }
 
 // Wait up to `ms` milliseconds for WhatsApp to reach 'connected' state
-function waitForConnected(ownerId, ms = 40000) {
+function waitForConnected(ownerId, ms = 60000) {
   return new Promise(resolve => {
     if (connStatus[ownerId] === 'connected') return resolve(true);
     const deadline = Date.now() + ms;
@@ -288,6 +307,9 @@ async function connectWithPairingCode(ownerId, phone) {
     browser: ['OfferCity', 'Chrome', '120.0'],
     syncFullHistory: false,
     getMessage: async () => undefined,
+    keepAliveIntervalMs: 20_000,
+    connectTimeoutMs:    30_000,
+    retryRequestDelayMs: 2_000,
   });
 
   sockets[ownerId] = sock;
