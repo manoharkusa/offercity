@@ -79,11 +79,12 @@ async function connect(ownerId) {
     browser: ['OfferCity', 'Chrome', '120.0'],
     syncFullHistory:              false,
     getMessage:                   async () => undefined,
-    keepAliveIntervalMs:          20_000,
-    connectTimeoutMs:             30_000,
-    retryRequestDelayMs:          2_000,
-    generateHighQualityLinkPreview: false,   // skip link scraping — saves CPU
-    markOnlineOnConnect:          false,     // don't broadcast presence immediately
+    keepAliveIntervalMs:            20_000,
+    connectTimeoutMs:               60_000,  // allow 60s to establish WS (was 30s)
+    defaultQueryTimeoutMs:         120_000,  // allow 2min for init queries like fetchProps
+    retryRequestDelayMs:            2_000,
+    generateHighQualityLinkPreview: false,
+    markOnlineOnConnect:            false,
   });
 
   sockets[ownerId] = sock;
@@ -115,17 +116,23 @@ async function connect(ownerId) {
       const code = lastDisconnect?.error?.output?.statusCode;
       clearInterval(keepAlive[ownerId]);
       delete sockets[ownerId];
+      console.log(`[WA] Owner ${ownerId} closed — code ${code}`);
       if (code === DisconnectReason.loggedOut) {
         connStatus[ownerId] = 'disconnected';
         reconnectTry[ownerId] = 0;
         contactMap[ownerId] = [];
         fs.rmSync(sessionDir, { recursive: true, force: true });
+      } else if (code === 408) {
+        // Init query timeout — retry quickly, don't penalise with backoff
+        connStatus[ownerId] = 'reconnecting';
+        console.log(`[WA] Owner ${ownerId} init timeout — retrying in 3s`);
+        setTimeout(() => connect(ownerId), 3000);
       } else {
         connStatus[ownerId] = 'reconnecting';
-        // Exponential backoff: 5s, 10s, 20s, 40s — max 60s
+        // Exponential backoff for other errors: 5s, 10s, 20s, 40s — max 60s
         const attempt = reconnectTry[ownerId]++ || 0;
         const delay = Math.min(5000 * Math.pow(2, attempt), 60_000);
-        console.log(`[WA] Owner ${ownerId} disconnected (code ${code}) — retry #${attempt+1} in ${delay/1000}s`);
+        console.log(`[WA] Owner ${ownerId} retry #${attempt + 1} in ${delay / 1000}s`);
         setTimeout(() => connect(ownerId), delay);
       }
     }
