@@ -2,8 +2,8 @@ import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import api from '../services/api';
 import { useAuth } from '../context/AuthContext';
-import OfferCard from '../components/OfferCard';
 import MapView from '../components/MapView';
+import OffersScroll from '../components/OffersScroll';
 
 const CATEGORIES = ['All', 'Food', 'Fashion', 'Electronics', 'Beauty', 'Grocery', 'Health', 'Travel', 'Other'];
 
@@ -18,7 +18,7 @@ export default function Home() {
   const [search, setSearch] = useState('');
   const [category, setCategory] = useState('All');
   const [radius, setRadius] = useState(10);
-  const [view, setView] = useState('grid');
+  const [view, setView] = useState('scroll');   // 'scroll' | 'map'
   const [newOffersCount, setNewOffersCount] = useState(0);
 
   useEffect(() => {
@@ -69,7 +69,7 @@ export default function Home() {
     }
   };
 
-  // Deduplicate by shop so each shop shows once on the map
+  // Deduplicate by shop for map pins
   const shopMarkers = [];
   const seenShops = new Set();
   offers.forEach(o => {
@@ -118,16 +118,16 @@ export default function Home() {
         </select>
         <button onClick={fetchOffers}>Search</button>
         <button
-          onClick={() => setView(v => v === 'grid' ? 'map' : 'grid')}
+          onClick={() => setView(v => v === 'map' ? 'scroll' : 'map')}
           style={{ background: view === 'map' ? '#e65100' : '#555' }}
         >
-          {view === 'grid' ? '🗺 Map View' : '⊞ Grid View'}
+          {view === 'map' ? '🎞 Scroll View' : '🗺 Map View'}
         </button>
       </div>
 
       {!coords && <p className="loading">📍 Detecting your location...</p>}
 
-      {/* MAP VIEW — shows nearby shops as clickable pins */}
+      {/* MAP VIEW */}
       {view === 'map' && coords && (
         <>
           <p style={{ color: '#888', fontSize: 13, marginBottom: 8 }}>
@@ -168,14 +168,13 @@ export default function Home() {
         </>
       )}
 
-      {/* GRID VIEW */}
-      {view === 'grid' && (
-        loading ? <p className="loading">Loading nearby offers...</p> :
-        offers.length === 0
-          ? <p className="loading">No offers found near you. Try increasing the radius.</p>
-          : <div className="offers-grid">
-              {offers.map(offer => <OfferCard key={offer.id} offer={offer} />)}
-            </div>
+      {/* SCROLL FEED VIEW — horizontal on desktop, vertical reels on mobile */}
+      {view === 'scroll' && (
+        loading
+          ? <p className="loading">Loading nearby offers...</p>
+          : offers.length === 0
+            ? <p className="loading">No offers found near you. Try increasing the radius.</p>
+            : <OffersScroll offers={offers} />
       )}
     </div>
   );
