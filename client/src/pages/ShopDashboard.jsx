@@ -79,6 +79,11 @@ export default function ShopDashboard() {
   const [campMsg, setCampMsg]             = useState('');
   const [campOfferId, setCampOfferId]     = useState('');
   const [campLoading, setCampLoading]     = useState(false);
+  const [sendMode, setSendMode]           = useState('all');        // 'all' | 'select'
+  const [allContacts, setAllContacts]     = useState([]);
+  const [selectedPhones, setSelectedPhones] = useState(new Set());
+  const [contactSearch, setContactSearch] = useState('');
+  const [contactsLoading, setContactsLoading] = useState(false);
   const waTimer   = useRef(null);
   const campTimer = useRef(null);
 
@@ -333,13 +338,35 @@ export default function ShopDashboard() {
     return `🔥 *${offer?.title}* — ${offer?.discount}% OFF!\n💰 ₹${fmt(offer?.offer_price)} (was ₹${fmt(offer?.original_price)})\n📍 ${shop?.name || ''}, ${shop?.city || ''}\n⏰ Valid till ${validDate}\n\n👉 ${window.location.origin}${shopUrl(shop)}`;
   };
 
+  const loadAllContacts = async () => {
+    setContactsLoading(true);
+    try {
+      const { data } = await api.get('/campaigns/whatsapp/contacts?all=1');
+      setAllContacts(data.list || []);
+    } catch { flash('Could not load contacts', 'err'); }
+    finally { setContactsLoading(false); }
+  };
+
+  const togglePhone = (phone, checked) => {
+    setSelectedPhones(prev => {
+      const next = new Set(prev);
+      checked ? next.add(phone) : next.delete(phone);
+      return next;
+    });
+  };
+
   const startCampaign = async () => {
     if (!campMsg.trim()) { flash('Please write a message first', 'err'); return; }
+    if (sendMode === 'select' && selectedPhones.size === 0) {
+      flash('Select at least one contact', 'err'); return;
+    }
     setCampLoading(true);
     try {
       const offerId = campOfferId ? Number(campOfferId) : null;
       const shopId  = offerId ? offers.find(o => o.id === offerId)?.shop_id : null;
-      const { data } = await api.post('/campaigns', { offer_id: offerId, shop_id: shopId, message: campMsg });
+      const payload = { offer_id: offerId, shop_id: shopId, message: campMsg };
+      if (sendMode === 'select') payload.selected_phones = [...selectedPhones];
+      const { data } = await api.post('/campaigns', payload);
       setActiveCampaign(data);
       setCampHistory(h => [data, ...h]);
     } catch (err) {
@@ -1091,21 +1118,96 @@ export default function ShopDashboard() {
                     </select>
                   </div>
 
+                  {/* Send to — All or Selected */}
+                  <div className="form-group">
+                    <label>Send to</label>
+                    <div className="camp-mode-toggle">
+                      <button
+                        className={`camp-mode-btn ${sendMode === 'all' ? 'active' : ''}`}
+                        onClick={() => setSendMode('all')}>
+                        All Contacts ({waStatus.contacts})
+                      </button>
+                      <button
+                        className={`camp-mode-btn ${sendMode === 'select' ? 'active' : ''}`}
+                        onClick={() => {
+                          setSendMode('select');
+                          if (allContacts.length === 0) loadAllContacts();
+                        }}>
+                        Select Contacts
+                      </button>
+                    </div>
+
+                    {sendMode === 'select' && (
+                      <div className="camp-contact-picker">
+                        {contactsLoading ? (
+                          <div style={{ textAlign:'center', padding:16 }}>
+                            <div className="opt-spinner" style={{ margin:'0 auto 8px' }} />
+                            <p style={{ fontSize:13, color:'#888' }}>Loading contacts…</p>
+                          </div>
+                        ) : (
+                          <>
+                            <div className="camp-picker-header">
+                              <input
+                                className="camp-contacts-search"
+                                value={contactSearch}
+                                onChange={e => setContactSearch(e.target.value)}
+                                placeholder="🔍 Search name or number…" />
+                              <div className="camp-picker-actions">
+                                <button onClick={() => setSelectedPhones(new Set(allContacts.map(c => c.phone)))}>All</button>
+                                <button onClick={() => setSelectedPhones(new Set())}>None</button>
+                                <span className="camp-sel-count">{selectedPhones.size} selected</span>
+                              </div>
+                            </div>
+                            <div className="camp-contacts-list">
+                              {allContacts
+                                .filter(c => {
+                                  const q = contactSearch.toLowerCase();
+                                  return !q || (c.name || '').toLowerCase().includes(q) || (c.phone || '').includes(q);
+                                })
+                                .map(c => (
+                                  <label key={c.phone} className="camp-contact-row">
+                                    <input type="checkbox"
+                                      checked={selectedPhones.has(c.phone)}
+                                      onChange={e => togglePhone(c.phone, e.target.checked)} />
+                                    <div className="camp-contact-info">
+                                      <span className="camp-contact-name">{c.name || 'Unknown'}</span>
+                                      <span className="camp-contact-phone">+{c.phone}</span>
+                                    </div>
+                                  </label>
+                                ))}
+                              {allContacts.length === 0 && (
+                                <p style={{ padding:12, color:'#aaa', fontSize:13 }}>No contacts found. Connect WhatsApp to sync contacts.</p>
+                              )}
+                            </div>
+                          </>
+                        )}
+                      </div>
+                    )}
+                  </div>
+
                   {/* Message */}
                   <div className="form-group">
                     <label>Message <span style={{ color:'#e65100', fontWeight:600 }}>*</span></label>
-                    <textarea value={campMsg} rows={6} onChange={e => setCampMsg(e.target.value)}
-                      placeholder={`Type your offer message here...\n\nExample:\n🔥 Big Sale Today!\n💰 Up to 50% off on all items\n📍 Visit us at Main Street\n👉 https://offerscity.co.in/shop/yourshop`}
+                    <textarea value={campMsg} rows={5} onChange={e => setCampMsg(e.target.value)}
+                      placeholder={`Type your offer message here...\n\nExample:\n🔥 Big Sale Today!\n💰 Up to 50% off on all items\n📍 Visit us at Main Street`}
                       style={{ fontFamily:'inherit', lineHeight:1.6 }} />
                     <div style={{ textAlign:'right', color:'#aaa', fontSize:12 }}>{campMsg.length} chars</div>
                   </div>
 
                   <div className="camp-recipient-info">
-                    👥 Will be sent to <strong>{waStatus.contacts}</strong> WhatsApp contacts · <strong>2–3 msgs/min</strong> · ~{Math.ceil(waStatus.contacts * 25 / 60)} min total
+                    {sendMode === 'all'
+                      ? <>👥 Sending to <strong>all {waStatus.contacts}</strong> contacts · ~{Math.ceil(waStatus.contacts * 25 / 60)} min</>
+                      : <>👥 Sending to <strong>{selectedPhones.size}</strong> selected contacts · ~{Math.ceil(selectedPhones.size * 25 / 60)} min</>
+                    }
                   </div>
 
-                  <button className="btn-post-offer" onClick={startCampaign} disabled={campLoading || !campMsg.trim()}>
-                    {campLoading ? '⏳ Starting…' : `🚀 Send to ${waStatus.contacts} Contacts`}
+                  <button className="btn-post-offer" onClick={startCampaign}
+                    disabled={campLoading || !campMsg.trim() || (sendMode === 'select' && selectedPhones.size === 0)}>
+                    {campLoading
+                      ? '⏳ Starting…'
+                      : sendMode === 'all'
+                        ? `🚀 Send to All ${waStatus.contacts} Contacts`
+                        : `🚀 Send to ${selectedPhones.size} Selected`}
                   </button>
                 </div>
               )}

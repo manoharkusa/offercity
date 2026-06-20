@@ -47,6 +47,7 @@ router.post('/whatsapp/connect-pairing', protect, requireRole('shop_owner', 'adm
 // GET /api/campaigns/whatsapp/contacts
 router.get('/whatsapp/contacts', protect, requireRole('shop_owner', 'admin'), (req, res) => {
   const list = wa.getContacts(req.user.id);
+  if (req.query.all === '1') return res.json({ count: list.length, list });
   res.json({ count: list.length, preview: list.slice(0, 8) });
 });
 
@@ -64,14 +65,21 @@ router.get('/', protect, requireRole('shop_owner', 'admin'), async (req, res) =>
 
 // POST /api/campaigns — create & start
 router.post('/', protect, requireRole('shop_owner', 'admin'), async (req, res) => {
-  const { offer_id, shop_id, message } = req.body;
+  const { offer_id, shop_id, message, selected_phones } = req.body;
   if (!message) return res.status(400).json({ message: 'message is required' });
 
   const status = wa.getStatus(req.user.id);
   if (status.status !== 'connected') return res.status(400).json({ message: 'WhatsApp not connected' });
 
-  const list = wa.getContacts(req.user.id);
+  let list = wa.getContacts(req.user.id);
   if (list.length === 0) return res.status(400).json({ message: 'No contacts found yet — wait a moment after connecting' });
+
+  // Filter to selected contacts when provided
+  if (Array.isArray(selected_phones) && selected_phones.length > 0) {
+    const allowed = new Set(selected_phones.map(String));
+    list = list.filter(c => allowed.has(String(c.phone)));
+    if (list.length === 0) return res.status(400).json({ message: 'None of the selected contacts were found' });
+  }
 
   const pool = getPool();
   const [ins] = await pool.query(
