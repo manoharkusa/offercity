@@ -89,7 +89,7 @@ if new_css:
     sh(f"cd {DIST_REMOTE}/assets && ls index-*.css 2>/dev/null | grep -v '{new_css}' | xargs -r rm -f",
        "clean old CSS")
 
-# ── 3. Upload server files ─────────────────────────────────────────────────────
+# ── 3. Upload server files — track whether any changed ───────────────────────
 print("=== Uploading server files ===")
 server_files = [
     ("server/Passengerfile.json",    f"{APP}/Passengerfile.json"),
@@ -108,14 +108,40 @@ server_files = [
     ("server/services/aichatbot.js", f"{APP}/services/aichatbot.js"),
     ("server/services/whatsapp.js",  f"{APP}/services/whatsapp.js"),
 ]
+
+import hashlib
+
+def file_hash(path):
+    try:
+        return hashlib.md5(open(path, 'rb').read()).hexdigest()
+    except:
+        return None
+
+def remote_hash(sftp_conn, remote):
+    try:
+        import io
+        buf = io.BytesIO()
+        sftp_conn.getfo(remote, buf)
+        return hashlib.md5(buf.getvalue()).hexdigest()
+    except:
+        return None
+
+server_changed = False
 for local, remote in server_files:
-    if os.path.exists(local):
-        upload_file(local, remote)
-    else:
+    if not os.path.exists(local):
         print(f"  -- skipped (not found): {local}")
+        continue
+    lh = file_hash(local)
+    rh = remote_hash(sftp, remote)
+    if lh != rh:
+        upload_file(local, remote)
+        server_changed = True
+    else:
+        print(f"  == unchanged: {os.path.basename(local)}")
 
 sftp.close()
 print()
+print(f"Server files changed: {server_changed}")
 
 # ── 4. Inject GROQ_API_KEY into production .env ───────────────────────────────
 groq_key = os.environ.get("GROQ_API_KEY", "").strip()
@@ -126,26 +152,41 @@ if groq_key:
 else:
     print("=== GROQ_API_KEY secret not set — skipping ===")
 
-# ── 5. Restart via localhost (avoids cPanel user-isolation issues) ────────────
-# The running Node.js server has /api/deploy-restart — call it on localhost:PORT
-# so the request hits Node directly without going through Passenger's proxy.
-# Falls back to the public URL if localhost fails.
+# ── 5. Restart only if server files changed ───────────────────────────────────
+# Skipping restart for client-only deploys prevents unnecessary Passenger exits
+# which can trigger crash protection when multiple deploys happen quickly.
 DEPLOY_SECRET = os.environ.get("DEPLOY_SECRET", "offerscity-deploy-2025")
 PORT_FILE = f"{HOME_REMOTE}/node_port.txt"
-print("=== Restarting Node process via localhost ===")
-sh(
-    f"PORT=$(cat {PORT_FILE} 2>/dev/null || echo 5008); "
-    f"curl -sf -X POST http://localhost:$PORT/api/deploy-restart "
-    f"  -H 'x-deploy-secret: {DEPLOY_SECRET}' -H 'Content-Type: application/json' "
-    f"&& echo 'restart triggered via localhost' "
-    f"|| curl -sf -X POST https://offerscity.co.in/api/deploy-restart "
-    f"  -H 'x-deploy-secret: {DEPLOY_SECRET}' -H 'Content-Type: application/json' "
-    f"&& echo 'restart triggered via public url' "
-    f"|| echo 'NOTE: deploy-restart not yet available — do one manual cPanel restart'",
-    "deploy-restart"
-)
-time.sleep(25)
-sh(f"curl -s https://offerscity.co.in/api/health", "health check")
+
+if not server_changed:
+    print("=== Client-only deploy — skipping server restart ===")
+    time.sleep(5)
+else:
+    print("=== Server files changed — restarting Node process ===")
+    # Wait a moment to ensure all files are flushed to disk
+    time.sleep(3)
+    sh(
+        f"PORT=$(cat {PORT_FILE} 2>/dev/null || echo 5008); "
+        f"curl -sf -X POST http://localhost:$PORT/api/deploy-restart "
+        f"  -H 'x-deploy-secret: {DEPLOY_SECRET}' -H 'Content-Type: application/json' "
+        f"&& echo 'restart triggered via localhost' "
+        f"|| curl -sf -X POST https://offerscity.co.in/api/deploy-restart "
+        f"  -H 'x-deploy-secret: {DEPLOY_SECRET}' -H 'Content-Type: application/json' "
+        f"&& echo 'restart triggered via public url' "
+        f"|| echo 'NOTE: deploy-restart not available — server may need manual cPanel restart'",
+        "deploy-restart"
+    )
+    # Wait for graceful shutdown + Passenger to spawn fresh worker (up to 40s)
+    print("Waiting for fresh worker to start…")
+    for i in range(8):
+        time.sleep(5)
+        r = sh(f"curl -sf https://offerscity.co.in/api/health || echo 'not yet'")
+        if 'running' in r or 'OfferCity' in r:
+            print(f"Server up after {(i+1)*5}s")
+            break
+        print(f"  {(i+1)*5}s: still starting…")
+
+sh(f"curl -s https://offerscity.co.in/api/health", "final health check")
 
 c.close()
 print("=== Deploy complete ===")

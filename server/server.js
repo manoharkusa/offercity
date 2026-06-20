@@ -49,13 +49,21 @@ app.use('/api/push',      require('./routes/push'));
 
 app.get('/api/health', (req, res) => res.json({ status: 'OfferCity API running', port: process.env.PORT || 5000 }));
 
-// Deploy restart — CI script calls this after uploading new files.
-// process.exit(0) causes Passenger to spawn a fresh worker that reads new code.
+// Deploy restart — CI script calls this after uploading new server files.
+// Graceful shutdown: stop accepting new connections, drain existing ones, then exit.
+// Passenger sees a clean exit (not a crash) and spawns a fresh worker.
 app.post('/api/deploy-restart', (req, res) => {
   const secret = process.env.DEPLOY_SECRET || 'offerscity-deploy-2025';
   if (req.headers['x-deploy-secret'] !== secret) return res.status(403).json({ error: 'forbidden' });
   res.json({ ok: true, pid: process.pid });
-  setTimeout(() => process.exit(0), 300);
+  setTimeout(() => {
+    server.close(() => {
+      console.log('[DEPLOY] Graceful shutdown complete — Passenger will spawn fresh worker');
+      process.exit(0);
+    });
+    // Force exit after 8s if connections don't drain in time
+    setTimeout(() => { console.log('[DEPLOY] Force exit after drain timeout'); process.exit(0); }, 8000);
+  }, 500);
 });
 
 // Last 100 log lines — useful for diagnosing production crashes

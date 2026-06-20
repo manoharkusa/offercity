@@ -355,19 +355,7 @@ async function connect(ownerId) {
     if (type !== 'notify') return;
     for (const msg of messages) {
       try {
-        if (msg.key.fromMe) {
-          // Log sent messages so we can see what JID format WhatsApp uses for the conversation
-          const sentJid = msg.key.remoteJid || '';
-          const sentUser = sentJid.split('@')[0];
-          const text0 = msg.message?.conversation || msg.message?.extendedTextMessage?.text || '';
-          console.log(`[WA SENT] jid=${sentJid} user.len=${sentUser.length} text="${text0.slice(0,30)}"`);
-          // If primary phone sent to a phone JID (real number ≤13 digits) and we have a
-          // pending LID for the same conversation, record the mapping
-          if (/^\d+$/.test(sentUser) && sentUser.length <= 13) {
-            console.log(`[WA SENT→PHONE] ${sentUser} — storing as potential chatbot target`);
-          }
-          continue;
-        }
+        if (msg.key.fromMe) continue;
         const remoteJid = msg.key.remoteJid || '';
         // Only handle direct 1-on-1 chats — skip groups, status broadcasts, newsletters
         if (!remoteJid.endsWith('@s.whatsapp.net')) continue;
