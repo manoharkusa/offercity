@@ -10,7 +10,6 @@ const connStatus    = {};   // ownerId → string
 const qrCodes       = {};   // ownerId → { dataUrl, ts }
 const contactMap    = {};   // ownerId → [{jid, phone, name}]
 const lidToPhone    = {};   // ownerId → { lidJid → phoneJid } — resolves WA internal IDs
-const waStores      = {};   // ownerId → Baileys makeInMemoryStore instance
 const activeCamps   = {};   // campaignId → { running: bool }
 const keepAlive     = {};   // ownerId → intervalId
 const reconnectTry  = {};   // ownerId → attempt count (for backoff)
@@ -102,25 +101,18 @@ function mergeContacts(ownerId, incoming) {
   persistContacts(ownerId);
 }
 
-// Resolve a LID JID (WhatsApp internal ID) to the real phone JID for reliable delivery.
-// LIDs are 14-15 digit internal WhatsApp identifiers; real phones are ≤13 digits in E.164.
+// Resolve a LID JID (WhatsApp internal ID) to the real phone JID for reliable delivery
 function resolvePhoneJid(ownerId, jid) {
   if (!jid) return jid;
   const user = jid.split('@')[0];
-  // Real phone: all digits, ≤13 chars (E.164 max minus 2). LIDs are typically 14-15 digits.
-  if (/^\d+$/.test(user) && user.length <= 13) return jid;
-  // Try Baileys in-memory store (most reliable — populated by contacts.set / contacts.upsert)
-  const storeC = waStores[ownerId]?.contacts?.[jid];
-  const pn = storeC?.pn || storeC?.phoneNumber;
-  if (pn) { const p = String(pn).replace(/\D/g,''); if (p) { console.log(`[WA] LID ${user} → ${p} (store)`); return `${p}@s.whatsapp.net`; } }
-  // Try lidToPhone built from contacts.set event (pn / lid fields)
+  if (/^\d{7,15}$/.test(user)) return jid; // already a phone number
+  // Look up LID → phone from contacts sync
   const phone = lidToPhone[ownerId]?.[user];
-  if (phone) { console.log(`[WA] LID ${user} → ${phone} (map)`); return `${phone}@s.whatsapp.net`; }
-  // Last resort: scan contactMap
+  if (phone) { console.log(`[WA] Resolved LID ${user} → ${phone}`); return `${phone}@s.whatsapp.net`; }
+  // Fallback: scan contactMap for a stored pn
   const contact = (contactMap[ownerId] || []).find(c => c.jid === jid);
-  if (contact?.phone && contact.phone.length <= 13) return `${contact.phone}@s.whatsapp.net`;
-  console.log(`[WA] LID ${user} unresolved — sending to original JID`);
-  return jid;
+  if (contact?.phone && /^\d{7,15}$/.test(contact.phone)) return `${contact.phone}@s.whatsapp.net`;
+  return jid; // unknown LID — send anyway, may or may not deliver
 }
 
 async function connect(ownerId) {
@@ -176,7 +168,7 @@ async function connect(ownerId) {
     getMessage:                   async () => undefined,
     keepAliveIntervalMs:            20_000,
     connectTimeoutMs:               60_000,  // allow 60s to establish WS (was 30s)
-    defaultQueryTimeoutMs:         120_000,  // allow 2min for init queries like fetchProps
+    defaultQueryTimeoutMs:          30_000,  // 30s — long enough for fetchProps, short enough to not hang LID sends
     retryRequestDelayMs:            2_000,
     generateHighQualityLinkPreview: false,
     markOnlineOnConnect:            false,
@@ -184,15 +176,6 @@ async function connect(ownerId) {
 
   sockets[ownerId] = sock;
   sock.ev.on('creds.update', saveCreds);
-
-  // Bind Baileys in-memory store — tracks contacts with LID→phone mapping
-  if (mod.makeInMemoryStore) {
-    try {
-      if (!waStores[ownerId]) waStores[ownerId] = mod.makeInMemoryStore({});
-      waStores[ownerId].bind(sock.ev);
-      console.log(`[WA] store bound for owner ${ownerId}`);
-    } catch (e) { console.log(`[WA] store unavailable: ${e.message}`); }
-  }
 
   sock.ev.on('connection.update', async ({ qr, connection, lastDisconnect }) => {
     if (qr && QRCode) {
@@ -266,22 +249,18 @@ async function connect(ownerId) {
           || msg.message?.imageMessage?.caption
           || '';
         const replyJid = resolvePhoneJid(ownerId, remoteJid);
-        // One-time: dump full msg keys so we can find sender_pn / participant_pn
-        if (text.trim() && !connect._msgLogged) {
-          connect._msgLogged = true;
-          console.log(`[WA MSGKEYS] ${Object.keys(msg).join(',')}`);
-          console.log(`[WA MSGKEY2] key=${JSON.stringify(msg.key)} verifiedBiz=${msg.verifiedBizName || ''}`);
-        }
         console.log(`[WA MSG] jid=${remoteJid} replyJid=${replyJid} name="${msg.pushName || ''}" age=${Math.round(age)}s text="${text.slice(0, 40)}"`);
         if (age > 300) continue;
         if (!text.trim()) continue;
         await new Promise(r => setTimeout(r, 1000 + Math.random() * 1000));
         const reply = await ai.handleIncoming(ownerId, replyJid, text, msg.pushName || '');
         if (reply) {
-          // Race sendMessage against a 15s timeout — LID JIDs can hang indefinitely
-          // Plain send (no quoted) — same as campaign sends, avoids LID-related hang
-          await sock.sendMessage(replyJid, { text: reply });
-          console.log(`[AI] Send OK → ${replyJid}`);
+          // Timeout resolves (not rejects) so a hung LID send never blocks the loop
+          const sent = await Promise.race([
+            sock.sendMessage(replyJid, { text: reply }).then(() => true),
+            new Promise(r => setTimeout(() => r(false), 12000))
+          ]);
+          console.log(`[AI] Send ${sent ? 'OK' : 'TIMEOUT'} → ${replyJid}`);
         }
       } catch (e) { console.error('[WA] message handler error:', e.message); }
     }
