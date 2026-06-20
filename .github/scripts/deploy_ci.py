@@ -126,19 +126,22 @@ if groq_key:
 else:
     print("=== GROQ_API_KEY secret not set — skipping ===")
 
-# ── 5. Verify upload & restart ────────────────────────────────────────────────
-print("=== Verifying uploaded server.js ===")
-# Write diagnostics to node.log so we can read them via /api/logs
-pass  # diagnostics removed — cPanel runs Node.js as a separate OS user; only /api/deploy-restart can trigger reload
-
-# Call /api/deploy-restart on the running server — it calls process.exit(0)
-# and Passenger immediately spawns a fresh worker from the new files on disk.
+# ── 5. Restart via localhost (avoids cPanel user-isolation issues) ────────────
+# The running Node.js server has /api/deploy-restart — call it on localhost:PORT
+# so the request hits Node directly without going through Passenger's proxy.
+# Falls back to the public URL if localhost fails.
 DEPLOY_SECRET = os.environ.get("DEPLOY_SECRET", "offerscity-deploy-2025")
-print("=== Restarting via /api/deploy-restart ===")
+PORT_FILE = f"{HOME_REMOTE}/node_port.txt"
+print("=== Restarting Node process via localhost ===")
 sh(
-    f"curl -s -X POST https://offerscity.co.in/api/deploy-restart "
-    f"-H 'x-deploy-secret: {DEPLOY_SECRET}' "
-    f"-H 'Content-Type: application/json' || echo 'restart endpoint not yet available (manual cPanel restart needed)'",
+    f"PORT=$(cat {PORT_FILE} 2>/dev/null || echo 5008); "
+    f"curl -sf -X POST http://localhost:$PORT/api/deploy-restart "
+    f"  -H 'x-deploy-secret: {DEPLOY_SECRET}' -H 'Content-Type: application/json' "
+    f"&& echo 'restart triggered via localhost' "
+    f"|| curl -sf -X POST https://offerscity.co.in/api/deploy-restart "
+    f"  -H 'x-deploy-secret: {DEPLOY_SECRET}' -H 'Content-Type: application/json' "
+    f"&& echo 'restart triggered via public url' "
+    f"|| echo 'NOTE: deploy-restart not yet available — do one manual cPanel restart'",
     "deploy-restart"
 )
 time.sleep(25)

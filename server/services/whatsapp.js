@@ -265,12 +265,9 @@ async function connect(ownerId) {
           || msg.message?.imageMessage?.caption
           || '';
         const replyJid = resolvePhoneJid(ownerId, remoteJid, msg.pushName || '');
-        const isLid = replyJid === remoteJid && replyJid.split('@')[0].length > 13;
-        console.log(`[WA MSG] jid=${remoteJid} replyJid=${replyJid} lid=${isLid} name="${msg.pushName || ''}" age=${Math.round(age)}s text="${text.slice(0, 40)}"`);
+        console.log(`[WA MSG] jid=${remoteJid} replyJid=${replyJid} name="${msg.pushName || ''}" age=${Math.round(age)}s text="${text.slice(0, 40)}"`);
         if (age > 300) continue;
         if (!text.trim()) continue;
-        // Skip AI reply if LID is unresolved — sending to LID causes socket instability
-        if (isLid) { console.log(`[WA] Skipping LID reply to ${replyJid} — cannot resolve to phone`); continue; }
         await new Promise(r => setTimeout(r, 1000 + Math.random() * 1000));
         const reply = await ai.handleIncoming(ownerId, replyJid, text, msg.pushName || '');
         if (reply) {
@@ -499,8 +496,6 @@ async function connectWithPairingCode(ownerId, phone) {
         const text = msg.message?.conversation || msg.message?.extendedTextMessage?.text || msg.message?.imageMessage?.caption || '';
         if (!text.trim()) continue;
         const replyJid2 = resolvePhoneJid(ownerId, remoteJid2, msg.pushName || '');
-        const isLid2 = replyJid2 === remoteJid2 && replyJid2.split('@')[0].length > 13;
-        if (isLid2) { console.log(`[WA] Skipping LID reply to ${replyJid2}`); continue; }
         await new Promise(r => setTimeout(r, 1000 + Math.random() * 1000));
         const reply = await ai.handleIncoming(ownerId, replyJid2, text, msg.pushName || '');
         if (reply) {
