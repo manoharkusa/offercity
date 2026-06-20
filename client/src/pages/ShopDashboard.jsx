@@ -918,43 +918,59 @@ export default function ShopDashboard() {
                     {/* Input — shown when no active code and not loading */}
                     {!pairLoading && !pairingCode && (
                       <>
-                        <div className="wa-pair-divider"><span>or connect on this phone</span></div>
+                        <div className="wa-pair-divider"><span>connect on this phone</span></div>
                         <div className="wa-pair-input-row">
-                          <input value={pairPhone} onChange={e => setPairPhone(e.target.value)}
-                            placeholder="Your WhatsApp number (e.g. 919876543210)" type="tel" />
-                          <button onClick={getPairingCode} disabled={!pairPhone.trim()}>Connect →</button>
+                          <input value={pairPhone} onChange={e => setPairPhone(e.target.value.replace(/\D/g, ''))}
+                            placeholder="WhatsApp number with country code — e.g. 919876543210" type="tel"
+                            inputMode="numeric" />
+                          <button onClick={getPairingCode} disabled={!pairPhone.trim() || pairPhone.length < 10}>
+                            Get Code →
+                          </button>
+                        </div>
+                        <p style={{ fontSize:11, color:'#999', marginTop:4, marginBottom:0 }}>
+                          Include country code, no + or spaces. India: 91XXXXXXXXXX
+                        </p>
+                        <div className="wa-desktop-tip">
+                          💻 <strong>Easier on computer:</strong> Open this page on a laptop — scan the QR with your phone in 2 seconds.
                         </div>
                       </>
                     )}
 
                     {/* Loading spinner */}
                     {pairLoading && (
-                      <div style={{ textAlign:'center', padding:'20px 0' }}>
+                      <div style={{ textAlign:'center', padding:'16px 0' }}>
                         <div className="opt-spinner" style={{ margin:'0 auto 10px' }} />
-                        <p style={{ color:'#666', fontSize:13 }}>Generating your pairing code…</p>
+                        <p style={{ color:'#666', fontSize:13 }}>Generating code… (5–10 seconds)</p>
                       </div>
                     )}
 
                     {/* Code ready */}
                     {pairingCode && (
                       <div className="wa-pair-code-box">
-                        <p>Enter this code in WhatsApp <strong>right now:</strong></p>
+                        <div className="wa-pair-timer" style={{
+                          color: pairCountdown < 15 ? '#c62828' : pairCountdown < 30 ? '#f57c00' : '#2e7d32',
+                          fontWeight: 700, fontSize: 13, marginBottom: 6
+                        }}>
+                          {pairCountdown > 0 ? `⏱ ${pairCountdown}s — enter NOW` : '⚠️ Expired — get new code'}
+                        </div>
                         <div className="wa-pair-code">
                           {pairingCode.length === 8 ? `${pairingCode.slice(0,4)}-${pairingCode.slice(4)}` : pairingCode}
                         </div>
-                        <div className="wa-pair-timer" style={{ color: pairCountdown < 15 ? '#c62828' : '#f57c00' }}>
-                          {pairCountdown > 0 ? `⏱ Expires in ${pairCountdown}s` : '⚠️ Code expired'}
-                        </div>
-                        <p className="wa-pair-steps">
-                          WhatsApp → ⋮ Menu → <strong>Linked Devices</strong> → Link a Device<br/>
-                          → tap <strong>"Link with phone number instead"</strong> → enter the code
-                        </p>
+                        <ol className="wa-pair-steps">
+                          <li>Open <strong>WhatsApp</strong> on your phone</li>
+                          <li>Tap <strong>⋮</strong> (3 dots, top-right corner)</li>
+                          <li>Tap <strong>Linked Devices</strong></li>
+                          <li>Tap <strong>Link a Device</strong></li>
+                          <li>Below the QR camera, tap <strong style={{color:'#1565c0'}}>"Link with phone number instead"</strong></li>
+                          <li>Enter the code above <strong style={{color:'#c62828'}}>within {pairCountdown}s</strong></li>
+                        </ol>
                         {pairCountdown === 0
                           ? <button className="wa-pair-regen-btn" onClick={getPairingCode} disabled={pairLoading}>
                               {pairLoading ? '…' : '🔄 Get New Code'}
                             </button>
-                          : <button onClick={() => { setPairingCode(''); setPairCountdown(0); }}>
-                              ✕ Try a different number
+                          : <button style={{marginTop:8, fontSize:12, padding:'6px 12px'}}
+                              onClick={() => { setPairingCode(''); setPairCountdown(0); }}>
+                              ✕ Cancel
                             </button>
                         }
                       </div>

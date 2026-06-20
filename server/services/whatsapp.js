@@ -208,22 +208,24 @@ async function connectWithPairingCode(ownerId, phone) {
   if (!cleanPhone || cleanPhone.length < 10)
     throw new Error('Enter a valid phone number with country code (e.g. 919876543210)');
 
-  // Close any existing socket so we start fresh
+  // Close any existing socket
   if (sockets[ownerId]) {
     try { sockets[ownerId].ws?.close(); } catch {}
     delete sockets[ownerId];
     delete qrCodes[ownerId];
   }
+  connStatus[ownerId] = 'disconnected';
 
   const sessionDir = path.join(SESSION_BASE, String(ownerId));
-  fs.mkdirSync(sessionDir, { recursive: true });
 
-  // Clear saved Baileys auth so it always generates a fresh QR — required for requestPairingCode
-  try {
-    for (const f of fs.readdirSync(sessionDir)) {
-      if (f !== 'contacts.json') fs.rmSync(path.join(sessionDir, f), { force: true, recursive: true });
-    }
-  } catch {}
+  // Nuclear session clear: save contacts, wipe whole dir, restore contacts.
+  // Baileys MUST start with no saved credentials to generate a fresh QR for requestPairingCode.
+  const contactsPath = path.join(sessionDir, 'contacts.json');
+  let savedContacts = null;
+  try { if (fs.existsSync(contactsPath)) savedContacts = fs.readFileSync(contactsPath); } catch {}
+  try { fs.rmSync(sessionDir, { recursive: true, force: true }); } catch {}
+  fs.mkdirSync(sessionDir, { recursive: true });
+  if (savedContacts) { try { fs.writeFileSync(contactsPath, savedContacts); } catch {} }
 
   loadSavedContacts(ownerId);
 
@@ -248,31 +250,12 @@ async function connectWithPairingCode(ownerId, phone) {
   sockets[ownerId] = sock;
   sock.ev.on('creds.update', saveCreds);
 
-  const ai = require('./aichatbot');
-  sock.ev.on('messages.upsert', async ({ messages, type }) => {
-    if (type !== 'notify') return;
-    for (const msg of messages) {
-      if (msg.key.fromMe || msg.key.remoteJid?.endsWith('@g.us')) continue;
-      const age = Date.now() / 1000 - (msg.messageTimestamp || 0);
-      if (age > 60) continue;
-      const text = msg.message?.conversation || msg.message?.extendedTextMessage?.text || msg.message?.imageMessage?.caption || '';
-      if (!text.trim()) continue;
-      await new Promise(r => setTimeout(r, 1000 + Math.random() * 1000));
-      const reply = await ai.handleIncoming(ownerId, msg.key.remoteJid, text, msg.pushName || '');
-      if (reply) await sock.sendMessage(msg.key.remoteJid, { text: reply });
-    }
-  });
-  sock.ev.on('contacts.set',      ({ contacts }) => mergeContacts(ownerId, contacts));
-  sock.ev.on('contacts.update',   upd => mergeContacts(ownerId, upd));
-  sock.ev.on('messaging-history.set', ({ contacts: c }) => { if (c?.length) mergeContacts(ownerId, c); });
-
-  // Return a Promise that resolves with the pairing code or rejects on timeout/error
-  return new Promise((resolve, reject) => {
-    const timeout = setTimeout(() => reject(new Error('Timed out waiting for QR — try again')), 16000);
+  // Register connection.update FIRST — before any async event could fire — so we never miss the QR
+  const pairResult = new Promise((resolve, reject) => {
+    const timeout = setTimeout(() => reject(new Error('Timed out — try again')), 20000);
 
     sock.ev.on('connection.update', async ({ qr, connection, lastDisconnect }) => {
       if (qr) {
-        // QR event is the correct moment to call requestPairingCode
         connStatus[ownerId] = 'waiting_scan';
         try {
           const code = await sock.requestPairingCode(cleanPhone);
@@ -281,7 +264,7 @@ async function connectWithPairingCode(ownerId, phone) {
         } catch (e) {
           clearTimeout(timeout);
           connStatus[ownerId] = 'error';
-          reject(new Error('Could not generate pairing code: ' + e.message));
+          reject(new Error('WhatsApp rejected the code request: ' + e.message));
         }
       }
       if (connection === 'open') {
@@ -303,6 +286,27 @@ async function connectWithPairingCode(ownerId, phone) {
       }
     });
   });
+
+  // Register remaining handlers after promise is set up
+  const ai = require('./aichatbot');
+  sock.ev.on('messages.upsert', async ({ messages, type }) => {
+    if (type !== 'notify') return;
+    for (const msg of messages) {
+      if (msg.key.fromMe || msg.key.remoteJid?.endsWith('@g.us')) continue;
+      const age = Date.now() / 1000 - (msg.messageTimestamp || 0);
+      if (age > 60) continue;
+      const text = msg.message?.conversation || msg.message?.extendedTextMessage?.text || msg.message?.imageMessage?.caption || '';
+      if (!text.trim()) continue;
+      await new Promise(r => setTimeout(r, 1000 + Math.random() * 1000));
+      const reply = await ai.handleIncoming(ownerId, msg.key.remoteJid, text, msg.pushName || '');
+      if (reply) await sock.sendMessage(msg.key.remoteJid, { text: reply });
+    }
+  });
+  sock.ev.on('contacts.set',      ({ contacts }) => mergeContacts(ownerId, contacts));
+  sock.ev.on('contacts.update',   upd => mergeContacts(ownerId, upd));
+  sock.ev.on('messaging-history.set', ({ contacts: c }) => { if (c?.length) mergeContacts(ownerId, c); });
+
+  return pairResult;
 }
 
 module.exports = { connect, disconnect, getStatus, getContacts, sendWAMessage, runCampaign, activeCamps, connectWithPairingCode };
