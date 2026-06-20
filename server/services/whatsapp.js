@@ -151,7 +151,7 @@ async function connect(ownerId) {
         if (msg.key.fromMe) continue;
         if (msg.key.remoteJid?.endsWith('@g.us')) continue;
         const age = Date.now() / 1000 - (msg.messageTimestamp || 0);
-        if (age > 60) continue;
+        if (age > 300) continue; // skip messages older than 5 min (was 60s — too short after disconnects)
         const text = msg.message?.conversation
           || msg.message?.extendedTextMessage?.text
           || msg.message?.imageMessage?.caption
@@ -368,14 +368,16 @@ async function connectWithPairingCode(ownerId, phone) {
   sock.ev.on('messages.upsert', async ({ messages, type }) => {
     if (type !== 'notify') return;
     for (const msg of messages) {
-      if (msg.key.fromMe || msg.key.remoteJid?.endsWith('@g.us')) continue;
-      const age = Date.now() / 1000 - (msg.messageTimestamp || 0);
-      if (age > 60) continue;
-      const text = msg.message?.conversation || msg.message?.extendedTextMessage?.text || msg.message?.imageMessage?.caption || '';
-      if (!text.trim()) continue;
-      await new Promise(r => setTimeout(r, 1000 + Math.random() * 1000));
-      const reply = await ai.handleIncoming(ownerId, msg.key.remoteJid, text, msg.pushName || '');
-      if (reply) await sock.sendMessage(msg.key.remoteJid, { text: reply });
+      try {
+        if (msg.key.fromMe || msg.key.remoteJid?.endsWith('@g.us')) continue;
+        const age = Date.now() / 1000 - (msg.messageTimestamp || 0);
+        if (age > 300) continue;
+        const text = msg.message?.conversation || msg.message?.extendedTextMessage?.text || msg.message?.imageMessage?.caption || '';
+        if (!text.trim()) continue;
+        await new Promise(r => setTimeout(r, 1000 + Math.random() * 1000));
+        const reply = await ai.handleIncoming(ownerId, msg.key.remoteJid, text, msg.pushName || '');
+        if (reply) await sock.sendMessage(msg.key.remoteJid, { text: reply });
+      } catch (e) { console.error('[WA] message handler error:', e.message); }
     }
   });
   sock.ev.on('contacts.set',      ({ contacts }) => mergeContacts(ownerId, contacts));
@@ -395,8 +397,10 @@ async function autoReconnectAll() {
       const ownerId = e.name;
       const credsPath = path.join(SESSION_BASE, ownerId, 'creds.json');
       if (fs.existsSync(credsPath)) {
-        connStatus[ownerId] = 'reconnecting'; // show correct state immediately on first poll
+        connStatus[ownerId] = 'reconnecting';
         loadSavedContacts(ownerId);
+        // Restore chatbot toggle from disk so it survives server restarts
+        require('./aichatbot').loadEnabled(ownerId);
         console.log(`[WA] Auto-reconnecting owner ${ownerId} from saved session`);
         connect(ownerId).catch(err => console.error(`[WA] Auto-reconnect failed for ${ownerId}:`, err.message));
       }

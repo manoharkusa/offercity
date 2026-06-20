@@ -1,4 +1,9 @@
 const https = require('https');
+const path  = require('path');
+const fs    = require('fs');
+
+const SESSION_BASE = process.env.WA_SESSION_DIR
+  || (process.platform === 'linux' ? '/home1/a1751tyi/whatsapp_sessions' : path.join(__dirname, '../whatsapp_sessions'));
 
 // In-memory cache: ownerId → { context, ts }
 const contextCache = {};
@@ -8,11 +13,39 @@ const CACHE_TTL = 5 * 60 * 1000; // 5 min
 const lastReply = {};
 const RATE_LIMIT_MS = 30000; // 30 sec between replies to same contact
 
-// Per-owner toggle: ownerId → bool
+// Per-owner toggle: ownerId → bool (in-memory mirror of the file)
 const chatbotEnabled = {};
 
-function setEnabled(ownerId, val) { chatbotEnabled[ownerId] = val; }
-function isEnabled(ownerId) { return chatbotEnabled[ownerId] === true; }
+function enabledFile(ownerId) {
+  return path.join(SESSION_BASE, String(ownerId), 'chatbot_enabled');
+}
+
+function setEnabled(ownerId, val) {
+  chatbotEnabled[ownerId] = val;
+  // Persist so toggle survives server restarts
+  try {
+    fs.mkdirSync(path.join(SESSION_BASE, String(ownerId)), { recursive: true });
+    if (val) {
+      fs.writeFileSync(enabledFile(ownerId), '1');
+    } else {
+      fs.rmSync(enabledFile(ownerId), { force: true });
+    }
+  } catch {}
+}
+
+function loadEnabled(ownerId) {
+  if (chatbotEnabled[ownerId] !== undefined) return; // already loaded
+  try {
+    chatbotEnabled[ownerId] = fs.existsSync(enabledFile(ownerId));
+  } catch {
+    chatbotEnabled[ownerId] = false;
+  }
+}
+
+function isEnabled(ownerId) {
+  if (chatbotEnabled[ownerId] === undefined) loadEnabled(ownerId);
+  return chatbotEnabled[ownerId] === true;
+}
 
 async function getShopContext(ownerId) {
   const now = Date.now();
@@ -28,7 +61,6 @@ async function getShopContext(ownerId) {
   );
   if (!shops.length) return null;
 
-  // Get active offers for all shops of this owner
   const shopIds = shops.map(s => s.id);
   const [offers] = await pool.query(
     `SELECT title, discount, offer_price, original_price, valid_until, shop_id
@@ -80,7 +112,7 @@ function callAI(systemPrompt, userMessage) {
   if (!apiKey) throw new Error('GROQ_API_KEY not set in .env');
 
   const body = JSON.stringify({
-    model: 'llama-3.1-8b-instant',   // free, fast, multilingual
+    model: 'llama-3.1-8b-instant',
     max_tokens: 280,
     messages: [
       { role: 'system', content: systemPrompt },
@@ -117,7 +149,6 @@ function callAI(systemPrompt, userMessage) {
 async function handleIncoming(ownerId, jid, messageText, senderName) {
   if (!isEnabled(ownerId)) return null;
 
-  // Rate limit: skip if replied recently
   const rateKey = `${ownerId}:${jid}`;
   const now = Date.now();
   if (lastReply[rateKey] && now - lastReply[rateKey] < RATE_LIMIT_MS) return null;
@@ -145,4 +176,4 @@ function invalidateCache(ownerId) {
   delete contextCache[ownerId];
 }
 
-module.exports = { handleIncoming, setEnabled, isEnabled, invalidateCache };
+module.exports = { handleIncoming, setEnabled, loadEnabled, isEnabled, invalidateCache };
