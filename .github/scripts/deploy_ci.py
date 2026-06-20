@@ -125,43 +125,14 @@ if groq_key:
 else:
     print("=== GROQ_API_KEY secret not set — skipping ===")
 
-# ── 5. Restart Node ────────────────────────────────────────────────────────────
-print("=== Restarting Node.js ===")
-# Show what start_node.sh currently contains
-sh(f"cat {HOME_REMOTE}/start_node.sh", "current start_node.sh")
-
-# Replace start_node.sh with a SINGLE-RUN version (no restart loop).
-# The old version had 'while true; do node ...; sleep 2; done' which caused
-# every deploy to accumulate one more zombie process.
-sh(f"""cat > {HOME_REMOTE}/start_node.sh << 'SHELLEOF'
-#!/bin/bash
-source ~/.nvm/nvm.sh 2>/dev/null || true
-nvm use 16 2>/dev/null || true
-export PORT=5004
-cd {APP}
-exec node server.js
-SHELLEOF
-chmod +x {HOME_REMOTE}/start_node.sh""", "overwrite start_node.sh (no loop)")
-
-# Kill all processes whose /proc/PID/cmdline mentions start_node or server.js.
-# This works even when nohup changes the visible process title that pkill sees.
-sh(r"""
-for pid in $(ls /proc/ 2>/dev/null | grep '^[0-9]'); do
-  cmd=$(tr '\0' ' ' < /proc/$pid/cmdline 2>/dev/null)
-  case "$cmd" in
-    *start_node*|*server.js*) echo "killing pid $pid: $cmd"; kill -9 $pid 2>/dev/null ;;
-  esac
-done
-sleep 4
-""", "kill by /proc cmdline")
-sh(f"source ~/.nvm/nvm.sh && nvm use 16 && nohup bash {HOME_REMOTE}/start_node.sh >> {HOME_REMOTE}/node.log 2>&1 &",
-   "start node", timeout=15)
+# ── 5. Restart via Phusion Passenger ─────────────────────────────────────────
+# The app is managed by cPanel's Application Manager (Phusion Passenger).
+# Passenger watches tmp/restart.txt — touching it triggers a clean restart
+# with exactly ONE process. No manual nohup, no kill commands needed.
+print("=== Restarting via Passenger (touch tmp/restart.txt) ===")
+sh(f"mkdir -p {APP}/tmp && touch {APP}/tmp/restart.txt", "passenger restart")
 time.sleep(8)
-port = sh(f"cat {HOME_REMOTE}/node_port.txt 2>/dev/null", "active port").strip()
-if port:
-    sh(f"curl -s http://127.0.0.1:{port}/api/health", "health check")
-sh(f"echo 'running node procs:' && pgrep -c -f 'node.*server' || echo 0", "process count")
-sh(f"tail -10 {HOME_REMOTE}/node.log", "node log")
+sh(f"curl -s https://offerscity.co.in/api/health", "health check")
 
 c.close()
 print("=== Deploy complete ===")
