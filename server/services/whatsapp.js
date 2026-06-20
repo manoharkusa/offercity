@@ -102,17 +102,33 @@ function mergeContacts(ownerId, incoming) {
 }
 
 // Resolve a LID JID (WhatsApp internal ID) to the real phone JID for reliable delivery
-function resolvePhoneJid(ownerId, jid) {
+// pushName is the sender's display name — used as last-resort fallback via name lookup in stored contacts
+function resolvePhoneJid(ownerId, jid, pushName) {
   if (!jid) return jid;
   const user = jid.split('@')[0];
-  if (/^\d{7,15}$/.test(user)) return jid; // already a phone number
-  // Look up LID → phone from contacts sync
+  // Real Indian phone: ≤13 digits (91+10). LIDs are 14-15 digits.
+  if (/^\d+$/.test(user) && user.length <= 13) return jid;
+  // LID → phone from lidToPhone map (built from contacts.set pn/lid fields)
   const phone = lidToPhone[ownerId]?.[user];
-  if (phone) { console.log(`[WA] Resolved LID ${user} → ${phone}`); return `${phone}@s.whatsapp.net`; }
-  // Fallback: scan contactMap for a stored pn
+  if (phone) { console.log(`[WA] LID ${user} → ${phone} (map)`); return `${phone}@s.whatsapp.net`; }
+  // JID-based lookup — only useful if the stored phone is a real phone (≤13 digits)
   const contact = (contactMap[ownerId] || []).find(c => c.jid === jid);
-  if (contact?.phone && /^\d{7,15}$/.test(contact.phone)) return `${contact.phone}@s.whatsapp.net`;
-  return jid; // unknown LID — send anyway, may or may not deliver
+  if (contact?.phone && contact.phone.length <= 13) {
+    console.log(`[WA] LID ${user} → ${contact.phone} (contact jid)`);
+    return `${contact.phone}@s.whatsapp.net`;
+  }
+  // Name-based lookup: find an older phone-JID entry for the same person
+  if (pushName) {
+    const nl = pushName.toLowerCase();
+    const byName = (contactMap[ownerId] || []).find(c =>
+      c.name && c.name.toLowerCase() === nl &&
+      /^\d+$/.test(c.phone) && c.phone.length <= 13
+    );
+    if (byName) { console.log(`[WA] LID ${user} → ${byName.phone} (name:${pushName})`); return byName.jid; }
+  }
+  const cmap = contactMap[ownerId] || [];
+  console.log(`[WA] LID ${user} unresolved name="${pushName}" contacts=${cmap.length} phoneJids=${cmap.filter(c=>/^\d+$/.test(c.phone)&&c.phone.length<=13).length}`);
+  return jid;
 }
 
 async function connect(ownerId) {
@@ -248,7 +264,7 @@ async function connect(ownerId) {
           || msg.message?.extendedTextMessage?.text
           || msg.message?.imageMessage?.caption
           || '';
-        const replyJid = resolvePhoneJid(ownerId, remoteJid);
+        const replyJid = resolvePhoneJid(ownerId, remoteJid, msg.pushName || '');
         console.log(`[WA MSG] jid=${remoteJid} replyJid=${replyJid} name="${msg.pushName || ''}" age=${Math.round(age)}s text="${text.slice(0, 40)}"`);
         if (age > 300) continue;
         if (!text.trim()) continue;
@@ -481,9 +497,15 @@ async function connectWithPairingCode(ownerId, phone) {
         const text = msg.message?.conversation || msg.message?.extendedTextMessage?.text || msg.message?.imageMessage?.caption || '';
         if (!text.trim()) continue;
         await new Promise(r => setTimeout(r, 1000 + Math.random() * 1000));
-        const replyJid2 = resolvePhoneJid(ownerId, remoteJid2);
+        const replyJid2 = resolvePhoneJid(ownerId, remoteJid2, msg.pushName || '');
         const reply = await ai.handleIncoming(ownerId, replyJid2, text, msg.pushName || '');
-        if (reply) await sock.sendMessage(replyJid2, { text: reply });
+        if (reply) {
+          const sent2 = await Promise.race([
+            sock.sendMessage(replyJid2, { text: reply }).then(() => true),
+            new Promise(r => setTimeout(() => r(false), 12000))
+          ]);
+          console.log(`[AI] Send ${sent2 ? 'OK' : 'TIMEOUT'} → ${replyJid2}`);
+        }
       } catch (e) { console.error('[WA] message handler error:', e.message); }
     }
   });
