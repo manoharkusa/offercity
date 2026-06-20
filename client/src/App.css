@@ -1117,6 +1117,104 @@ a { text-decoration: none; color: inherit; }
 .wa-pair-regen-btn:disabled { opacity: .6; cursor: default; }
 
 /* ══════════════════════════════════════════
+   CAMPAIGN HUB
+══════════════════════════════════════════ */
+.camp-hub { }
+
+/* Live sending screen */
+.camp-live {
+  background: #fff8f0; border: 2px solid #ffb74d;
+  border-radius: 14px; padding: 22px 16px;
+  text-align: center; margin-bottom: 16px;
+}
+.camp-live-label { font-size: 13px; color: #e65100; font-weight: 600; margin-bottom: 10px; }
+.camp-live-num   { font-size: 56px; font-weight: 900; color: #e65100; line-height: 1; }
+.camp-live-sep   { font-size: 22px; color: #ccc; }
+.camp-live-tot   { font-size: 22px; color: #aaa; font-weight: 700; }
+.camp-live-sublabel { font-size: 13px; color: #999; margin-top: 4px; }
+
+/* Result / done screen */
+.camp-result {
+  text-align: center; padding: 24px 16px; margin-bottom: 16px;
+  background: #f1f8e9; border: 2px solid #a5d6a7;
+  border-radius: 14px;
+}
+.camp-result-icon { font-size: 40px; }
+.camp-result-num  { font-size: 52px; font-weight: 900; color: #2e7d32; line-height: 1.1; }
+.camp-result-lbl  { font-size: 14px; color: #555; margin-top: 4px; }
+
+/* Setup rows */
+.camp-setup { }
+.camp-row {
+  display: flex; align-items: center; gap: 12px;
+  padding: 14px 0; border-bottom: 1px solid #f0f0f0;
+}
+.camp-row:last-of-type { border-bottom: none; }
+.camp-row-icon  { font-size: 22px; flex-shrink: 0; }
+.camp-row-body  { flex: 1; min-width: 0; }
+.camp-row-title { font-size: 14px; font-weight: 700; color: #222; }
+.camp-row-sub   { font-size: 12px; color: #888; margin-top: 2px; }
+.camp-row-action {
+  padding: 7px 16px; border: 1.5px solid #e65100; color: #e65100;
+  border-radius: 8px; background: #fff; font-size: 13px;
+  font-weight: 600; cursor: pointer; font-family: inherit; white-space: nowrap;
+  flex-shrink: 0;
+}
+.camp-row-action:hover { background: #fff3e0; }
+.camp-row-col { flex-wrap: wrap; }
+.camp-offer-select {
+  flex-basis: 100%; margin-top: 8px;
+  padding: 10px 12px; border: 1.5px solid #ddd; border-radius: 8px;
+  font-size: 13px; font-family: inherit; background: #fafafa;
+  width: 100%; box-sizing: border-box;
+}
+.camp-toggle-wrap { cursor: pointer; flex-shrink: 0; }
+.camp-toggle {
+  width: 52px; height: 28px; border-radius: 14px;
+  position: relative; transition: background .2s;
+}
+.camp-toggle-knob {
+  position: absolute; top: 3px; width: 22px; height: 22px;
+  border-radius: 50%; background: #fff;
+  box-shadow: 0 1px 3px rgba(0,0,0,.3); transition: left .2s;
+}
+.camp-send-big {
+  width: 100%; padding: 16px; margin-top: 16px;
+  background: linear-gradient(135deg, #e65100, #ff7043);
+  color: #fff; border: none; border-radius: 12px;
+  font-size: 16px; font-weight: 800; cursor: pointer;
+  font-family: inherit; letter-spacing: .3px;
+  box-shadow: 0 4px 16px rgba(230,81,0,.25);
+  transition: transform .1s, box-shadow .1s;
+}
+.camp-send-big:hover:not(:disabled) { transform: translateY(-1px); box-shadow: 0 6px 20px rgba(230,81,0,.35); }
+.camp-send-big:disabled { background: #ccc; box-shadow: none; cursor: default; }
+
+/* Contact group picker — bottom sheet overlay */
+.camp-group-overlay {
+  position: fixed; inset: 0; background: rgba(0,0,0,.45);
+  z-index: 1000; display: flex; align-items: flex-end;
+}
+.camp-group-sheet {
+  background: #fff; width: 100%; border-radius: 16px 16px 0 0;
+  max-height: 82vh; display: flex; flex-direction: column;
+  overflow: hidden;
+}
+.camp-group-header {
+  display: flex; justify-content: space-between; align-items: center;
+  padding: 14px 16px; border-bottom: 1px solid #eee; flex-shrink: 0;
+}
+.camp-group-cancel {
+  padding: 7px 14px; border: 1.5px solid #ddd; border-radius: 8px;
+  background: #fff; color: #555; font-size: 13px; cursor: pointer; font-family: inherit;
+}
+.camp-group-save {
+  padding: 7px 18px; background: #e65100; color: #fff;
+  border: none; border-radius: 8px; font-weight: 700;
+  font-size: 13px; cursor: pointer; font-family: inherit;
+}
+
+/* ══════════════════════════════════════════
    CAMPAIGN CONTACT PICKER
 ══════════════════════════════════════════ */
 .camp-mode-toggle {

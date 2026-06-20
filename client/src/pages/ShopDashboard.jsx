@@ -79,11 +79,16 @@ export default function ShopDashboard() {
   const [campMsg, setCampMsg]             = useState('');
   const [campOfferId, setCampOfferId]     = useState('');
   const [campLoading, setCampLoading]     = useState(false);
-  const [sendMode, setSendMode]           = useState('all');        // 'all' | 'select'
+  const [sendMode, setSendMode]           = useState('all');
   const [allContacts, setAllContacts]     = useState([]);
   const [selectedPhones, setSelectedPhones] = useState(new Set());
   const [contactSearch, setContactSearch] = useState('');
   const [contactsLoading, setContactsLoading] = useState(false);
+  const [savedGroup, setSavedGroup]       = useState(() => {
+    try { return JSON.parse(localStorage.getItem('wa_contact_group') || 'null') || { phones:[], names:{} }; }
+    catch { return { phones:[], names:{} }; }
+  });
+  const [showGroupEdit, setShowGroupEdit] = useState(false);
   const waTimer   = useRef(null);
   const campTimer = useRef(null);
 
@@ -355,17 +360,23 @@ export default function ShopDashboard() {
     });
   };
 
+  const saveContactGroup = () => {
+    const names = {};
+    [...selectedPhones].forEach(p => { names[p] = allContacts.find(c => c.phone === p)?.name || ''; });
+    const group = { phones: [...selectedPhones], names };
+    localStorage.setItem('wa_contact_group', JSON.stringify(group));
+    setSavedGroup(group);
+    setShowGroupEdit(false);
+  };
+
   const startCampaign = async () => {
     if (!campMsg.trim()) { flash('Please write a message first', 'err'); return; }
-    if (sendMode === 'select' && selectedPhones.size === 0) {
-      flash('Select at least one contact', 'err'); return;
-    }
     setCampLoading(true);
     try {
       const offerId = campOfferId ? Number(campOfferId) : null;
       const shopId  = offerId ? offers.find(o => o.id === offerId)?.shop_id : null;
       const payload = { offer_id: offerId, shop_id: shopId, message: campMsg };
-      if (sendMode === 'select') payload.selected_phones = [...selectedPhones];
+      if (savedGroup.phones.length > 0) payload.selected_phones = savedGroup.phones;
       const { data } = await api.post('/campaigns', payload);
       setActiveCampaign(data);
       setCampHistory(h => [data, ...h]);
@@ -1006,216 +1017,201 @@ export default function ShopDashboard() {
                 )}
               </div>
 
-              {/* ── AI Chatbot Card ── */}
+              {/* ══ CAMPAIGN HUB ══ */}
               {waStatus.status === 'connected' && (
-                <div className="wa-ai-card" style={{
-                  background: waStatus.chatbot ? 'linear-gradient(135deg,#e8f5e9,#f1f8e9)' : '#fafafa',
-                  border: `2px solid ${waStatus.chatbot ? '#66bb6a' : '#e0e0e0'}`,
-                  borderRadius: 14, padding: '18px 20px', marginBottom: 20
-                }}>
-                  <div className="wa-ai-top" style={{ display:'flex', alignItems:'center', gap:14 }}>
-                    <div style={{ fontSize: 36 }}>🤖</div>
-                    <div style={{ flex: 1 }}>
-                      <div style={{ fontWeight: 700, fontSize: 16, color: waStatus.chatbot ? '#2e7d32' : '#333' }}>
-                        AI Auto-Reply {waStatus.chatbot ? '— ON ✅' : '— OFF'}
-                      </div>
-                      <div style={{ fontSize: 13, color: '#666', marginTop: 3 }}>
-                        {waStatus.chatbot
-                          ? 'AI is replying to customer messages automatically using your shop info & offers'
-                          : 'Turn ON to let AI reply to customers 24/7 — uses your shop details & active offers'}
-                      </div>
-                    </div>
-                    {/* Toggle switch */}
-                    <div onClick={async () => {
-                        const { data } = await api.post('/campaigns/chatbot/toggle');
-                        setWaStatus(s => ({ ...s, chatbot: data.chatbot }));
-                      }}
-                      style={{
-                        width: 52, height: 28, borderRadius: 14, cursor: 'pointer', flexShrink: 0,
-                        background: waStatus.chatbot ? '#43a047' : '#bbb',
-                        position: 'relative', transition: 'background 0.2s'
-                      }}>
-                      <div style={{
-                        position: 'absolute', top: 3, left: waStatus.chatbot ? 26 : 3,
-                        width: 22, height: 22, borderRadius: '50%', background: '#fff',
-                        boxShadow: '0 1px 3px rgba(0,0,0,.3)', transition: 'left 0.2s'
-                      }} />
-                    </div>
-                  </div>
+                <div className="camp-hub">
 
-                  {waStatus.chatbot && (
-                    <div style={{ marginTop: 14, display: 'flex', gap: 8, flexWrap: 'wrap' }}>
-                      {['Replies in Telugu/Hindi/English', 'Shares your active offers', 'Answers price & product queries', '2–3 sec human-like delay', 'Skips groups'].map(f => (
-                        <span key={f} style={{ background:'#c8e6c9', color:'#1b5e20', padding:'3px 10px', borderRadius:12, fontSize:12, fontWeight:500 }}>✓ {f}</span>
-                      ))}
+                  {/* ── LIVE: sending ── */}
+                  {activeCampaign && !['completed','stopped'].includes(activeCampaign.status) && (
+                    <div className="camp-live">
+                      <div className="camp-live-label">Sending campaign…</div>
+                      <div className="camp-live-count">
+                        <span className="camp-live-num">{activeCampaign.sent_count}</span>
+                        <span className="camp-live-sep"> / </span>
+                        <span className="camp-live-tot">{activeCampaign.total_contacts}</span>
+                      </div>
+                      <div className="camp-live-sublabel">messages sent</div>
+                      <div className="camp-bar-bg" style={{ margin:'12px 0 8px' }}>
+                        <div className="camp-bar-fill" style={{ width:`${Math.round((activeCampaign.sent_count+activeCampaign.failed_count)/Math.max(activeCampaign.total_contacts,1)*100)}%` }} />
+                      </div>
+                      {activeCampaign.failed_count > 0 && (
+                        <div style={{ fontSize:12, color:'#e53935', marginBottom:8 }}>❌ {activeCampaign.failed_count} failed</div>
+                      )}
+                      <div style={{ display:'flex', gap:10, justifyContent:'center' }}>
+                        {activeCampaign.status === 'running'
+                          ? <button className="camp-btn-pause" onClick={() => pauseCampaign(activeCampaign.id)}>⏸ Pause</button>
+                          : <button className="camp-btn-resume" onClick={() => resumeCampaign(activeCampaign.id)}>▶ Resume</button>
+                        }
+                        <button className="camp-btn-stop" onClick={() => stopCampaign(activeCampaign.id)}>⏹ Stop</button>
+                      </div>
                     </div>
                   )}
 
-                  {!process.env.ANTHROPIC_API_KEY && waStatus.chatbot && (
-                    <p style={{ marginTop:10, color:'#c62828', fontSize:13 }}>
-                      ⚠️ Add ANTHROPIC_API_KEY to your .env file to activate AI replies
-                    </p>
-                  )}
-                </div>
-              )}
-
-              {/* Active Campaign Progress */}
-              {activeCampaign && !['completed','stopped'].includes(activeCampaign.status) && (
-                <div className="camp-progress-card">
-                  <div className="camp-progress-header">
-                    <strong>{activeCampaign.offer_title || 'Campaign'}</strong>
-                    <span className={`camp-badge camp-badge-${activeCampaign.status}`}>{activeCampaign.status}</span>
-                  </div>
-                  <div className="camp-counts">
-                    <span className="camp-sent">✅ {activeCampaign.sent_count} sent</span>
-                    <span className="camp-fail">❌ {activeCampaign.failed_count} failed</span>
-                    <span className="camp-total">/ {activeCampaign.total_contacts} total</span>
-                  </div>
-                  <div className="camp-bar-bg">
-                    <div className="camp-bar-fill" style={{ width: `${Math.round(((activeCampaign.sent_count + activeCampaign.failed_count) / Math.max(activeCampaign.total_contacts, 1)) * 100)}%` }} />
-                  </div>
-                  <div className="camp-eta">
-                    ⏱ ~{Math.ceil((activeCampaign.total_contacts - activeCampaign.sent_count - activeCampaign.failed_count) * 25 / 60)} min remaining · Rate: 2–3 msgs/min
-                  </div>
-                  <div style={{ display:'flex', gap:10, marginTop:12 }}>
-                    {activeCampaign.status === 'running'
-                      ? <button className="camp-btn-pause" onClick={() => pauseCampaign(activeCampaign.id)}>⏸ Pause</button>
-                      : <button className="camp-btn-resume" onClick={() => resumeCampaign(activeCampaign.id)}>▶ Resume</button>
-                    }
-                    <button className="camp-btn-stop" onClick={() => stopCampaign(activeCampaign.id)}>⏹ Stop</button>
-                  </div>
-                </div>
-              )}
-
-              {activeCampaign?.status === 'completed' && (
-                <div className="camp-done-card">
-                  <span style={{ fontSize:32 }}>🎉</span>
-                  <h3>Campaign Done!</h3>
-                  <p>✅ {activeCampaign.sent_count} sent · ❌ {activeCampaign.failed_count} failed out of {activeCampaign.total_contacts} contacts</p>
-                  <button onClick={() => setActiveCampaign(null)} style={{ marginTop:8, padding:'8px 20px', background:'#e65100', color:'#fff', border:'none', borderRadius:8, cursor:'pointer', fontWeight:700 }}>
-                    Start Another
-                  </button>
-                </div>
-              )}
-
-              {/* Launch New Campaign — only when connected and no active campaign */}
-              {waStatus.status === 'connected' && (!activeCampaign || ['completed','stopped'].includes(activeCampaign.status)) && (
-                <div className="camp-launch-card">
-                  <h3 style={{ marginBottom:16 }}>🚀 Launch New Campaign</h3>
-
-                  {/* Pick offer (optional) */}
-                  <div className="form-group">
-                    <label>Link to an offer <span style={{ color:'#bbb', fontWeight:400 }}>(optional)</span></label>
-                    <select value={campOfferId} onChange={e => {
-                      setCampOfferId(e.target.value);
-                      if (e.target.value) {
-                        const o = offers.find(x => String(x.id) === e.target.value);
-                        if (o) setCampMsg(buildWAMessage(o));
-                      }
-                    }}>
-                      <option value="">— No specific offer —</option>
-                      {offers.map(o => <option key={o.id} value={o.id}>{o.title}</option>)}
-                    </select>
-                  </div>
-
-                  {/* Send to — All or Selected */}
-                  <div className="form-group">
-                    <label>Send to</label>
-                    <div className="camp-mode-toggle">
-                      <button
-                        className={`camp-mode-btn ${sendMode === 'all' ? 'active' : ''}`}
-                        onClick={() => setSendMode('all')}>
-                        All Contacts ({waStatus.contacts})
-                      </button>
-                      <button
-                        className={`camp-mode-btn ${sendMode === 'select' ? 'active' : ''}`}
-                        onClick={() => {
-                          setSendMode('select');
-                          if (allContacts.length === 0) loadAllContacts();
-                        }}>
-                        Select Contacts
-                      </button>
+                  {/* ── DONE / STOPPED ── */}
+                  {activeCampaign && ['completed','stopped'].includes(activeCampaign.status) && (
+                    <div className="camp-result">
+                      <div className="camp-result-icon">{activeCampaign.status === 'completed' ? '🎉' : '⏹'}</div>
+                      <div className="camp-result-num">{activeCampaign.sent_count}</div>
+                      <div className="camp-result-lbl">messages sent</div>
+                      {activeCampaign.failed_count > 0 && (
+                        <div style={{ fontSize:13, color:'#e53935', margin:'4px 0' }}>❌ {activeCampaign.failed_count} failed</div>
+                      )}
+                      <button className="camp-send-big" style={{ marginTop:16 }} onClick={() => {
+                        setActiveCampaign(null); setCampMsg(''); setCampOfferId('');
+                      }}>🚀 New Campaign</button>
                     </div>
+                  )}
 
-                    {sendMode === 'select' && (
-                      <div className="camp-contact-picker">
-                        {contactsLoading ? (
-                          <div style={{ textAlign:'center', padding:16 }}>
-                            <div className="opt-spinner" style={{ margin:'0 auto 8px' }} />
-                            <p style={{ fontSize:13, color:'#888' }}>Loading contacts…</p>
+                  {/* ── SETUP ── */}
+                  {(!activeCampaign || ['completed','stopped'].includes(activeCampaign.status)) && (
+                    <div className="camp-setup">
+
+                      {/* Row: Contacts */}
+                      <div className="camp-row">
+                        <span className="camp-row-icon">👥</span>
+                        <div className="camp-row-body">
+                          <div className="camp-row-title">Contacts</div>
+                          <div className="camp-row-sub">
+                            {savedGroup.phones.length > 0
+                              ? `${savedGroup.phones.length} contacts selected`
+                              : `All ${waStatus.contacts} contacts`}
                           </div>
-                        ) : (
-                          <>
-                            <div className="camp-picker-header">
-                              <input
-                                className="camp-contacts-search"
-                                value={contactSearch}
-                                onChange={e => setContactSearch(e.target.value)}
-                                placeholder="🔍 Search name or number…" />
-                              <div className="camp-picker-actions">
-                                <button onClick={() => setSelectedPhones(new Set(allContacts.map(c => c.phone)))}>All</button>
-                                <button onClick={() => setSelectedPhones(new Set())}>None</button>
-                                <span className="camp-sel-count">{selectedPhones.size} selected</span>
-                              </div>
-                            </div>
-                            <div className="camp-contacts-list">
-                              {allContacts
-                                .filter(c => {
-                                  const q = contactSearch.toLowerCase();
-                                  return !q || (c.name || '').toLowerCase().includes(q) || (c.phone || '').includes(q);
-                                })
-                                .map(c => (
-                                  <label key={c.phone} className="camp-contact-row">
-                                    <input type="checkbox"
-                                      checked={selectedPhones.has(c.phone)}
-                                      onChange={e => togglePhone(c.phone, e.target.checked)} />
-                                    <div className="camp-contact-info">
-                                      <span className="camp-contact-name">{c.name || 'Unknown'}</span>
-                                      <span className="camp-contact-phone">+{c.phone}</span>
-                                    </div>
-                                  </label>
-                                ))}
-                              {allContacts.length === 0 && (
-                                <p style={{ padding:12, color:'#aaa', fontSize:13 }}>No contacts found. Connect WhatsApp to sync contacts.</p>
-                              )}
-                            </div>
-                          </>
-                        )}
+                        </div>
+                        <button className="camp-row-action" onClick={() => {
+                          if (allContacts.length === 0) loadAllContacts();
+                          setSelectedPhones(new Set(savedGroup.phones));
+                          setContactSearch('');
+                          setShowGroupEdit(true);
+                        }}>
+                          {savedGroup.phones.length > 0 ? 'Edit' : 'Select'}
+                        </button>
                       </div>
-                    )}
-                  </div>
 
-                  {/* Message */}
-                  <div className="form-group">
-                    <label>Message <span style={{ color:'#e65100', fontWeight:600 }}>*</span></label>
-                    <textarea value={campMsg} rows={5} onChange={e => setCampMsg(e.target.value)}
-                      placeholder={`Type your offer message here...\n\nExample:\n🔥 Big Sale Today!\n💰 Up to 50% off on all items\n📍 Visit us at Main Street`}
-                      style={{ fontFamily:'inherit', lineHeight:1.6 }} />
-                    <div style={{ textAlign:'right', color:'#aaa', fontSize:12 }}>{campMsg.length} chars</div>
-                  </div>
+                      {/* Row: AI Robo */}
+                      <div className="camp-row">
+                        <span className="camp-row-icon">🤖</span>
+                        <div className="camp-row-body">
+                          <div className="camp-row-title">AI Auto-Reply (Robo)</div>
+                          <div className="camp-row-sub">{waStatus.chatbot ? 'ON — replying to customers 24/7' : 'OFF'}</div>
+                        </div>
+                        <div className="camp-toggle-wrap" onClick={async () => {
+                          const { data } = await api.post('/campaigns/chatbot/toggle');
+                          setWaStatus(s => ({ ...s, chatbot: data.chatbot }));
+                        }}>
+                          <div className="camp-toggle" style={{ background: waStatus.chatbot ? '#43a047' : '#ccc' }}>
+                            <div className="camp-toggle-knob" style={{ left: waStatus.chatbot ? 26 : 3 }} />
+                          </div>
+                        </div>
+                      </div>
 
-                  <div className="camp-recipient-info">
-                    {sendMode === 'all'
-                      ? <>👥 Sending to <strong>all {waStatus.contacts}</strong> contacts · ~{Math.ceil(waStatus.contacts * 25 / 60)} min</>
-                      : <>👥 Sending to <strong>{selectedPhones.size}</strong> selected contacts · ~{Math.ceil(selectedPhones.size * 25 / 60)} min</>
+                      {/* Row: Offer dropdown */}
+                      <div className="camp-row camp-row-col">
+                        <span className="camp-row-icon">🏷️</span>
+                        <div className="camp-row-body">
+                          <div className="camp-row-title">Select Offer</div>
+                        </div>
+                        <select className="camp-offer-select" value={campOfferId} onChange={e => {
+                          setCampOfferId(e.target.value);
+                          if (e.target.value) {
+                            const o = offers.find(x => String(x.id) === e.target.value);
+                            if (o) setCampMsg(buildWAMessage(o));
+                          } else { setCampMsg(''); }
+                        }}>
+                          <option value="">— Custom message —</option>
+                          {offers.map(o => (
+                            <option key={o.id} value={o.id}>{o.title} — {o.discount}% OFF</option>
+                          ))}
+                        </select>
+                      </div>
+
+                      {/* Message */}
+                      <div className="form-group" style={{ marginTop:4 }}>
+                        <label style={{ fontSize:12, color:'#888' }}>
+                          Message {campOfferId ? '(auto-filled — you can edit)' : '*'}
+                        </label>
+                        <textarea value={campMsg} rows={4} onChange={e => setCampMsg(e.target.value)}
+                          placeholder="Pick an offer above to auto-fill, or type your message here…"
+                          style={{ fontFamily:'inherit', lineHeight:1.6, fontSize:13 }} />
+                        <div style={{ textAlign:'right', color:'#ccc', fontSize:11 }}>{campMsg.length} chars</div>
+                      </div>
+
+                      {/* Send */}
+                      <button className="camp-send-big" onClick={startCampaign}
+                        disabled={campLoading || !campMsg.trim()}>
+                        {campLoading ? '⏳ Starting…'
+                          : savedGroup.phones.length > 0
+                            ? `🚀 Send to ${savedGroup.phones.length} Contacts`
+                            : `🚀 Send to All ${waStatus.contacts} Contacts`}
+                      </button>
+                    </div>
+                  )}
+
+                </div>
+              )}
+
+              {/* Contact group picker — bottom sheet */}
+              {showGroupEdit && (
+                <div className="camp-group-overlay" onClick={e => { if (e.target === e.currentTarget) setShowGroupEdit(false); }}>
+                  <div className="camp-group-sheet">
+                    <div className="camp-group-header">
+                      <span style={{ fontWeight:700, fontSize:15 }}>Select Contacts</span>
+                      <div style={{ display:'flex', gap:8 }}>
+                        <button className="camp-group-cancel" onClick={() => setShowGroupEdit(false)}>Cancel</button>
+                        <button className="camp-group-save" onClick={saveContactGroup}>
+                          Save ({selectedPhones.size})
+                        </button>
+                      </div>
+                    </div>
+                    {contactsLoading
+                      ? <div style={{ textAlign:'center', padding:24 }}>
+                          <div className="opt-spinner" style={{ margin:'0 auto 10px' }} />
+                          <p style={{ color:'#888', fontSize:13 }}>Loading contacts…</p>
+                        </div>
+                      : <>
+                          <div className="camp-picker-header">
+                            <input className="camp-contacts-search"
+                              value={contactSearch}
+                              onChange={e => setContactSearch(e.target.value)}
+                              placeholder="🔍 Search name or number…" />
+                            <div className="camp-picker-actions">
+                              <button onClick={() => setSelectedPhones(new Set(allContacts.map(c => c.phone)))}>All</button>
+                              <button onClick={() => setSelectedPhones(new Set())}>None</button>
+                              <span className="camp-sel-count">{selectedPhones.size} / {allContacts.length}</span>
+                            </div>
+                          </div>
+                          <div className="camp-contacts-list">
+                            {allContacts
+                              .filter(c => {
+                                const q = contactSearch.toLowerCase();
+                                return !q || (c.name||'').toLowerCase().includes(q) || (c.phone||'').includes(q);
+                              })
+                              .map(c => (
+                                <label key={c.phone} className="camp-contact-row">
+                                  <input type="checkbox"
+                                    checked={selectedPhones.has(c.phone)}
+                                    onChange={e => togglePhone(c.phone, e.target.checked)} />
+                                  <div className="camp-contact-info">
+                                    <span className="camp-contact-name">{c.name || 'Unknown'}</span>
+                                    <span className="camp-contact-phone">+{c.phone}</span>
+                                  </div>
+                                </label>
+                              ))}
+                            {allContacts.length === 0 && !contactsLoading && (
+                              <p style={{ padding:16, color:'#aaa', fontSize:13, textAlign:'center' }}>
+                                No contacts yet — connect WhatsApp first to sync contacts.
+                              </p>
+                            )}
+                          </div>
+                        </>
                     }
                   </div>
-
-                  <button className="btn-post-offer" onClick={startCampaign}
-                    disabled={campLoading || !campMsg.trim() || (sendMode === 'select' && selectedPhones.size === 0)}>
-                    {campLoading
-                      ? '⏳ Starting…'
-                      : sendMode === 'all'
-                        ? `🚀 Send to All ${waStatus.contacts} Contacts`
-                        : `🚀 Send to ${selectedPhones.size} Selected`}
-                  </button>
                 </div>
               )}
 
               {waStatus.status !== 'connected' && waStatus.status !== 'waiting_scan' && (
                 <div className="camp-hint">
-                  <p>Connect your WhatsApp above to broadcast offers to all your saved contacts.</p>
-                  <p style={{ color:'#aaa', fontSize:13 }}>Messages are sent at 2–3 per minute to stay safe. No spam risk.</p>
+                  <p>Connect your WhatsApp above to broadcast offers to your customers.</p>
+                  <p style={{ color:'#aaa', fontSize:13 }}>Messages are sent at 2–3 per minute to stay safe.</p>
                 </div>
               )}
 
