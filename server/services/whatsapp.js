@@ -241,7 +241,11 @@ async function connect(ownerId) {
         if (!text.trim()) continue;
         await new Promise(r => setTimeout(r, 1000 + Math.random() * 1000));
         const reply = await ai.handleIncoming(ownerId, replyJid, text, msg.pushName || '');
-        if (reply) await sock.sendMessage(replyJid, { text: reply });
+        if (reply) {
+          // Use quoted:msg so Baileys uses the original message context for routing
+          await sock.sendMessage(replyJid, { text: reply }, { quoted: msg });
+          console.log(`[AI] Send OK → ${replyJid}`);
+        }
       } catch (e) { console.error('[WA] message handler error:', e.message); }
     }
   });
