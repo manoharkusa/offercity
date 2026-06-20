@@ -204,17 +204,19 @@ async function connect(ownerId) {
     for (const msg of messages) {
       try {
         if (msg.key.fromMe) continue;
-        if (msg.key.remoteJid?.endsWith('@g.us')) continue;
+        const remoteJid = msg.key.remoteJid || '';
+        if (remoteJid.endsWith('@g.us')) continue;
         const age = Date.now() / 1000 - (msg.messageTimestamp || 0);
-        if (age > 300) continue; // skip messages older than 5 min (was 60s — too short after disconnects)
         const text = msg.message?.conversation
           || msg.message?.extendedTextMessage?.text
           || msg.message?.imageMessage?.caption
           || '';
+        console.log(`[WA MSG] jid=${remoteJid} name="${msg.pushName || ''}" age=${Math.round(age)}s text="${text.slice(0, 40)}"`);
+        if (age > 300) continue;
         if (!text.trim()) continue;
         await new Promise(r => setTimeout(r, 1000 + Math.random() * 1000));
-        const reply = await ai.handleIncoming(ownerId, msg.key.remoteJid, text, msg.pushName || '');
-        if (reply) await sock.sendMessage(msg.key.remoteJid, { text: reply });
+        const reply = await ai.handleIncoming(ownerId, remoteJid, text, msg.pushName || '');
+        if (reply) await sock.sendMessage(remoteJid, { text: reply });
       } catch (e) { console.error('[WA] message handler error:', e.message); }
     }
   });
