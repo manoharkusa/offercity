@@ -127,11 +127,24 @@ else:
 
 # ── 5. Restart Node ────────────────────────────────────────────────────────────
 print("=== Restarting Node.js ===")
-# Best-effort kill of old node processes. cPanel's process manager may
-# respawn them immediately — that's fine. The wa.lock file (added in
-# whatsapp.js) ensures only ONE process actually connects to WhatsApp
-# even when multiple Node.js instances run at the same time.
-sh("pkill -f start_node.sh 2>/dev/null; pkill -f 'node.*server.js' 2>/dev/null; sleep 3 || true", "kill old node")
+# Show what start_node.sh currently contains
+sh(f"cat {HOME_REMOTE}/start_node.sh", "current start_node.sh")
+
+# Replace start_node.sh with a SINGLE-RUN version (no restart loop).
+# The old version had 'while true; do node ...; sleep 2; done' which caused
+# every deploy to accumulate one more zombie process.
+sh(f"""cat > {HOME_REMOTE}/start_node.sh << 'SHELLEOF'
+#!/bin/bash
+source ~/.nvm/nvm.sh 2>/dev/null || true
+nvm use 16 2>/dev/null || true
+export PORT=5004
+cd {APP}
+exec node server.js
+SHELLEOF
+chmod +x {HOME_REMOTE}/start_node.sh""", "overwrite start_node.sh (no loop)")
+
+# Kill ALL existing node processes and their wrapper shells
+sh(f"pkill -9 -f start_node.sh 2>/dev/null; pkill -9 -f 'node.*server.js' 2>/dev/null; sleep 4 || true", "kill old node")
 sh(f"source ~/.nvm/nvm.sh && nvm use 16 && nohup bash {HOME_REMOTE}/start_node.sh >> {HOME_REMOTE}/node.log 2>&1 &",
    "start node", timeout=15)
 time.sleep(8)
