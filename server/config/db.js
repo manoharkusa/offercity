@@ -6,7 +6,7 @@ const connectDB = async () => {
   pool = mysql.createPool({
     host: process.env.DB_HOST || 'localhost',
     user: process.env.DB_USER || 'a1751tyi_offeruser',
-    password: process.env.DB_PASS || 'Geetha22@#',
+    password: process.env.DB_PASS ?? '',
     database: process.env.DB_NAME || 'a1751tyi_offerscity',
     waitForConnections: true,
     connectionLimit: 10,

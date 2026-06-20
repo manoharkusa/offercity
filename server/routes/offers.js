@@ -70,6 +70,18 @@ router.get('/mine', protect, requireRole('shop_owner', 'admin'), async (req, res
   } catch (err) { res.status(500).json({ message: err.message }); }
 });
 
+// GET /api/offers/shop/:shopId  — must be BEFORE /:id
+router.get('/shop/:shopId', async (req, res) => {
+  try {
+    const [offers] = await getPool().query(
+      'SELECT * FROM offers WHERE shop_id = ? ORDER BY created_at DESC', [req.params.shopId]
+    );
+    res.json(offers);
+  } catch (err) {
+    res.status(500).json({ message: err.message });
+  }
+});
+
 // GET /api/offers/:id
 router.get('/:id', async (req, res) => {
   try {
@@ -155,18 +167,6 @@ router.delete('/:id', protect, requireRole('shop_owner', 'admin'), async (req, r
       return res.status(403).json({ message: 'Not authorized' });
     await pool.query('DELETE FROM offers WHERE id = ?', [req.params.id]);
     res.json({ message: 'Offer deleted' });
-  } catch (err) {
-    res.status(500).json({ message: err.message });
-  }
-});
-
-// GET /api/offers/shop/:shopId
-router.get('/shop/:shopId', async (req, res) => {
-  try {
-    const [offers] = await getPool().query(
-      'SELECT * FROM offers WHERE shop_id = ? ORDER BY created_at DESC', [req.params.shopId]
-    );
-    res.json(offers);
   } catch (err) {
     res.status(500).json({ message: err.message });
   }

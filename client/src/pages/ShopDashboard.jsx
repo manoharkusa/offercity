@@ -106,8 +106,9 @@ export default function ShopDashboard() {
 
   // Auto-select first shop as default (user can change if they have multiple)
   useEffect(() => {
-    if (shops.length > 0 && !offerForm.shop_id) {
-      setOfferForm(f => ({ ...f, shop_id: String(shops[0].id) }));
+    if (shops.length > 0) {
+      if (!offerForm.shop_id) setOfferForm(f => ({ ...f, shop_id: String(shops[0].id) }));
+      if (!selectedShop) setSelectedShop(String(shops[0].id));
     }
   }, [shops]);
 

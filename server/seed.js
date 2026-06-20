@@ -35,24 +35,24 @@ const seed = async () => {
 
   // Shops
   const [s1] = await pool.query(
-    'INSERT INTO shops (owner_id, name, description, category, address, city, lat, lng) VALUES (?,?,?,?,?,?,?,?)',
-    [o1, 'Ravi Fashion Hub', 'Latest fashion for men and women', 'Fashion', 'Ameerpet', 'Hyderabad', 17.4374, 78.4483]
+    'INSERT INTO shops (owner_id, name, slug, description, category, address, city, lat, lng) VALUES (?,?,?,?,?,?,?,?,?)',
+    [o1, 'Ravi Fashion Hub', 'ravi-fashion-hub', 'Latest fashion for men and women', 'Fashion', 'Ameerpet', 'Hyderabad', 17.4374, 78.4483]
   );
   const [s2] = await pool.query(
-    'INSERT INTO shops (owner_id, name, description, category, address, city, lat, lng) VALUES (?,?,?,?,?,?,?,?)',
-    [o1, 'Ravi Electronics', 'Best electronics deals in town', 'Electronics', 'Kukatpally', 'Hyderabad', 17.4948, 78.4103]
+    'INSERT INTO shops (owner_id, name, slug, description, category, address, city, lat, lng) VALUES (?,?,?,?,?,?,?,?,?)',
+    [o1, 'Ravi Electronics', 'ravi-electronics', 'Best electronics deals in town', 'Electronics', 'Kukatpally', 'Hyderabad', 17.4948, 78.4103]
   );
   const [s3] = await pool.query(
-    'INSERT INTO shops (owner_id, name, description, category, address, city, lat, lng) VALUES (?,?,?,?,?,?,?,?)',
-    [o2, "Priya's Beauty Parlour", 'Premium beauty and wellness', 'Beauty', 'Banjara Hills', 'Hyderabad', 17.4126, 78.4482]
+    'INSERT INTO shops (owner_id, name, slug, description, category, address, city, lat, lng) VALUES (?,?,?,?,?,?,?,?,?)',
+    [o2, "Priya's Beauty Parlour", 'priyas-beauty-parlour', 'Premium beauty and wellness', 'Beauty', 'Banjara Hills', 'Hyderabad', 17.4126, 78.4482]
   );
   const [s4] = await pool.query(
-    'INSERT INTO shops (owner_id, name, description, category, address, city, lat, lng) VALUES (?,?,?,?,?,?,?,?)',
-    [o2, 'Fresh Grocery Mart', 'Daily fresh vegetables and groceries', 'Grocery', 'Madhapur', 'Hyderabad', 17.4487, 78.3810]
+    'INSERT INTO shops (owner_id, name, slug, description, category, address, city, lat, lng) VALUES (?,?,?,?,?,?,?,?,?)',
+    [o2, 'Fresh Grocery Mart', 'fresh-grocery-mart', 'Daily fresh vegetables and groceries', 'Grocery', 'Madhapur', 'Hyderabad', 17.4487, 78.3810]
   );
   const [s5] = await pool.query(
-    'INSERT INTO shops (owner_id, name, description, category, address, city, lat, lng) VALUES (?,?,?,?,?,?,?,?)',
-    [o1, 'Spice Garden Restaurant', 'Authentic Hyderabadi biryani', 'Food', 'Dilsukhnagar', 'Hyderabad', 17.3692, 78.5247]
+    'INSERT INTO shops (owner_id, name, slug, description, category, address, city, lat, lng) VALUES (?,?,?,?,?,?,?,?,?)',
+    [o1, 'Spice Garden Restaurant', 'spice-garden-restaurant', 'Authentic Hyderabadi biryani', 'Food', 'Dilsukhnagar', 'Hyderabad', 17.3692, 78.5247]
   );
 
   const offers = [

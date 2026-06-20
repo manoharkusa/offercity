@@ -1,7 +1,8 @@
 const path = require('path');
 const fs   = require('fs');
 
-const SESSION_BASE   = '/home1/a1751tyi/whatsapp_sessions';
+const SESSION_BASE   = process.env.WA_SESSION_DIR
+  || (process.platform === 'linux' ? '/home1/a1751tyi/whatsapp_sessions' : path.join(__dirname, '../whatsapp_sessions'));
 const contactsFile   = (id) => path.join(SESSION_BASE, String(id), 'contacts.json');
 
 const sockets     = {};   // ownerId → sock
