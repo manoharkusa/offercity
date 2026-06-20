@@ -77,7 +77,7 @@ export default function LoginNudge() {
         {/* Actions */}
         <div className="nudge-actions">
           <button className="nudge-btn-login" onClick={handleLogin}>Login / Register</button>
-          <button className="nudge-btn-skip"  onClick={handleSkip}>Skip &amp; Accept Cookies</button>
+          <button className="nudge-btn-skip"  onClick={handleSkip}>Skip</button>
         </div>
       </div>
     </>
