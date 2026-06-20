@@ -351,4 +351,25 @@ async function connectWithPairingCode(ownerId, phone) {
   return pairResult;
 }
 
-module.exports = { connect, disconnect, getStatus, getContacts, sendWAMessage, runCampaign, activeCamps, connectWithPairingCode };
+// On server start, reconnect any owner that has saved Baileys credentials
+async function autoReconnectAll() {
+  try {
+    if (!fs.existsSync(SESSION_BASE)) return;
+    const entries = fs.readdirSync(SESSION_BASE, { withFileTypes: true });
+    for (const e of entries) {
+      if (!e.isDirectory()) continue;
+      const ownerId = e.name;
+      const credsPath = path.join(SESSION_BASE, ownerId, 'creds.json');
+      if (fs.existsSync(credsPath)) {
+        connStatus[ownerId] = 'reconnecting'; // show correct state immediately on first poll
+        loadSavedContacts(ownerId);
+        console.log(`[WA] Auto-reconnecting owner ${ownerId} from saved session`);
+        connect(ownerId).catch(err => console.error(`[WA] Auto-reconnect failed for ${ownerId}:`, err.message));
+      }
+    }
+  } catch (e) {
+    console.error('[WA] autoReconnectAll error:', e.message);
+  }
+}
+
+module.exports = { connect, disconnect, getStatus, getContacts, sendWAMessage, runCampaign, activeCamps, connectWithPairingCode, autoReconnectAll };

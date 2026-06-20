@@ -940,9 +940,15 @@ export default function ShopDashboard() {
                       ? <button className="wa-btn-disconnect" onClick={() => api.post('/campaigns/whatsapp/disconnect').then(() => setWaStatus({ status:'disconnected', qr:null, contacts:0 }))}>Disconnect</button>
                       : !pairLoading && !pairingCode && (
                           <button className="wa-btn-connect"
-                            onClick={() => api.post('/campaigns/whatsapp/connect').catch(() => {})}
+                            onClick={async () => {
+                              try { await api.post('/campaigns/whatsapp/connect'); }
+                              catch (err) { flash(err.response?.data?.message || 'Could not connect WhatsApp', 'err'); }
+                            }}
                             disabled={['connecting','waiting_scan','reconnecting'].includes(waStatus.status)}>
-                            {waStatus.status === 'waiting_scan' ? 'Scan QR…' : waStatus.status === 'connecting' ? 'Connecting…' : '🔗 Connect WhatsApp'}
+                            {waStatus.status === 'waiting_scan' ? 'Scan QR…'
+                              : waStatus.status === 'reconnecting' ? 'Reconnecting…'
+                              : waStatus.status === 'connecting' ? 'Generating QR…'
+                              : '🔗 Connect WhatsApp'}
                           </button>
                         )
                     }
@@ -958,13 +964,19 @@ export default function ShopDashboard() {
                   </div>
                 )}
 
-                {/* Pairing code section — hide when connected or auto-reconnecting */}
+                {/* Pairing code section — hide only when connected or auto-reconnecting */}
                 {!['connected','reconnecting'].includes(waStatus.status) && (
                   <div className="wa-pair-section">
 
                     {/* Input — shown when no active code and not loading */}
                     {!pairLoading && !pairingCode && (
                       <>
+                        {waStatus.status === 'connecting' && (
+                          <div style={{ textAlign:'center', padding:'12px 0 4px', color:'#f57c00', fontSize:13 }}>
+                            <div className="opt-spinner" style={{ margin:'0 auto 8px', width:22, height:22 }} />
+                            Generating QR code… (5–15 sec)
+                          </div>
+                        )}
                         <div className="wa-pair-divider"><span>connect on this phone</span></div>
                         <div className="wa-pair-input-row">
                           <input value={pairPhone} onChange={e => setPairPhone(e.target.value.replace(/\D/g, ''))}
@@ -1029,6 +1041,11 @@ export default function ShopDashboard() {
               {/* ══ CAMPAIGN HUB ══ */}
               {(waStatus.status === 'connected' || waStatus.contacts > 0) && (
                 <div className="camp-hub">
+                  {['connecting','reconnecting'].includes(waStatus.status) && (
+                    <div style={{ background:'#fff3cd', border:'1px solid #ffc107', borderRadius:8, padding:'10px 14px', marginBottom:12, fontSize:13, color:'#7a5700' }}>
+                      ⏳ WhatsApp reconnecting… Your contacts are ready. Wait a moment before sending.
+                    </div>
+                  )}
 
                   {/* ── LIVE: sending ── */}
                   {activeCampaign && !['completed','stopped'].includes(activeCampaign.status) && (
@@ -1164,8 +1181,9 @@ export default function ShopDashboard() {
 
                       {/* Send */}
                       <button className="camp-send-big" onClick={startCampaign}
-                        disabled={campLoading || !campMsg.trim()}>
+                        disabled={campLoading || !campMsg.trim() || waStatus.status !== 'connected'}>
                         {campLoading ? '⏳ Starting…'
+                          : waStatus.status !== 'connected' ? '⏳ Waiting for WhatsApp…'
                           : savedGroup.phones.length > 0
                             ? `🚀 Send to ${savedGroup.phones.length} Contacts`
                             : `🚀 Send to All ${waStatus.contacts} Contacts`}
