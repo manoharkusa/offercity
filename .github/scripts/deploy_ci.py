@@ -129,11 +129,15 @@ else:
 # ── 5. Verify upload & restart ────────────────────────────────────────────────
 print("=== Verifying uploaded server.js ===")
 # Write diagnostics to node.log so we can read them via /api/logs
-# Try uapi restart (cPanel's privileged restart — works even when Node runs as different user)
+# Find where cPanel is ACTUALLY running the app from
 sh(
-    f"echo \"[DEPLOY UAPI] $(uapi NodeJS restart_app 2>&1 | head -5)\" >> {HOME_REMOTE}/node.log "
-    f"|| echo '[DEPLOY UAPI] uapi not available' >> {HOME_REMOTE}/node.log",
-    "uapi-restart"
+    f"ALT={HOME_REMOTE}/server/server.js; "
+    f"HAS_ALT=$(grep -c 'deploy-restart' $ALT 2>/dev/null || echo 0); "
+    f"LS1=$(ls -la {APP}/server.js 2>/dev/null | awk '{{print $1,$5,$9}}'); "
+    f"LS2=$(ls -la $ALT 2>/dev/null | awk '{{print $1,$5,$9}}'); "
+    f"echo \"[DEPLOY PATHS] public_html/server=$LS1 has=$HAS alt_server=$LS2 alt_has=$HAS_ALT\" >> {HOME_REMOTE}/node.log; "
+    f"ls {HOME_REMOTE}/ >> {HOME_REMOTE}/node.log 2>&1 || true",
+    "find-app-path"
 )
 
 # Call /api/deploy-restart on the running server — it calls process.exit(0)
