@@ -92,6 +92,7 @@ if new_css:
 # ── 3. Upload server files ─────────────────────────────────────────────────────
 print("=== Uploading server files ===")
 server_files = [
+    ("server/Passengerfile.json",    f"{APP}/Passengerfile.json"),
     ("server/server.js",             f"{APP}/server.js"),
     ("server/config/db.js",          f"{APP}/config/db.js"),
     ("server/middleware/auth.js",    f"{APP}/middleware/auth.js"),
