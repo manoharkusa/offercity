@@ -143,8 +143,17 @@ exec node server.js
 SHELLEOF
 chmod +x {HOME_REMOTE}/start_node.sh""", "overwrite start_node.sh (no loop)")
 
-# Kill ALL existing node processes and their wrapper shells
-sh(f"pkill -9 -f start_node.sh 2>/dev/null; pkill -9 -f 'node.*server.js' 2>/dev/null; sleep 4 || true", "kill old node")
+# Kill all processes whose /proc/PID/cmdline mentions start_node or server.js.
+# This works even when nohup changes the visible process title that pkill sees.
+sh(r"""
+for pid in $(ls /proc/ 2>/dev/null | grep '^[0-9]'); do
+  cmd=$(tr '\0' ' ' < /proc/$pid/cmdline 2>/dev/null)
+  case "$cmd" in
+    *start_node*|*server.js*) echo "killing pid $pid: $cmd"; kill -9 $pid 2>/dev/null ;;
+  esac
+done
+sleep 4
+""", "kill by /proc cmdline")
 sh(f"source ~/.nvm/nvm.sh && nvm use 16 && nohup bash {HOME_REMOTE}/start_node.sh >> {HOME_REMOTE}/node.log 2>&1 &",
    "start node", timeout=15)
 time.sleep(8)
