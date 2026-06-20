@@ -3,6 +3,7 @@ import { lazy, Suspense } from 'react';
 import { AuthProvider, useAuth } from './context/AuthContext';
 import Navbar from './components/Navbar';
 import LoginNudge from './components/LoginNudge';
+import Footer from './components/Footer';
 import Home from './pages/Home';
 import Login from './pages/Login';
 import Register from './pages/Register';
@@ -50,6 +51,7 @@ export default function App() {
             <Route path="/:city/:slug"   element={<ShopPage />} />
           </Routes>
         </Suspense>
+        <Footer />
       </BrowserRouter>
     </AuthProvider>
   );

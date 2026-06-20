@@ -5,30 +5,45 @@ import { useAuth } from '../context/AuthContext';
 import MapView from '../components/MapView';
 import OffersScroll from '../components/OffersScroll';
 
-const CATEGORIES = ['All', 'Food', 'Fashion', 'Electronics', 'Beauty', 'Grocery', 'Health', 'Travel', 'Other'];
+const CATEGORIES = [
+  { key: 'All',         label: 'All Offers',   icon: '🔥', sub: 'Everything near you',    color: '#e65100' },
+  { key: 'Food',        label: 'Food',          icon: '🍽️', sub: 'Restaurants & Eateries', color: '#d84315' },
+  { key: 'Fashion',     label: 'Fashion',       icon: '👗', sub: 'Clothing & Accessories', color: '#6a1b9a' },
+  { key: 'Electronics', label: 'Electronics',   icon: '📱', sub: 'Gadgets & Devices',      color: '#1565c0' },
+  { key: 'Beauty',      label: 'Beauty',        icon: '💄', sub: 'Salons & Wellness',      color: '#ad1457' },
+  { key: 'Grocery',     label: 'Grocery',       icon: '🛒', sub: 'Daily Essentials',       color: '#2e7d32' },
+  { key: 'Health',      label: 'Health',        icon: '💊', sub: 'Pharmacy & Clinics',     color: '#00695c' },
+  { key: 'Travel',      label: 'Travel',        icon: '✈️', sub: 'Tours & Stays',          color: '#0277bd' },
+  { key: 'Other',       label: 'More',          icon: '🏷️', sub: 'Other Deals',            color: '#4e342e' },
+];
 
 const VISITOR_KEY = 'offercity_visitor';
 
 export default function Home() {
   const { user, updateLocation } = useAuth();
   const navigate = useNavigate();
-  const [offers, setOffers] = useState([]);
-  const [loading, setLoading] = useState(true);
-  const [coords, setCoords] = useState(null);
-  const [search, setSearch] = useState('');
-  const [category, setCategory] = useState('All');
-  const [radius, setRadius] = useState(10);
-  const [view, setView] = useState('scroll');   // 'scroll' | 'map'
+  const [offers, setOffers]           = useState([]);
+  const [loading, setLoading]         = useState(true);
+  const [coords, setCoords]           = useState(null);
+  const [search, setSearch]           = useState('');
+  const [category, setCategory]       = useState('All');
+  const [radius, setRadius]           = useState(10);
+  const [view, setView]               = useState('scroll');
   const [newOffersCount, setNewOffersCount] = useState(0);
+  const [locationLabel, setLocationLabel]   = useState('Detecting location…');
 
   useEffect(() => {
     navigator.geolocation?.getCurrentPosition(
       ({ coords: c }) => {
         const pos = { lng: c.longitude, lat: c.latitude };
         setCoords(pos);
+        setLocationLabel('Near You');
         if (user) updateLocation(pos.lng, pos.lat);
       },
-      () => setCoords({ lng: 78.4867, lat: 17.3850 }) // fallback: Hyderabad center
+      () => {
+        setCoords({ lng: 78.4867, lat: 17.3850 });
+        setLocationLabel('Hyderabad');
+      }
     );
   }, []);
 
@@ -44,21 +59,14 @@ export default function Home() {
       if (category !== 'All') params.category = category;
       const { data } = await api.get('/offers', { params });
       setOffers(data);
-
-      // New-offers notification for returning anonymous visitors
       if (!user) {
         try {
           const raw = localStorage.getItem(VISITOR_KEY);
           if (raw) {
             const visitor = JSON.parse(raw);
-            const currentCount = data.length;
-            const lastCount = visitor.lastOfferCount || 0;
-            if (currentCount > lastCount && lastCount > 0) {
-              setNewOffersCount(currentCount - lastCount);
-            }
-            localStorage.setItem(VISITOR_KEY, JSON.stringify({
-              ...visitor, lastOfferCount: currentCount, lastVisit: Date.now()
-            }));
+            const diff = data.length - (visitor.lastOfferCount || 0);
+            if (diff > 0 && visitor.lastOfferCount > 0) setNewOffersCount(diff);
+            localStorage.setItem(VISITOR_KEY, JSON.stringify({ ...visitor, lastOfferCount: data.length, lastVisit: Date.now() }));
           }
         } catch (_) {}
       }
@@ -69,92 +77,127 @@ export default function Home() {
     }
   };
 
-  // Deduplicate by shop for map pins
   const shopMarkers = [];
   const seenShops = new Set();
   offers.forEach(o => {
     if (o.lat && o.lng && !seenShops.has(o.shop_id)) {
       seenShops.add(o.shop_id);
-      shopMarkers.push({
-        id: o.shop_id,
-        lng: parseFloat(o.lng),
-        lat: parseFloat(o.lat),
-        label: o.shop_name,
-        sublabel: `${o.category} · ${o.address}`,
-        link: o.slug ? `/shop/${o.slug}` : null,
-        color: '#e65100',
-      });
+      shopMarkers.push({ id: o.shop_id, lng: parseFloat(o.lng), lat: parseFloat(o.lat), label: o.shop_name, sublabel: `${o.category} · ${o.address}`, link: o.slug ? `/shop/${o.slug}` : null, color: '#e65100' });
     }
   });
 
+  const handleSearch = (e) => {
+    e.preventDefault();
+    fetchOffers();
+  };
+
   return (
-    <div className="page">
-      <h1 style={{ marginBottom: newOffersCount ? 12 : 20, color: '#e65100' }}>🔥 Nearby Offers & Deals</h1>
+    <div className="home-root">
 
-      {newOffersCount > 0 && (
-        <div className="new-offers-bar">
-          <span>🎉 <strong>{newOffersCount} new offer{newOffersCount > 1 ? 's' : ''}</strong> added near you since your last visit!</span>
-          <button onClick={() => setNewOffersCount(0)}>✕</button>
+      {/* ── HERO ── */}
+      <section className="home-hero">
+        <div className="home-hero-inner">
+          <h1 className="hero-tagline">Discover the Best Deals<br />Near You — Every Day!</h1>
+          <p className="hero-sub">Exclusive offers from local shops in your city</p>
+
+          {/* Location + Search bar */}
+          <form className="hero-search" onSubmit={handleSearch}>
+            <div className="hero-loc">
+              <span>📍</span>
+              <span className="hero-loc-label">{locationLabel}</span>
+              <select value={radius} onChange={e => setRadius(Number(e.target.value))} className="hero-radius">
+                <option value={1}>1 km</option>
+                <option value={3}>3 km</option>
+                <option value={5}>5 km</option>
+                <option value={10}>10 km</option>
+                <option value={25}>25 km</option>
+                <option value={50}>50 km</option>
+              </select>
+            </div>
+            <div className="hero-search-divider" />
+            <input
+              className="hero-search-input"
+              placeholder="Search offers, shops or products…"
+              value={search}
+              onChange={e => setSearch(e.target.value)}
+            />
+            <button type="submit" className="hero-search-btn">🔍</button>
+          </form>
         </div>
-      )}
+      </section>
 
-      <div className="search-bar">
-        <input
-          placeholder="Search offers or products..."
-          value={search}
-          onChange={e => setSearch(e.target.value)}
-          onKeyDown={e => e.key === 'Enter' && fetchOffers()}
-        />
-        <select value={category} onChange={e => setCategory(e.target.value)}>
-          {CATEGORIES.map(c => <option key={c}>{c}</option>)}
-        </select>
-        <select value={radius} onChange={e => setRadius(Number(e.target.value))}>
-          <option value={1}>Within 1 km</option>
-          <option value={3}>Within 3 km</option>
-          <option value={5}>Within 5 km</option>
-          <option value={10}>Within 10 km</option>
-          <option value={25}>Within 25 km</option>
-          <option value={50}>Within 50 km</option>
-        </select>
-        <button onClick={fetchOffers}>Search</button>
-        <button
-          onClick={() => setView(v => v === 'map' ? 'scroll' : 'map')}
-          style={{ background: view === 'map' ? '#e65100' : '#555' }}
-        >
-          {view === 'map' ? '🎞 Scroll View' : '🗺 Map View'}
-        </button>
-      </div>
+      {/* ── CATEGORY CARDS (Swiggy-style) ── */}
+      <section className="home-cats-section">
+        <div className="home-cats-inner">
+          <div className="home-cats-grid">
+            {CATEGORIES.map(cat => {
+              const count = cat.key === 'All' ? offers.length : offers.filter(o => o.category === cat.key).length;
+              return (
+                <div
+                  key={cat.key}
+                  className={`cat-card${category === cat.key ? ' active' : ''}`}
+                  style={{ '--cat-color': cat.color }}
+                  onClick={() => setCategory(cat.key)}
+                >
+                  <div className="cat-card-icon">{cat.icon}</div>
+                  <div className="cat-card-body">
+                    <div className="cat-card-name">{cat.label}</div>
+                    <div className="cat-card-sub">{cat.sub}</div>
+                    {count > 0 && <div className="cat-card-badge">Upto {Math.max(...(offers.filter(o => cat.key === 'All' || o.category === cat.key).map(o => o.discount || 0)), 0)}% OFF</div>}
+                  </div>
+                  <div className="cat-card-arrow">→</div>
+                </div>
+              );
+            })}
+          </div>
+        </div>
+      </section>
 
-      {!coords && <p className="loading">📍 Detecting your location...</p>}
+      {/* ── OFFERS SECTION ── */}
+      <div className="home-offers-section">
 
-      {/* MAP VIEW */}
-      {view === 'map' && coords && (
-        <>
-          <p style={{ color: '#888', fontSize: 13, marginBottom: 8 }}>
-            📍 Click a pin to see the shop. Showing {shopMarkers.length} nearby shops.
-          </p>
-          <MapView
-            center={[coords.lng, coords.lat]}
-            markers={[
-              { lng: coords.lng, lat: coords.lat, label: 'You are here', sublabel: 'Your location', color: '#1565c0' },
-              ...shopMarkers
-            ]}
-            onMarkerClick={(m) => m.link && navigate(m.link)}
-          />
-          {shopMarkers.length > 0 && (
-            <div style={{ marginTop: 16 }}>
-              <h3 style={{ color: '#e65100', marginBottom: 12 }}>Shops on Map</h3>
-              <div style={{ display: 'flex', flexWrap: 'wrap', gap: 10 }}>
+        {newOffersCount > 0 && (
+          <div className="new-offers-bar">
+            <span>🎉 <strong>{newOffersCount} new offer{newOffersCount > 1 ? 's' : ''}</strong> added near you since your last visit!</span>
+            <button onClick={() => setNewOffersCount(0)}>✕</button>
+          </div>
+        )}
+
+        {/* Section header */}
+        <div className="offers-section-head">
+          <div>
+            <h2 className="offers-section-title">
+              {category === 'All' ? '🔥 All Nearby Offers' : `${CATEGORIES.find(c=>c.key===category)?.icon} ${category} Offers`}
+            </h2>
+            {!loading && <p className="offers-section-sub">{offers.length} offer{offers.length !== 1 ? 's' : ''} found near you</p>}
+          </div>
+          <button
+            className="btn-map-toggle"
+            onClick={() => setView(v => v === 'map' ? 'scroll' : 'map')}
+          >
+            {view === 'map' ? '🎞 Scroll View' : '🗺 Map View'}
+          </button>
+        </div>
+
+        {!coords && <p className="loading">📍 Detecting your location…</p>}
+
+        {/* MAP VIEW */}
+        {view === 'map' && coords && (
+          <>
+            <p style={{ color: '#888', fontSize: 13, marginBottom: 8 }}>📍 {shopMarkers.length} nearby shops on map. Click a pin to view.</p>
+            <MapView
+              center={[coords.lng, coords.lat]}
+              markers={[
+                { lng: coords.lng, lat: coords.lat, label: 'You are here', sublabel: 'Your location', color: '#1565c0' },
+                ...shopMarkers
+              ]}
+              onMarkerClick={(m) => m.link && navigate(m.link)}
+            />
+            {shopMarkers.length > 0 && (
+              <div style={{ marginTop: 16, display: 'flex', flexWrap: 'wrap', gap: 10 }}>
                 {shopMarkers.map(m => (
-                  <div
-                    key={m.id}
-                    onClick={() => m.link && navigate(m.link)}
-                    style={{
-                      background: '#fff', border: '1px solid #ffe0b2', borderRadius: 10,
-                      padding: '10px 14px', cursor: 'pointer', minWidth: 160,
-                      boxShadow: '0 1px 4px rgba(0,0,0,.06)'
-                    }}
-                  >
+                  <div key={m.id} onClick={() => m.link && navigate(m.link)}
+                    style={{ background: '#fff', border: '1px solid #ffe0b2', borderRadius: 10, padding: '10px 14px', cursor: 'pointer', minWidth: 160, boxShadow: '0 1px 4px rgba(0,0,0,.06)' }}>
                     <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
                       <span style={{ width: 10, height: 10, borderRadius: '50%', background: '#e65100', display: 'inline-block' }} />
                       <strong style={{ fontSize: 14 }}>{m.label}</strong>
@@ -163,19 +206,20 @@ export default function Home() {
                   </div>
                 ))}
               </div>
-            </div>
-          )}
-        </>
-      )}
+            )}
+          </>
+        )}
 
-      {/* SCROLL FEED VIEW — horizontal on desktop, vertical reels on mobile */}
-      {view === 'scroll' && (
-        loading
-          ? <p className="loading">Loading nearby offers...</p>
-          : offers.length === 0
-            ? <p className="loading">No offers found near you. Try increasing the radius.</p>
-            : <OffersScroll offers={offers} />
-      )}
+        {/* SCROLL FEED */}
+        {view === 'scroll' && (
+          loading
+            ? <p className="loading">Loading nearby offers…</p>
+            : offers.length === 0
+              ? <p className="loading">No offers found near you. Try increasing the radius.</p>
+              : <OffersScroll offers={offers} />
+        )}
+      </div>
+
     </div>
   );
 }
