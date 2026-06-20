@@ -129,15 +129,11 @@ else:
 # ── 5. Verify upload & restart ────────────────────────────────────────────────
 print("=== Verifying uploaded server.js ===")
 # Write diagnostics to node.log so we can read them via /api/logs
+# Try uapi restart (cPanel's privileged restart — works even when Node runs as different user)
 sh(
-    f"FILE={APP}/server.js; "
-    f"PID=$(cat {HOME_REMOTE}/node.pid 2>/dev/null); "
-    f"CMD=$(cat /proc/$PID/cmdline 2>/dev/null | tr '\\0' ' '); "
-    f"ALLNODE=$(pgrep -a node 2>/dev/null || ps aux 2>/dev/null | grep '[n]ode' | awk '{{print $2,$11,$12}}'); "
-    f"HAS=$(grep -c 'deploy-restart' $FILE 2>/dev/null || echo 0); "
-    f"echo \"[DEPLOY CHECK] pid=$PID file=$FILE has_endpoint=$HAS cmd=$CMD\" >> {HOME_REMOTE}/node.log; "
-    f"echo \"[DEPLOY PROCS] $ALLNODE\" >> {HOME_REMOTE}/node.log",
-    "verify"
+    f"echo \"[DEPLOY UAPI] $(uapi NodeJS restart_app 2>&1 | head -5)\" >> {HOME_REMOTE}/node.log "
+    f"|| echo '[DEPLOY UAPI] uapi not available' >> {HOME_REMOTE}/node.log",
+    "uapi-restart"
 )
 
 # Call /api/deploy-restart on the running server — it calls process.exit(0)
