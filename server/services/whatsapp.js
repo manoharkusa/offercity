@@ -244,9 +244,8 @@ async function connect(ownerId) {
         const reply = await ai.handleIncoming(ownerId, replyJid, text, msg.pushName || '');
         if (reply) {
           // Race sendMessage against a 15s timeout — LID JIDs can hang indefinitely
-          const sendPromise = sock.sendMessage(replyJid, { text: reply }, { quoted: msg });
-          const timeout = new Promise((_, rej) => setTimeout(() => rej(new Error('sendMessage timeout')), 15000));
-          await Promise.race([sendPromise, timeout]);
+          // Plain send (no quoted) — same as campaign sends, avoids LID-related hang
+          await sock.sendMessage(replyJid, { text: reply });
           console.log(`[AI] Send OK → ${replyJid}`);
         }
       } catch (e) { console.error('[WA] message handler error:', e.message); }
@@ -460,14 +459,17 @@ async function connectWithPairingCode(ownerId, phone) {
     if (type !== 'notify') return;
     for (const msg of messages) {
       try {
-        if (msg.key.fromMe || msg.key.remoteJid?.endsWith('@g.us')) continue;
+        if (msg.key.fromMe) continue;
+        const remoteJid2 = msg.key.remoteJid || '';
+        if (!remoteJid2.endsWith('@s.whatsapp.net')) continue;
         const age = Date.now() / 1000 - (msg.messageTimestamp || 0);
         if (age > 300) continue;
         const text = msg.message?.conversation || msg.message?.extendedTextMessage?.text || msg.message?.imageMessage?.caption || '';
         if (!text.trim()) continue;
         await new Promise(r => setTimeout(r, 1000 + Math.random() * 1000));
-        const reply = await ai.handleIncoming(ownerId, msg.key.remoteJid, text, msg.pushName || '');
-        if (reply) await sock.sendMessage(msg.key.remoteJid, { text: reply });
+        const replyJid2 = resolvePhoneJid(ownerId, remoteJid2);
+        const reply = await ai.handleIncoming(ownerId, replyJid2, text, msg.pushName || '');
+        if (reply) await sock.sendMessage(replyJid2, { text: reply });
       } catch (e) { console.error('[WA] message handler error:', e.message); }
     }
   });
