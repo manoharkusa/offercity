@@ -127,13 +127,11 @@ else:
 
 # ── 5. Restart Node ────────────────────────────────────────────────────────────
 print("=== Restarting Node.js ===")
-# Kill ALL start_node.sh wrappers first (they restart node on crash in a loop),
-# then kill any remaining node processes.  Without killing the shell wrapper,
-# every deploy leaves a zombie start_node.sh that fights the new one over the
-# same WhatsApp session (Baileys conflict code 440 → endless disconnect loop).
-sh("pkill -f start_node.sh 2>/dev/null || true", "kill start_node.sh wrappers")
-sh("pkill -f 'node.*server.js' 2>/dev/null || true", "kill node processes")
-sh("sleep 3 && echo 'remaining node procs:' && pgrep -a -f 'node.*server' || echo none", "verify clean")
+# Hard-kill ALL node processes for this user. nohup isolates processes from
+# pkill (SIGTERM), so we use killall -9 (SIGKILL) which cannot be ignored.
+# This cleans up zombie start_node.sh restart-loops from previous deploys.
+sh("killall -9 node 2>/dev/null; killall -9 bash 2>/dev/null; sleep 4", "hard kill all node+bash")
+sh("pgrep -a node 2>/dev/null || echo 'no node processes — clean'", "verify clean")
 sh(f"source ~/.nvm/nvm.sh && nvm use 16 && nohup bash {HOME_REMOTE}/start_node.sh >> {HOME_REMOTE}/node.log 2>&1 &",
    "start node", timeout=15)
 time.sleep(8)
