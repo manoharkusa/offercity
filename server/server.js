@@ -157,5 +157,11 @@ const server = app.listen(PORT, () => {
 
 server.on('error', (err) => {
   log.error('Server listen error:', err.code, err.message);
-  process.exit(1);
+  if (err.code === 'EADDRINUSE') {
+    // Port still held by dying old process — wait and retry once
+    log.info(`Port ${PORT} busy — retrying in 4s…`);
+    setTimeout(() => server.listen(PORT), 4000);
+  } else {
+    process.exit(1);
+  }
 });

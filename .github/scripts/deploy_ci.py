@@ -174,18 +174,18 @@ else:
     print("=== Server files changed — restarting Node process ===")
     time.sleep(3)
 
-    # PRIMARY: touch Passenger restart file — works even when Node is already dead.
-    # Passenger watches this file and spawns a fresh worker automatically.
-    sh(f"mkdir -p {APP}/tmp && touch {APP}/tmp/restart.txt", "passenger restart.txt")
-
-    # SECONDARY: graceful HTTP restart (best-effort — no problem if it fails)
+    # Graceful HTTP restart — tells the running process to exit cleanly so Passenger
+    # spawns a fresh worker with the new files. If the server is already down,
+    # the curl fails silently and Passenger will auto-spawn on the next request.
     sh(
         f"PORT=$(cat {PORT_FILE} 2>/dev/null || echo 5008); "
         f"curl -sf -X POST http://localhost:$PORT/api/deploy-restart "
         f"  -H 'x-deploy-secret: {DEPLOY_SECRET}' -H 'Content-Type: application/json' "
         f"&& echo 'graceful HTTP restart OK' "
-        f"|| echo 'HTTP restart skipped (server was down) — Passenger will respawn via restart.txt'",
-        "http restart (best-effort)"
+        f"|| (PID=$(cat {HOME_REMOTE}/node.pid 2>/dev/null); "
+        f"   [ -n \"$PID\" ] && kill $PID 2>/dev/null && echo \"killed PID $PID\" "
+        f"   || echo 'server was already down — Passenger will spawn on next request')",
+        "restart"
     )
 
     # Wait up to 75s for Passenger to spawn a fresh worker
