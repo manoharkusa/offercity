@@ -172,28 +172,38 @@ if not server_changed:
     time.sleep(5)
 else:
     print("=== Server files changed — restarting Node process ===")
-    # Wait a moment to ensure all files are flushed to disk
     time.sleep(3)
+
+    # PRIMARY: touch Passenger restart file — works even when Node is already dead.
+    # Passenger watches this file and spawns a fresh worker automatically.
+    sh(f"mkdir -p {APP}/tmp && touch {APP}/tmp/restart.txt", "passenger restart.txt")
+
+    # SECONDARY: graceful HTTP restart (best-effort — no problem if it fails)
     sh(
         f"PORT=$(cat {PORT_FILE} 2>/dev/null || echo 5008); "
         f"curl -sf -X POST http://localhost:$PORT/api/deploy-restart "
         f"  -H 'x-deploy-secret: {DEPLOY_SECRET}' -H 'Content-Type: application/json' "
-        f"&& echo 'restart triggered via localhost' "
-        f"|| curl -sf -X POST https://offerscity.co.in/api/deploy-restart "
-        f"  -H 'x-deploy-secret: {DEPLOY_SECRET}' -H 'Content-Type: application/json' "
-        f"&& echo 'restart triggered via public url' "
-        f"|| echo 'NOTE: deploy-restart not available — server may need manual cPanel restart'",
-        "deploy-restart"
+        f"&& echo 'graceful HTTP restart OK' "
+        f"|| echo 'HTTP restart skipped (server was down) — Passenger will respawn via restart.txt'",
+        "http restart (best-effort)"
     )
-    # Wait for graceful shutdown + Passenger to spawn fresh worker (up to 40s)
-    print("Waiting for fresh worker to start…")
-    for i in range(8):
+
+    # Wait up to 75s for Passenger to spawn a fresh worker
+    print("Waiting for server to come back up…")
+    up = False
+    for i in range(15):
         time.sleep(5)
         r = sh(f"curl -sf https://offerscity.co.in/api/health || echo 'not yet'")
         if 'running' in r or 'OfferCity' in r:
-            print(f"Server up after {(i+1)*5}s")
+            print(f"✅ Server up after {(i+1)*5}s")
+            up = True
             break
-        print(f"  {(i+1)*5}s: still starting…")
+        print(f"  {(i+1)*5}s — still starting…")
+
+    if not up:
+        print("❌ ERROR: Server did not come up within 75s after deploy!")
+        # Exit non-zero so CI is marked failed and team is alerted
+        import sys; sys.exit(1)
 
 sh(f"curl -s https://offerscity.co.in/api/health", "final health check")
 
