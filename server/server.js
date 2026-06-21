@@ -1,23 +1,40 @@
+// ── Bootstrap logger — must be first, before ANY require that could crash ─────
+const fs = require('fs');
+const LOG_FILE = '/home1/a1751tyi/node.log';
+function flog(level, msg) {
+  const line = `[${new Date().toISOString().slice(0,19).replace('T',' ')}] [${level}] ${msg}\n`;
+  process.stdout.write(line);
+  try { fs.appendFileSync(LOG_FILE, line); } catch (_) {}
+}
+flog('INFO', `=== OfferCity starting === Node ${process.version} PID ${process.pid}`);
+
+// Catch crashes before express is even loaded
+process.on('uncaughtException', (err) => {
+  flog('CRASH', `uncaughtException: ${err.message}`);
+  flog('CRASH', err.stack || '(no stack)');
+});
+process.on('unhandledRejection', (reason) => {
+  flog('CRASH', `unhandledRejection: ${reason instanceof Error ? reason.stack : JSON.stringify(reason)}`);
+});
+
+flog('INFO', 'Loading dotenv...');
 require('dotenv').config();
-const fs   = require('fs');
-const log  = require('./utils/log');
+flog('INFO', `PORT env: ${process.env.PORT || '(not set)'}`);
 
-log.info('=== OfferCity server starting ===', new Date().toISOString());
-log.info('Node', process.version, '| PID', process.pid);
-log.info('PORT env:', process.env.PORT || '(not set, will use 5000)');
+flog('INFO', 'Loading utils/log...');
+let log;
+try {
+  log = require('./utils/log');
+  flog('INFO', 'utils/log loaded OK');
+} catch (e) {
+  flog('WARN', `utils/log failed (${e.message}) — using inline logger`);
+  log = { info: (...a) => flog('INFO', a.join(' ')), warn: (...a) => flog('WARN', a.join(' ')), error: (...a) => flog('ERROR', a.join(' ')) };
+}
 
+flog('INFO', 'Loading express...');
 const express = require('express');
 const cors    = require('cors');
 const path    = require('path');
-
-// Catch anything that slips through — log to file so we can read it even when server is down
-process.on('uncaughtException', (err) => {
-  log.error('[CRASH] uncaughtException:', err.message);
-  log.error(err.stack || '(no stack)');
-});
-process.on('unhandledRejection', (reason) => {
-  log.error('[CRASH] unhandledRejection:', reason instanceof Error ? reason.stack : JSON.stringify(reason));
-});
 
 // Write PID so start_node.sh can kill us cleanly next restart
 try { fs.writeFileSync('/home1/a1751tyi/node.pid', String(process.pid)); } catch (_) {}
