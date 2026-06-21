@@ -350,8 +350,8 @@ export default function ShopDashboard() {
 
   const shopUrl = (s) => {
     if (!s) return '';
-    const city = (s.city || '').toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '');
-    return city ? `/${city}/${s.slug}` : `/shop/${s.slug}`;
+    const area = ((s.area || s.city || '')).toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '');
+    return area ? `/${area}/${s.slug}` : `/shop/${s.slug}`;
   };
 
   const buildWAMessage = (offer) => {

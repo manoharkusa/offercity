@@ -132,16 +132,17 @@ router.post('/', protect, requireRole('shop_owner', 'admin'), upload.single('ima
     const slug = await uniqueSlug(pool, makeSlug(name));
     const image = req.file ? `/uploads/${req.file.filename}` : null;
 
-    // Auto-assign BDO by pincode
+    // Auto-assign BDO and area name by pincode
     const [bdoRows] = await pool.query(
-      'SELECT bdo_id FROM bdo_areas WHERE pincode = ? LIMIT 1', [pin_code.trim()]
+      'SELECT bdo_id, area_name FROM bdo_areas WHERE pincode = ? LIMIT 1', [pin_code.trim()]
     );
-    const bdo_id = bdoRows.length > 0 ? bdoRows[0].bdo_id : null;
-    const status = req.user.role === 'admin' ? 'approved' : 'pending';
+    const bdo_id   = bdoRows.length > 0 ? bdoRows[0].bdo_id : null;
+    const area     = bdoRows.length > 0 ? (bdoRows[0].area_name || null) : null;
+    const status   = req.user.role === 'admin' ? 'approved' : 'pending';
 
     const [result] = await pool.query(
-      'INSERT INTO shops (owner_id, name, slug, description, category, address, city, pin_code, lat, lng, image, status, bdo_id) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?)',
-      [req.user.id, name, slug, description, category, address, city, pin_code.trim(), lat, lng, image, status, bdo_id]
+      'INSERT INTO shops (owner_id, name, slug, description, category, address, city, pin_code, lat, lng, image, status, bdo_id, area) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?)',
+      [req.user.id, name, slug, description, category, address, city, pin_code.trim(), lat, lng, image, status, bdo_id, area]
     );
     const [rows] = await pool.query('SELECT * FROM shops WHERE id = ?', [result.insertId]);
     res.status(201).json(rows[0]);
