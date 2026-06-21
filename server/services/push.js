@@ -10,36 +10,62 @@ function init() {
     process.env.VAPID_PRIVATE_KEY
   );
   ready = true;
+  console.log('[PUSH] Web Push ready');
 }
 
-async function notifyShopSubscribers(shopId, offer, shopName, shopPageUrl) {
+// Haversine distance in km between two lat/lng points
+function distanceKm(lat1, lng1, lat2, lng2) {
+  const R = 6371;
+  const dLat = (lat2 - lat1) * Math.PI / 180;
+  const dLng = (lng2 - lng1) * Math.PI / 180;
+  const a = Math.sin(dLat/2)**2 +
+            Math.cos(lat1 * Math.PI/180) * Math.cos(lat2 * Math.PI/180) * Math.sin(dLng/2)**2;
+  return R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a));
+}
+
+// Called when a new offer is published — notifies users within RADIUS_KM of the shop
+async function notifyNearbyUsers(offer, shop) {
   if (!ready) return;
+  if (!shop?.lat || !shop?.lng) return;
+
+  const RADIUS_KM = 10;
   const { getPool } = require('../config/db');
   const pool = getPool();
-  const [subs] = await pool.query(
-    'SELECT * FROM push_subscriptions WHERE shop_id = ?', [shopId]
-  );
-  if (!subs.length) return;
 
-  const title = `🔥 ${shopName} — New Offer!`;
-  const body  = `${offer.discount}% OFF: ${offer.title}${offer.offer_price ? ' at ₹' + Math.round(offer.offer_price) : ''}`;
-  const payload = JSON.stringify({ title, body, url: shopPageUrl });
+  // Fetch all subscriptions that have a stored location
+  const [subs] = await pool.query(
+    'SELECT * FROM push_subscriptions WHERE lat IS NOT NULL AND lng IS NOT NULL'
+  );
+
+  const nearby = subs.filter(s =>
+    distanceKm(parseFloat(shop.lat), parseFloat(shop.lng), s.lat, s.lng) <= RADIUS_KM
+  );
+
+  if (!nearby.length) return;
+
+  const shopUrl = shop.slug ? `/shop/${shop.slug}` : '/';
+  const title   = `🔥 New Offer Near You!`;
+  const body    = `${offer.discount}% OFF: ${offer.title} — ${shop.name}`;
+  const payload = JSON.stringify({ title, body, url: shopUrl, icon: '/favicon.ico' });
 
   const expired = [];
-  for (const sub of subs) {
+  let sent = 0;
+  for (const sub of nearby) {
     try {
       await webpush.sendNotification(
         { endpoint: sub.endpoint, keys: { p256dh: sub.p256dh, auth: sub.auth } },
         payload
       );
+      sent++;
     } catch (err) {
       if (err.statusCode === 410 || err.statusCode === 404) expired.push(sub.id);
     }
   }
+
   if (expired.length) {
     await pool.query('DELETE FROM push_subscriptions WHERE id IN (?)', [expired]);
   }
-  console.log(`[PUSH] Notified ${subs.length - expired.length} subscribers for shop ${shopId}`);
+  console.log(`[PUSH] Notified ${sent} nearby users for offer "${offer.title}" (shop: ${shop.name})`);
 }
 
-module.exports = { init, notifyShopSubscribers };
+module.exports = { init, notifyNearbyUsers };

@@ -116,11 +116,12 @@ router.post('/', protect, requireRole('shop_owner', 'admin'), upload.single('ima
     const [rows] = await pool.query('SELECT * FROM offers WHERE id = ?', [result.insertId]);
     res.status(201).json(rows[0]);
 
-    // Fire-and-forget push notifications to subscribers
+    // Fire-and-forget push notifications to nearby users
     if (shopRows.length) {
-      const s = shopRows[0];
-      const pageUrl = `https://offerscity.co.in/${s.city}/${s.slug}`;
-      require('../services/push').notifyShopSubscribers(shop_id, rows[0], s.name, pageUrl).catch(() => {});
+      const [shopFull] = await getPool().query('SELECT * FROM shops WHERE id = ?', [shop_id]);
+      if (shopFull.length) {
+        require('../services/push').notifyNearbyUsers(rows[0], shopFull[0]).catch(() => {});
+      }
     }
   } catch (err) {
     res.status(500).json({ message: err.message });

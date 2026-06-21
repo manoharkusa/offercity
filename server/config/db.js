@@ -137,16 +137,16 @@ const createTables = async () => {
     ["shops",  "pin_code",  "VARCHAR(10) DEFAULT NULL AFTER city"],
   ];
 
-  // push_subscriptions table
+  // push_subscriptions — location-based, no shop dependency
   await pool.query(`CREATE TABLE IF NOT EXISTS push_subscriptions (
     id INT AUTO_INCREMENT PRIMARY KEY,
-    shop_id INT NOT NULL,
     endpoint TEXT NOT NULL,
     p256dh VARCHAR(512) NOT NULL,
     auth VARCHAR(255) NOT NULL,
+    lat FLOAT DEFAULT NULL,
+    lng FLOAT DEFAULT NULL,
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-    UNIQUE KEY unique_sub (shop_id, endpoint(200)),
-    FOREIGN KEY (shop_id) REFERENCES shops(id) ON DELETE CASCADE
+    UNIQUE KEY unique_endpoint (endpoint(200))
   ) ENGINE=InnoDB`);
   for (const [tbl, col, def] of migrations) {
     const [cols] = await pool.query(

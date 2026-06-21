@@ -143,14 +143,19 @@ sftp.close()
 print()
 print(f"Server files changed: {server_changed}")
 
-# ── 4. Inject GROQ_API_KEY into production .env ───────────────────────────────
-groq_key = os.environ.get("GROQ_API_KEY", "").strip()
-if groq_key:
-    print("=== Injecting GROQ_API_KEY into .env ===")
-    env_path = f"{HOME_REMOTE}/.env"
-    sh(f"""if grep -q '^GROQ_API_KEY=' {env_path} 2>/dev/null; then sed -i 's|^GROQ_API_KEY=.*|GROQ_API_KEY={groq_key}|' {env_path} && echo "Updated"; else echo "GROQ_API_KEY={groq_key}" >> {env_path} && echo "Added"; fi""", "update .env")
-else:
-    print("=== GROQ_API_KEY secret not set — skipping ===")
+# ── 4. Inject secrets into production .env ────────────────────────────────────
+env_path = f"{HOME_REMOTE}/.env"
+
+def inject_env(key, value, label=""):
+    if not value:
+        print(f"=== {label or key} secret not set — skipping ===")
+        return
+    print(f"=== Injecting {label or key} into .env ===")
+    sh(f"""if grep -q '^{key}=' {env_path} 2>/dev/null; then sed -i 's|^{key}=.*|{key}={value}|' {env_path} && echo "Updated"; else echo "{key}={value}" >> {env_path} && echo "Added"; fi""", f"update .env ({key})")
+
+inject_env("GROQ_API_KEY",        os.environ.get("GROQ_API_KEY","").strip(),        "GROQ_API_KEY")
+inject_env("VAPID_PUBLIC_KEY",    os.environ.get("VAPID_PUBLIC_KEY","").strip(),    "VAPID_PUBLIC_KEY")
+inject_env("VAPID_PRIVATE_KEY",   os.environ.get("VAPID_PRIVATE_KEY","").strip(),   "VAPID_PRIVATE_KEY")
 
 # ── 5. Restart only if server files changed ───────────────────────────────────
 # Skipping restart for client-only deploys prevents unnecessary Passenger exits

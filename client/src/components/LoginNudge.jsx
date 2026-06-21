@@ -4,7 +4,7 @@ import { useAuth } from '../context/AuthContext';
 import api from '../services/api';
 
 const COOKIE_KEY  = 'oc_cookies_accepted';
-const NUDGE_DELAY = 15 * 1000; // 15 seconds after page load
+const NUDGE_DELAY = 15 * 1000;
 
 export function acceptCookies() {
   localStorage.setItem(COOKIE_KEY, 'true');
@@ -12,9 +12,55 @@ export function acceptCookies() {
 
 async function saveLead(email) {
   if (!email || !email.includes('@')) return;
+  try { await api.post('/leads', { name: 'Guest', email: email.trim(), phone: '' }); } catch (_) {}
+}
+
+// Request browser notification permission + subscribe to push — called from a click handler
+async function requestPushPermission() {
   try {
-    await api.post('/leads', { name: 'Guest', email: email.trim(), phone: '' });
-  } catch (_) {}
+    if (!('Notification' in window) || !('serviceWorker' in navigator) || !('PushManager' in window)) return;
+
+    const permission = await Notification.requestPermission();
+    if (permission !== 'granted') return;
+
+    // Get VAPID public key from server
+    const { data } = await api.get('/push/vapid-key');
+    if (!data?.publicKey) return;
+
+    const reg = await navigator.serviceWorker.ready;
+
+    // Convert VAPID key to Uint8Array
+    const key = data.publicKey.replace(/-/g, '+').replace(/_/g, '/');
+    const raw = Uint8Array.from(atob(key), c => c.charCodeAt(0));
+
+    const sub = await reg.pushManager.subscribe({
+      userVisibleOnly: true,
+      applicationServerKey: raw,
+    });
+
+    const { endpoint, keys } = sub.toJSON();
+
+    // Get user's location to enable nearby notifications
+    const getCoords = () => new Promise(resolve => {
+      navigator.geolocation?.getCurrentPosition(
+        ({ coords: c }) => resolve({ lat: c.latitude, lng: c.longitude }),
+        () => resolve({})
+      );
+    });
+    const coords = await getCoords();
+
+    await api.post('/push/subscribe', {
+      endpoint,
+      p256dh: keys.p256dh,
+      auth:   keys.auth,
+      lat:    coords.lat,
+      lng:    coords.lng,
+    });
+
+    console.log('[Push] Subscribed for nearby notifications');
+  } catch (e) {
+    console.warn('[Push] Could not subscribe:', e.message);
+  }
 }
 
 export default function LoginNudge() {
@@ -24,25 +70,22 @@ export default function LoginNudge() {
   const [email, setEmail] = useState('');
 
   useEffect(() => {
-    // If already logged in — accept cookies silently, never show modal
     if (user) { acceptCookies(); return; }
-
-    // Already accepted (enrolled or skipped before) — skip modal
     if (localStorage.getItem(COOKIE_KEY) === 'true') return;
-
     const t = setTimeout(() => setShow(true), NUDGE_DELAY);
     return () => clearTimeout(t);
   }, [user]);
 
-  // If user logs in while modal is open — close it
   useEffect(() => {
     if (user) { acceptCookies(); setShow(false); }
   }, [user]);
 
   const dismiss = async (goLogin = false) => {
+    setShow(false);
     await saveLead(email);
     acceptCookies();
-    setShow(false);
+    // Request push permission from inside this click — browser allows it here
+    await requestPushPermission();
     if (goLogin) navigate('/login');
   };
 
@@ -61,7 +104,6 @@ export default function LoginNudge() {
           Sign in to save offers and get personalised deals — or drop your email and we'll keep you posted.
         </p>
 
-        {/* Email capture */}
         <input
           className="nudge-email"
           type="email"
@@ -71,7 +113,7 @@ export default function LoginNudge() {
           autoComplete="email"
         />
 
-        <p className="nudge-cookie">🍪 This site uses cookies to personalise your experience.</p>
+        <p className="nudge-cookie">🍪 This site uses cookies &amp; may send you offer alerts nearby.</p>
 
         <div className="nudge-actions">
           <button className="nudge-btn-login" onClick={() => dismiss(true)}>Login / Register</button>
