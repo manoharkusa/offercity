@@ -68,4 +68,32 @@ async function notifyNearbyUsers(offer, shop) {
   console.log(`[PUSH] Notified ${sent} nearby users for offer "${offer.title}" (shop: ${shop.name})`);
 }
 
-module.exports = { init, notifyNearbyUsers };
+// Generic nearby push — title, body, url, radius in km
+async function sendNearby(lat, lng, radiusKm, title, body, url = '/') {
+  if (!ready) return;
+  if (!lat || !lng) return;
+  const { getPool } = require('../config/db');
+  const [subs] = await getPool().query(
+    'SELECT * FROM push_subscriptions WHERE lat IS NOT NULL AND lng IS NOT NULL'
+  );
+  const nearby = subs.filter(s => distanceKm(parseFloat(lat), parseFloat(lng), s.lat, s.lng) <= radiusKm);
+  if (!nearby.length) return;
+  const payload = JSON.stringify({ title, body, url, icon: '/favicon.ico' });
+  const expired = [];
+  let sent = 0;
+  for (const sub of nearby) {
+    try {
+      await webpush.sendNotification(
+        { endpoint: sub.endpoint, keys: { p256dh: sub.p256dh, auth: sub.auth } },
+        payload
+      );
+      sent++;
+    } catch (err) {
+      if (err.statusCode === 410 || err.statusCode === 404) expired.push(sub.id);
+    }
+  }
+  if (expired.length) await getPool().query('DELETE FROM push_subscriptions WHERE id IN (?)', [expired]);
+  console.log(`[PUSH] sendNearby: sent ${sent} within ${radiusKm}km of (${lat},${lng})`);
+}
+
+module.exports = { init, notifyNearbyUsers, sendNearby };

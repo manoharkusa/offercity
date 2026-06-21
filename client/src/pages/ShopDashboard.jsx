@@ -169,15 +169,15 @@ export default function ShopDashboard() {
     return () => clearInterval(waTimer.current);
   }, [tab]);
 
-  // Poll incoming customers every 15s when on incoming tab
+  // Poll incoming customers every 20s always (for sidebar badge) — faster when on the tab
   useEffect(() => {
-    if (tab !== 'incoming') { clearInterval(incomingTimer.current); return; }
     const load = () => {
-      setIncomingLoading(true);
+      if (tab === 'incoming') setIncomingLoading(true);
       api.get('/coming/shop').then(r => setIncoming(r.data)).catch(() => {}).finally(() => setIncomingLoading(false));
     };
     load();
-    incomingTimer.current = setInterval(load, 15000);
+    const interval = tab === 'incoming' ? 10000 : 20000;
+    incomingTimer.current = setInterval(load, interval);
     return () => clearInterval(incomingTimer.current);
   }, [tab]);
 
@@ -513,7 +513,7 @@ export default function ShopDashboard() {
             ['offers',   '🏷 My Offers'],
             ['add-offer', editingOffer ? '✏️ Edit Offer' : '➕ Add Offer'],
             ['campaign', '📣 Campaign'],
-            ['incoming', '🚶 Incoming'],
+            ['incoming', incoming.length > 0 ? `🚶 Incoming (${incoming.length})` : '🚶 Incoming'],
             ['stamps',   '🎟 Stamp Cards']
           ].map(([t, label]) => (
             <button key={t} className={tab === t ? 'active' : ''}

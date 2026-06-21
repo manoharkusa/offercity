@@ -1,6 +1,7 @@
 const express = require('express');
 const { getPool } = require('../config/db');
 const { protect, requireRole } = require('../middleware/auth');
+const { sendNearby } = require('../services/push');
 
 const router = express.Router();
 
@@ -11,7 +12,8 @@ router.post('/', protect, async (req, res) => {
   try {
     const pool = getPool();
     const [offerRows] = await pool.query(
-      'SELECT o.*, s.id AS shop_id, s.name AS shop_name FROM offers o JOIN shops s ON s.id = o.shop_id WHERE o.id = ?',
+      `SELECT o.*, s.id AS shop_id, s.name AS shop_name, s.lat, s.lng, s.owner_id
+       FROM offers o JOIN shops s ON s.id = o.shop_id WHERE o.id = ?`,
       [offer_id]
     );
     if (offerRows.length === 0) return res.status(404).json({ message: 'Offer not found' });
@@ -25,6 +27,17 @@ router.post('/', protect, async (req, res) => {
        ON DUPLICATE KEY UPDATE eta_minutes=?, expires_at=?, status='coming'`,
       [offer_id, req.user.id, offer.shop_id, req.user.name, eta_minutes, expires_at, eta_minutes, expires_at]
     );
+
+    // Push notification targeting the shop's location (0.5 km) — reaches the shop owner's device
+    try {
+      await sendNearby(
+        offer.lat, offer.lng, 0.5,
+        `🚶 ${req.user.name} is coming!`,
+        `For: "${offer.title}" — arriving in ~${eta_minutes} min. Open your Incoming tab.`,
+        '/shop-dashboard'
+      );
+    } catch (_) {}
+
     res.json({ message: 'Confirmed! Shop notified.', eta_minutes, expires_at });
   } catch (err) {
     res.status(500).json({ message: err.message });

@@ -111,7 +111,7 @@ export default function OfferDetails() {
               onClick={getRoute}>
               🗺 Get Directions
             </button>
-            {user && !coming && (
+            {user && user.role === 'user' && !coming && (
               <div style={{ position:'relative' }}>
                 <button className="btn-primary"
                   style={{ width:'auto', padding:'10px 20px', background:'#2e7d32' }}
