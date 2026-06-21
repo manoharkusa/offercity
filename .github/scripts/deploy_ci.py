@@ -68,7 +68,7 @@ def upload_dir(local_dir, remote_dir):
 
 # ── 1. Ensure remote dirs exist ───────────────────────────────────────────────
 print("=== Ensuring remote directories ===")
-sh(f"mkdir -p {DIST_REMOTE}/assets {APP}/config {APP}/middleware {APP}/routes {APP}/services")
+sh(f"mkdir -p {DIST_REMOTE}/assets {APP}/config {APP}/middleware {APP}/routes {APP}/services {APP}/utils")
 
 # ── 2. Upload client dist ─────────────────────────────────────────────────────
 print("=== Uploading React dist ===")
@@ -94,6 +94,7 @@ print("=== Uploading server files ===")
 server_files = [
     ("server/Passengerfile.json",    f"{APP}/Passengerfile.json"),
     ("server/server.js",             f"{APP}/server.js"),
+    ("server/utils/log.js",          f"{APP}/utils/log.js"),
     ("server/config/db.js",          f"{APP}/config/db.js"),
     ("server/middleware/auth.js",    f"{APP}/middleware/auth.js"),
     ("server/routes/auth.js",        f"{APP}/routes/auth.js"),

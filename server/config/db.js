@@ -1,8 +1,10 @@
 const mysql = require('mysql2/promise');
+const log   = require('../utils/log');
 
 let pool;
 
 const connectDB = async () => {
+  log.info('connectDB: creating pool...');
   pool = mysql.createPool({
     host: process.env.DB_HOST || 'localhost',
     user: process.env.DB_USER || 'a1751tyi_offeruser',
@@ -14,17 +16,19 @@ const connectDB = async () => {
   });
 
   try {
+    log.info('connectDB: testing connection...');
     const conn = await pool.getConnection();
-    console.log('MySQL connected');
+    log.info('MySQL connected');
     conn.release();
     await createTables();
   } catch (err) {
-    console.error('MySQL connection error:', err.message);
+    log.error('MySQL connection error:', err.message, err.stack);
     setTimeout(connectDB, 10000);
   }
 };
 
 const createTables = async () => {
+  log.info('createTables: starting...');
   const queries = [
     `CREATE TABLE IF NOT EXISTS users (
       id INT AUTO_INCREMENT PRIMARY KEY,
@@ -126,7 +130,15 @@ const createTables = async () => {
   ];
 
   for (const q of queries) {
-    await pool.query(q);
+    const tblMatch = q.match(/CREATE TABLE IF NOT EXISTS (\w+)/i);
+    const tblName  = tblMatch ? tblMatch[1] : 'unknown';
+    try {
+      await pool.query(q);
+      log.info(`createTables: table OK — ${tblName}`);
+    } catch (e) {
+      log.error(`createTables: FAILED table ${tblName}:`, e.message);
+      throw e;
+    }
   }
 
   // BDO areas table — pincodes assigned to each BDO
@@ -218,11 +230,11 @@ const createTables = async () => {
     );
     if (cols.length === 0) {
       await pool.query(`ALTER TABLE ${tbl} ADD COLUMN ${col} ${def}`);
-      console.log(`Migration: added ${tbl}.${col}`);
+      log.info(`Migration: added ${tbl}.${col}`);
     }
   }
 
-  console.log('Tables ready');
+  log.info('createTables: all done.');
 };
 
 const getPool = () => pool;

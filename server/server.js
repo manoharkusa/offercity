@@ -1,95 +1,144 @@
 require('dotenv').config();
-const express = require('express');
-const cors = require('cors');
-const path = require('path');
-const fs = require('fs');
-const { connectDB } = require('./config/db');
-const seed = require('./seed');
+const fs   = require('fs');
+const log  = require('./utils/log');
 
-// Prevent ANY unhandled error from killing the process
-process.on('uncaughtException',  err    => console.error('[CRASH CAUGHT]',      err.message, err.stack));
-process.on('unhandledRejection', reason => console.error('[REJECTION CAUGHT]',  reason));
+log.info('=== OfferCity server starting ===', new Date().toISOString());
+log.info('Node', process.version, '| PID', process.pid);
+log.info('PORT env:', process.env.PORT || '(not set, will use 5000)');
+
+const express = require('express');
+const cors    = require('cors');
+const path    = require('path');
+
+// Catch anything that slips through — log to file so we can read it even when server is down
+process.on('uncaughtException', (err) => {
+  log.error('[CRASH] uncaughtException:', err.message);
+  log.error(err.stack || '(no stack)');
+});
+process.on('unhandledRejection', (reason) => {
+  log.error('[CRASH] unhandledRejection:', reason instanceof Error ? reason.stack : JSON.stringify(reason));
+});
 
 // Write PID so start_node.sh can kill us cleanly next restart
 try { fs.writeFileSync('/home1/a1751tyi/node.pid', String(process.pid)); } catch (_) {}
 
+log.info('Loading DB module...');
+const { connectDB } = require('./config/db');
+log.info('Loading seed module...');
+const seed = require('./seed');
+log.info('Core modules loaded.');
+
 const app = express();
 
-// Request logger — prints every incoming request to node.log
+// ── Request logger ────────────────────────────────────────────────────────────
 app.use((req, res, next) => {
-  const ts = new Date().toISOString().slice(11, 19);
   const start = Date.now();
   res.on('finish', () => {
     const ms = Date.now() - start;
-    console.log(`[${ts}] ${req.method} ${req.originalUrl} → ${res.statusCode} (${ms}ms)`);
+    const lvl = res.statusCode >= 500 ? 'error' : res.statusCode >= 400 ? 'warn' : 'info';
+    log[lvl](`${req.method} ${req.originalUrl} → ${res.statusCode} (${ms}ms)`);
   });
   next();
 });
 
-connectDB().then(seed).then(() => {
-  const push = require('./services/push');
-  push.init();
-  const wa = require('./services/whatsapp');
-  wa.autoReconnectAll();
-  wa.startWatchdog();
-}).catch(err => console.error('Startup error:', err.message));
+// ── Connect DB then start services ────────────────────────────────────────────
+connectDB()
+  .then(seed)
+  .then(() => {
+    log.info('DB + seed done. Loading push service...');
+    try {
+      const push = require('./services/push');
+      push.init();
+      log.info('Push service ready.');
+    } catch (e) { log.error('Push service failed to load:', e.message); }
+
+    try {
+      const wa = require('./services/whatsapp');
+      wa.autoReconnectAll();
+      wa.startWatchdog();
+      log.info('WhatsApp service ready.');
+    } catch (e) { log.error('WhatsApp service failed to load:', e.message); }
+  })
+  .catch(err => log.error('DB startup error:', err.message, err.stack));
 
 app.use(cors({ origin: process.env.CLIENT_URL || '*', credentials: true }));
 app.use(express.json());
 app.use('/uploads', express.static(path.join(__dirname, 'uploads')));
 
-app.use('/api/auth',      require('./routes/auth'));
-app.use('/api/shops',     require('./routes/shops'));
-app.use('/api/offers',    require('./routes/offers'));
-app.use('/api/reviews',   require('./routes/reviews'));
-app.use('/api/admin',     require('./routes/admin'));
-app.use('/api/bdo',       require('./routes/bdo'));
-app.use('/api/coming',    require('./routes/coming'));
-app.use('/api/stamps',    require('./routes/stamps'));
-app.use('/api/leads',     require('./routes/leads'));
-app.use('/api/campaigns', require('./routes/campaigns'));
-app.use('/api/push',      require('./routes/push'));
+// ── Routes — each in try/catch so one bad file can't kill the server ──────────
+const routes = [
+  ['/api/auth',      './routes/auth'],
+  ['/api/shops',     './routes/shops'],
+  ['/api/offers',    './routes/offers'],
+  ['/api/reviews',   './routes/reviews'],
+  ['/api/admin',     './routes/admin'],
+  ['/api/bdo',       './routes/bdo'],
+  ['/api/coming',    './routes/coming'],
+  ['/api/stamps',    './routes/stamps'],
+  ['/api/leads',     './routes/leads'],
+  ['/api/campaigns', './routes/campaigns'],
+  ['/api/push',      './routes/push'],
+];
 
-app.get('/api/health', (req, res) => res.json({ status: 'OfferCity API running', port: process.env.PORT || 5000 }));
+for (const [prefix, mod] of routes) {
+  try {
+    app.use(prefix, require(mod));
+    log.info('Route loaded:', prefix);
+  } catch (e) {
+    log.error(`FAILED to load route ${prefix} (${mod}):`, e.message);
+    // register a fallback so other routes keep working
+    app.use(prefix, (_req, res) =>
+      res.status(503).json({ error: `Route ${prefix} unavailable`, detail: e.message })
+    );
+  }
+}
 
-// Deploy restart — CI script calls this after uploading new server files.
-// Graceful shutdown: stop accepting new connections, drain existing ones, then exit.
-// Passenger sees a clean exit (not a crash) and spawns a fresh worker.
+// ── Health ────────────────────────────────────────────────────────────────────
+app.get('/api/health', (req, res) => {
+  res.json({ status: 'OfferCity API running', port: process.env.PORT || 5000, pid: process.pid });
+});
+
+// ── Deploy restart ────────────────────────────────────────────────────────────
 app.post('/api/deploy-restart', (req, res) => {
   const secret = process.env.DEPLOY_SECRET || 'offerscity-deploy-2025';
   if (req.headers['x-deploy-secret'] !== secret) return res.status(403).json({ error: 'forbidden' });
+  log.info('[DEPLOY] restart triggered');
   res.json({ ok: true, pid: process.pid });
   setTimeout(() => {
     server.close(() => {
-      console.log('[DEPLOY] Graceful shutdown complete — Passenger will spawn fresh worker');
+      log.info('[DEPLOY] graceful shutdown complete');
       process.exit(0);
     });
-    // Force exit after 8s if connections don't drain in time
-    setTimeout(() => { console.log('[DEPLOY] Force exit after drain timeout'); process.exit(0); }, 8000);
+    setTimeout(() => { log.info('[DEPLOY] force exit'); process.exit(0); }, 8000);
   }, 500);
 });
 
-// Last 100 log lines — useful for diagnosing production crashes
+// ── Logs endpoint ─────────────────────────────────────────────────────────────
 app.get('/api/logs', (req, res) => {
   const logFile = '/home1/a1751tyi/node.log';
   try {
-    const data = fs.readFileSync(logFile, 'utf8');
-    const lines = data.split('\n').filter(Boolean).slice(-100);
+    const data  = fs.readFileSync(logFile, 'utf8');
+    const lines = data.split('\n').filter(Boolean).slice(-200);
     res.json({ lines });
-  } catch { res.json({ lines: [] }); }
+  } catch (e) { res.json({ lines: [], error: e.message }); }
 });
 
-const PORT = parseInt(process.env.PORT) || 5000;
+// ── Global error handler ──────────────────────────────────────────────────────
+app.use((err, req, res, next) => {
+  log.error('Unhandled route error:', err.message, err.stack);
+  res.status(500).json({ error: 'Internal server error', detail: err.message });
+});
+
+// ── Listen ────────────────────────────────────────────────────────────────────
+const PORT      = parseInt(process.env.PORT) || 5000;
 const PORT_FILE = '/home1/a1751tyi/node_port.txt';
 
 const server = app.listen(PORT, () => {
-  console.log(`Server running on port ${PORT} — ${new Date().toISOString()}`);
+  log.info(`Server listening on port ${PORT}`);
   try { fs.writeFileSync(PORT_FILE, String(PORT)); } catch (_) {}
 });
 
 server.on('error', (err) => {
-  if (err.code === 'EADDRINUSE') {
-    console.error(`Port ${PORT} in use — try next port or run start_node.sh`);
-  }
+  log.error('Server listen error:', err.code, err.message);
   process.exit(1);
 });
