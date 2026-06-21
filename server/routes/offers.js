@@ -19,29 +19,32 @@ router.get('/', async (req, res) => {
     const pool = getPool();
     let query, params;
 
+    const activeClause = `o.is_active = true
+        AND (o.valid_until IS NULL OR o.valid_until >= CURDATE())
+        AND (o.flash_expires_at IS NULL OR o.flash_expires_at > NOW())
+        AND s.status = 'approved'`;
+
     if (lat && lng) {
       query = `
-        SELECT o.*, s.name AS shop_name, s.slug, s.city, s.address, s.category, s.lat, s.lng,
+        SELECT o.*, s.name AS shop_name, s.slug, s.city, s.area, s.address, s.category, s.lat, s.lng,
           (6371 * ACOS(COS(RADIANS(?)) * COS(RADIANS(s.lat)) *
             COS(RADIANS(s.lng) - RADIANS(?)) +
             SIN(RADIANS(?)) * SIN(RADIANS(s.lat)))) AS distance
-        FROM offers o
-        JOIN shops s ON s.id = o.shop_id
-        WHERE o.is_active = true AND (o.valid_until IS NULL OR o.valid_until >= CURDATE())
+        FROM offers o JOIN shops s ON s.id = o.shop_id
+        WHERE ${activeClause}
         HAVING distance <= ?
-        ORDER BY distance ASC
+        ORDER BY o.flash_expires_at IS NULL ASC, distance ASC
         LIMIT 50
       `;
       params = [lat, lng, lat, parseFloat(radius)];
     } else {
       query = `
-        SELECT o.*, s.name AS shop_name, s.slug, s.city, s.address, s.category, s.lat, s.lng
-        FROM offers o
-        JOIN shops s ON s.id = o.shop_id
-        WHERE o.is_active = true AND (o.valid_until IS NULL OR o.valid_until >= CURDATE())
+        SELECT o.*, s.name AS shop_name, s.slug, s.city, s.area, s.address, s.category, s.lat, s.lng
+        FROM offers o JOIN shops s ON s.id = o.shop_id
+        WHERE ${activeClause}
         ${category ? 'AND s.category = ?' : ''}
         ${city ? 'AND s.city LIKE ?' : ''}
-        ORDER BY o.created_at DESC LIMIT 50
+        ORDER BY o.flash_expires_at IS NULL ASC, o.created_at DESC LIMIT 50
       `;
       params = [];
       if (category) params.push(category);
@@ -101,27 +104,33 @@ router.get('/:id', async (req, res) => {
 
 // POST /api/offers  (shop_owner)
 router.post('/', protect, requireRole('shop_owner', 'admin'), upload.single('image'), async (req, res) => {
-  const { shop_id, title, description, discount, original_price, offer_price, valid_until } = req.body;
+  const { shop_id, title, description, discount, original_price, offer_price, valid_until, flash_hours } = req.body;
   if (!shop_id || !title) return res.status(400).json({ message: 'shop_id and title required' });
   try {
     const pool = getPool();
     const [shopRows] = await pool.query('SELECT id, name, city, slug FROM shops WHERE id = ? AND owner_id = ?', [shop_id, req.user.id]);
     if (shopRows.length === 0 && req.user.role !== 'admin')
       return res.status(403).json({ message: 'Not your shop' });
+
     const image = req.file ? `/uploads/${req.file.filename}` : null;
+    const flash_expires_at = flash_hours
+      ? new Date(Date.now() + parseFloat(flash_hours) * 3600 * 1000).toISOString().slice(0, 19).replace('T', ' ')
+      : null;
+
     const [result] = await pool.query(
-      'INSERT INTO offers (shop_id, title, description, discount, original_price, offer_price, valid_until, image) VALUES (?,?,?,?,?,?,?,?)',
-      [shop_id, title, description, discount || 0, original_price, offer_price, valid_until || null, image]
+      'INSERT INTO offers (shop_id, title, description, discount, original_price, offer_price, valid_until, image, flash_expires_at) VALUES (?,?,?,?,?,?,?,?,?)',
+      [shop_id, title, description, discount || 0, original_price, offer_price, valid_until || null, image, flash_expires_at]
     );
     const [rows] = await pool.query('SELECT * FROM offers WHERE id = ?', [result.insertId]);
     res.status(201).json(rows[0]);
 
-    // Fire-and-forget push notifications to nearby users
-    if (shopRows.length) {
-      const [shopFull] = await getPool().query('SELECT * FROM shops WHERE id = ?', [shop_id]);
-      if (shopFull.length) {
-        require('../services/push').notifyNearbyUsers(rows[0], shopFull[0]).catch(() => {});
-      }
+    // Fire-and-forget push — flash sales get urgent title
+    const [shopFull] = await getPool().query('SELECT * FROM shops WHERE id = ?', [shop_id]);
+    if (shopFull.length) {
+      const pushOffer = flash_expires_at
+        ? { ...rows[0], title: `⚡ FLASH SALE — ${flash_hours}hr only! ${title}` }
+        : rows[0];
+      require('../services/push').notifyNearbyUsers(pushOffer, shopFull[0]).catch(() => {});
     }
   } catch (err) {
     res.status(500).json({ message: err.message });

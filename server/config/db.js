@@ -149,7 +149,8 @@ const createTables = async () => {
     ["shops",  "bdo_id",            "INT DEFAULT NULL AFTER status"],
     ["shops",  "area",              "VARCHAR(150) DEFAULT NULL AFTER bdo_id"],
     ["shops",  "rejection_reason",  "TEXT DEFAULT NULL AFTER area"],
-    ["shops",  "approved_at",       "TIMESTAMP NULL DEFAULT NULL AFTER rejection_reason"],
+    ["shops",  "approved_at",        "TIMESTAMP NULL DEFAULT NULL AFTER rejection_reason"],
+    ["offers", "flash_expires_at",  "TIMESTAMP NULL DEFAULT NULL AFTER valid_until"],
   ];
 
   // Extend users.role enum to include 'bdo'

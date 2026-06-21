@@ -4,7 +4,7 @@ import api from '../services/api';
 const CATEGORIES = ['Food', 'Fashion', 'Electronics', 'Beauty', 'Grocery', 'Health', 'Travel', 'Other'];
 const DISCOUNTS  = [5,10,15,20,25,30,35,40,45,50,55,60,65,70,75,80,85,90];
 
-const EMPTY_OFFER = { shop_id: '', title: '', description: '', category: 'Food', discount: '', original_price: '', offer_price: '', valid_until: '' };
+const EMPTY_OFFER = { shop_id: '', title: '', description: '', category: 'Food', discount: '', original_price: '', offer_price: '', valid_until: '', flash_hours: '' };
 const fmt   = (n) => n ? Number(n).toLocaleString('en-IN') : '';
 const fmtSz = (b) => b < 1048576 ? `${(b/1024).toFixed(0)} KB` : `${(b/1048576).toFixed(1)} MB`;
 
@@ -850,8 +850,36 @@ export default function ShopDashboard() {
                           <label>Valid Until *</label>
                           <input type="date" value={offerForm.valid_until}
                             onChange={e => setOfferForm({ ...offerForm, valid_until: e.target.value })}
-                            required min={new Date().toISOString().slice(0,10)} />
+                            required={!offerForm.flash_hours}
+                            min={new Date().toISOString().slice(0,10)} />
                         </div>
+                      </div>
+
+                      {/* Flash Sale */}
+                      <div style={{ background:'#fff8f5', border:'2px solid #ffcc80', borderRadius:10, padding:'14px 16px', marginBottom:16 }}>
+                        <div style={{ display:'flex', alignItems:'center', gap:10, marginBottom: offerForm.flash_hours ? 10 : 0 }}>
+                          <span style={{ fontSize:20 }}>⚡</span>
+                          <div style={{ flex:1 }}>
+                            <div style={{ fontWeight:700, color:'#e65100', fontSize:14 }}>Flash Sale</div>
+                            <div style={{ fontSize:12, color:'#888' }}>Instant push to nearby users · Offer expires automatically</div>
+                          </div>
+                          <select value={offerForm.flash_hours}
+                            onChange={e => setOfferForm({ ...offerForm, flash_hours: e.target.value })}
+                            style={{ padding:'6px 10px', borderRadius:6, border:'1px solid #ffcc80', fontSize:13, fontWeight:600, color: offerForm.flash_hours ? '#e65100' : '#888' }}>
+                            <option value="">Off</option>
+                            <option value="1">1 hour</option>
+                            <option value="2">2 hours</option>
+                            <option value="4">4 hours</option>
+                            <option value="6">6 hours</option>
+                            <option value="12">12 hours</option>
+                          </select>
+                        </div>
+                        {offerForm.flash_hours && (
+                          <div style={{ fontSize:12, color:'#e65100', fontWeight:600 }}>
+                            ⚡ Push notification fires immediately · Expires in {offerForm.flash_hours} hour{offerForm.flash_hours > 1 ? 's' : ''}
+                          </div>
+                        )}
+                      </div>
                       </div>
 
                       <div className="form-group">
