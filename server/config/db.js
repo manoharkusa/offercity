@@ -211,6 +211,15 @@ const createTables = async () => {
     await pool.query(`ALTER TABLE users MODIFY COLUMN role ENUM('user','shop_owner','admin','bdo') DEFAULT 'user'`);
   } catch (_) {}
 
+  // Auto-approve shops that have no BDO assigned — they were created before the BDO flow
+  // or are in areas with no BDO, so there's nobody to approve them.
+  try {
+    const [r] = await pool.query(
+      `UPDATE shops SET status='approved' WHERE status='pending' AND bdo_id IS NULL`
+    );
+    if (r.affectedRows > 0) log.info(`Migration: auto-approved ${r.affectedRows} unassigned shop(s)`);
+  } catch (e) { log.error('Migration auto-approve shops:', e.message); }
+
   // push_subscriptions — location-based, no shop dependency
   await pool.query(`CREATE TABLE IF NOT EXISTS push_subscriptions (
     id INT AUTO_INCREMENT PRIMARY KEY,
