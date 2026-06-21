@@ -59,6 +59,12 @@ router.get('/whatsapp/contacts', protect, requireRole('shop_owner', 'admin'), (r
   res.json({ count: list.length, preview: list.slice(0, 8) });
 });
 
+// GET /api/campaigns/whatsapp/groups
+router.get('/whatsapp/groups', protect, requireRole('shop_owner', 'admin'), (req, res) => {
+  const groups = wa.getGroups(req.user.id);
+  res.json(groups);
+});
+
 // GET /api/campaigns — list past campaigns
 router.get('/', protect, requireRole('shop_owner', 'admin'), async (req, res) => {
   const pool = getPool();

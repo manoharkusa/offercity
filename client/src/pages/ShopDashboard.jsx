@@ -87,9 +87,13 @@ export default function ShopDashboard() {
   const [selectedPhones, setSelectedPhones] = useState(new Set());
   const [contactSearch, setContactSearch] = useState('');
   const [contactsLoading, setContactsLoading] = useState(false);
+  const [allGroups, setAllGroups]         = useState([]);
+  const [selectedGroups, setSelectedGroups] = useState(new Set());
+  const [groupsLoading, setGroupsLoading] = useState(false);
+  const [pickerTab, setPickerTab]         = useState('contacts'); // 'contacts' | 'groups'
   const [savedGroup, setSavedGroup]       = useState(() => {
-    try { return JSON.parse(localStorage.getItem('wa_contact_group') || 'null') || { phones:[], names:{} }; }
-    catch { return { phones:[], names:{} }; }
+    try { return JSON.parse(localStorage.getItem('wa_contact_group') || 'null') || { phones:[], names:{}, groups:[] }; }
+    catch { return { phones:[], names:{}, groups:[] }; }
   });
   const [showGroupEdit, setShowGroupEdit] = useState(false);
   const waTimer   = useRef(null);
@@ -366,6 +370,15 @@ export default function ShopDashboard() {
     finally { setContactsLoading(false); }
   };
 
+  const loadGroups = async () => {
+    setGroupsLoading(true);
+    try {
+      const { data } = await api.get('/campaigns/whatsapp/groups');
+      setAllGroups(data || []);
+    } catch { flash('Could not load groups', 'err'); }
+    finally { setGroupsLoading(false); }
+  };
+
   const togglePhone = (phone, checked) => {
     setSelectedPhones(prev => {
       const next = new Set(prev);
@@ -374,10 +387,21 @@ export default function ShopDashboard() {
     });
   };
 
+  const toggleGroup = (jid, checked) => {
+    setSelectedGroups(prev => {
+      const next = new Set(prev);
+      checked ? next.add(jid) : next.delete(jid);
+      return next;
+    });
+  };
+
   const saveContactGroup = () => {
     const names = {};
     [...selectedPhones].forEach(p => { names[p] = allContacts.find(c => c.phone === p)?.name || ''; });
-    const group = { phones: [...selectedPhones], names };
+    const groups = [...selectedGroups].map(jid => ({
+      jid, name: allGroups.find(g => g.jid === jid)?.name || 'Group'
+    }));
+    const group = { phones: [...selectedPhones], names, groups };
     localStorage.setItem('wa_contact_group', JSON.stringify(group));
     setSavedGroup(group);
     setShowGroupEdit(false);
@@ -390,7 +414,10 @@ export default function ShopDashboard() {
       const offerId = campOfferId ? Number(campOfferId) : null;
       const shopId  = offerId ? offers.find(o => o.id === offerId)?.shop_id : null;
       const payload = { offer_id: offerId, shop_id: shopId, message: campMsg };
-      if (savedGroup.phones.length > 0) payload.selected_phones = savedGroup.phones;
+      // Merge individual contact phones + group JIDs into one recipient list
+      const groupJids = (savedGroup.groups || []).map(g => g.jid);
+      const allRecipients = [...savedGroup.phones, ...groupJids];
+      if (allRecipients.length > 0) payload.selected_phones = allRecipients;
       const { data } = await api.post('/campaigns', payload);
       setActiveCampaign(data);
       setCampHistory(h => [data, ...h]);
@@ -1097,24 +1124,30 @@ export default function ShopDashboard() {
                   {!activeCampaign && (
                     <div className="camp-setup">
 
-                      {/* Row: Contacts */}
+                      {/* Row: Contacts & Groups */}
                       <div className="camp-row">
                         <span className="camp-row-icon">👥</span>
                         <div className="camp-row-body">
-                          <div className="camp-row-title">Contacts</div>
+                          <div className="camp-row-title">Recipients</div>
                           <div className="camp-row-sub">
-                            {savedGroup.phones.length > 0
-                              ? `${savedGroup.phones.length} contacts selected`
+                            {(savedGroup.phones.length > 0 || (savedGroup.groups||[]).length > 0)
+                              ? [
+                                  savedGroup.phones.length > 0 && `${savedGroup.phones.length} contact${savedGroup.phones.length > 1 ? 's' : ''}`,
+                                  (savedGroup.groups||[]).length > 0 && `${savedGroup.groups.length} group${savedGroup.groups.length > 1 ? 's' : ''}`
+                                ].filter(Boolean).join(' + ')
                               : `All ${waStatus.contacts} contacts`}
                           </div>
                         </div>
                         <button className="camp-row-action" onClick={() => {
                           if (allContacts.length === 0) loadAllContacts();
+                          if (allGroups.length === 0) loadGroups();
                           setSelectedPhones(new Set(savedGroup.phones));
+                          setSelectedGroups(new Set((savedGroup.groups||[]).map(g => g.jid)));
                           setContactSearch('');
+                          setPickerTab('contacts');
                           setShowGroupEdit(true);
                         }}>
-                          {savedGroup.phones.length > 0 ? 'Edit' : 'Select'}
+                          {(savedGroup.phones.length > 0 || (savedGroup.groups||[]).length > 0) ? 'Edit' : 'Select'}
                         </button>
                       </div>
 
@@ -1217,9 +1250,15 @@ export default function ShopDashboard() {
                         disabled={campLoading || !campMsg.trim() || waStatus.status !== 'connected'}>
                         {campLoading ? '⏳ Starting…'
                           : waStatus.status !== 'connected' ? '⏳ Waiting for WhatsApp…'
-                          : savedGroup.phones.length > 0
-                            ? `🚀 Send to ${savedGroup.phones.length} Contacts`
-                            : `🚀 Send to All ${waStatus.contacts} Contacts`}
+                          : (() => {
+                              const c = savedGroup.phones.length;
+                              const g = (savedGroup.groups||[]).length;
+                              if (c === 0 && g === 0) return `🚀 Send to All ${waStatus.contacts} Contacts`;
+                              const parts = [];
+                              if (c > 0) parts.push(`${c} Contact${c>1?'s':''}`);
+                              if (g > 0) parts.push(`${g} Group${g>1?'s':''}`);
+                              return `🚀 Send to ${parts.join(' + ')}`;
+                            })()}
                       </button>
                     </div>
                   )}
@@ -1227,61 +1266,125 @@ export default function ShopDashboard() {
                 </div>
               )}
 
-              {/* Contact group picker — bottom sheet */}
+              {/* Recipients picker — bottom sheet (Contacts + Groups tabs) */}
               {showGroupEdit && (
                 <div className="camp-group-overlay" onClick={e => { if (e.target === e.currentTarget) setShowGroupEdit(false); }}>
                   <div className="camp-group-sheet">
+
+                    {/* Header */}
                     <div className="camp-group-header">
-                      <span style={{ fontWeight:700, fontSize:15 }}>Select Contacts</span>
+                      <span style={{ fontWeight:700, fontSize:15 }}>Select Recipients</span>
                       <div style={{ display:'flex', gap:8 }}>
                         <button className="camp-group-cancel" onClick={() => setShowGroupEdit(false)}>Cancel</button>
                         <button className="camp-group-save" onClick={saveContactGroup}>
-                          Save ({selectedPhones.size})
+                          Save ({selectedPhones.size + selectedGroups.size})
                         </button>
                       </div>
                     </div>
-                    {contactsLoading
-                      ? <div style={{ textAlign:'center', padding:24 }}>
-                          <div className="opt-spinner" style={{ margin:'0 auto 10px' }} />
-                          <p style={{ color:'#888', fontSize:13 }}>Loading contacts…</p>
-                        </div>
-                      : <>
-                          <div className="camp-picker-header">
-                            <input className="camp-contacts-search"
-                              value={contactSearch}
-                              onChange={e => setContactSearch(e.target.value)}
-                              placeholder="🔍 Search name or number…" />
-                            <div className="camp-picker-actions">
-                              <button onClick={() => setSelectedPhones(new Set(allContacts.map(c => c.phone)))}>All</button>
-                              <button onClick={() => setSelectedPhones(new Set())}>None</button>
-                              <span className="camp-sel-count">{selectedPhones.size} / {allContacts.length}</span>
+
+                    {/* Tab toggle */}
+                    <div className="camp-picker-tabs">
+                      <button
+                        className={`camp-picker-tab${pickerTab === 'contacts' ? ' active' : ''}`}
+                        onClick={() => setPickerTab('contacts')}
+                      >
+                        👤 Contacts {selectedPhones.size > 0 && <span className="camp-tab-badge">{selectedPhones.size}</span>}
+                      </button>
+                      <button
+                        className={`camp-picker-tab${pickerTab === 'groups' ? ' active' : ''}`}
+                        onClick={() => { setPickerTab('groups'); if (allGroups.length === 0) loadGroups(); }}
+                      >
+                        👨‍👩‍👦 Groups {selectedGroups.size > 0 && <span className="camp-tab-badge">{selectedGroups.size}</span>}
+                      </button>
+                    </div>
+
+                    {/* CONTACTS TAB */}
+                    {pickerTab === 'contacts' && (
+                      contactsLoading
+                        ? <div style={{ textAlign:'center', padding:24 }}>
+                            <div className="opt-spinner" style={{ margin:'0 auto 10px' }} />
+                            <p style={{ color:'#888', fontSize:13 }}>Loading contacts…</p>
+                          </div>
+                        : <>
+                            <div className="camp-picker-header">
+                              <input className="camp-contacts-search"
+                                value={contactSearch}
+                                onChange={e => setContactSearch(e.target.value)}
+                                placeholder="🔍 Search name or number…" />
+                              <div className="camp-picker-actions">
+                                <button onClick={() => setSelectedPhones(new Set(allContacts.map(c => c.phone)))}>All</button>
+                                <button onClick={() => setSelectedPhones(new Set())}>None</button>
+                                <span className="camp-sel-count">{selectedPhones.size} / {allContacts.length}</span>
+                              </div>
                             </div>
+                            <div className="camp-contacts-list">
+                              {allContacts
+                                .filter(c => {
+                                  const q = contactSearch.toLowerCase();
+                                  return !q || (c.name||'').toLowerCase().includes(q) || (c.phone||'').includes(q);
+                                })
+                                .map(c => (
+                                  <label key={c.phone} className="camp-contact-row">
+                                    <input type="checkbox"
+                                      checked={selectedPhones.has(c.phone)}
+                                      onChange={e => togglePhone(c.phone, e.target.checked)} />
+                                    <div className="camp-contact-info">
+                                      <span className="camp-contact-name">{c.name || 'Unknown'}</span>
+                                      <span className="camp-contact-phone">+{c.phone}</span>
+                                    </div>
+                                  </label>
+                                ))}
+                              {allContacts.length === 0 && (
+                                <p style={{ padding:16, color:'#aaa', fontSize:13, textAlign:'center' }}>
+                                  No contacts yet — connect WhatsApp first to sync contacts.
+                                </p>
+                              )}
+                            </div>
+                          </>
+                    )}
+
+                    {/* GROUPS TAB */}
+                    {pickerTab === 'groups' && (
+                      groupsLoading
+                        ? <div style={{ textAlign:'center', padding:24 }}>
+                            <div className="opt-spinner" style={{ margin:'0 auto 10px' }} />
+                            <p style={{ color:'#888', fontSize:13 }}>Loading groups…</p>
                           </div>
-                          <div className="camp-contacts-list">
-                            {allContacts
-                              .filter(c => {
-                                const q = contactSearch.toLowerCase();
-                                return !q || (c.name||'').toLowerCase().includes(q) || (c.phone||'').includes(q);
-                              })
-                              .map(c => (
-                                <label key={c.phone} className="camp-contact-row">
-                                  <input type="checkbox"
-                                    checked={selectedPhones.has(c.phone)}
-                                    onChange={e => togglePhone(c.phone, e.target.checked)} />
-                                  <div className="camp-contact-info">
-                                    <span className="camp-contact-name">{c.name || 'Unknown'}</span>
-                                    <span className="camp-contact-phone">+{c.phone}</span>
-                                  </div>
-                                </label>
-                              ))}
-                            {allContacts.length === 0 && !contactsLoading && (
-                              <p style={{ padding:16, color:'#aaa', fontSize:13, textAlign:'center' }}>
-                                No contacts yet — connect WhatsApp first to sync contacts.
-                              </p>
-                            )}
-                          </div>
-                        </>
-                    }
+                        : <>
+                            <div className="camp-picker-header">
+                              <input className="camp-contacts-search"
+                                value={contactSearch}
+                                onChange={e => setContactSearch(e.target.value)}
+                                placeholder="🔍 Search group name…" />
+                              <div className="camp-picker-actions">
+                                <button onClick={() => setSelectedGroups(new Set(allGroups.map(g => g.jid)))}>All</button>
+                                <button onClick={() => setSelectedGroups(new Set())}>None</button>
+                                <span className="camp-sel-count">{selectedGroups.size} / {allGroups.length}</span>
+                              </div>
+                            </div>
+                            <div className="camp-contacts-list">
+                              {allGroups
+                                .filter(g => !contactSearch || g.name.toLowerCase().includes(contactSearch.toLowerCase()))
+                                .map(g => (
+                                  <label key={g.jid} className="camp-contact-row">
+                                    <input type="checkbox"
+                                      checked={selectedGroups.has(g.jid)}
+                                      onChange={e => toggleGroup(g.jid, e.target.checked)} />
+                                    <div className="camp-contact-info">
+                                      <span className="camp-contact-name">👨‍👩‍👦 {g.name}</span>
+                                      <span className="camp-contact-phone">{g.size} member{g.size !== 1 ? 's' : ''}</span>
+                                    </div>
+                                  </label>
+                                ))}
+                              {allGroups.length === 0 && (
+                                <p style={{ padding:16, color:'#aaa', fontSize:13, textAlign:'center' }}>
+                                  No groups found. Make sure WhatsApp is connected and you are in at least one group.
+                                </p>
+                              )}
+                            </div>
+                          </>
+                    )}
+
                   </div>
                 </div>
               )}

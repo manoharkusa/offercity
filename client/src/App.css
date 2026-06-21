@@ -1279,6 +1279,41 @@ a { text-decoration: none; color: inherit; }
 }
 .camp-contact-phone { font-size: 11px; color: #999; }
 
+/* Contacts / Groups tab toggle inside picker */
+.camp-picker-tabs {
+  display: flex;
+  border-bottom: 2px solid #f0f0f0;
+  background: #fafafa;
+}
+.camp-picker-tab {
+  flex: 1;
+  padding: 11px 8px;
+  font-size: 13px;
+  font-weight: 600;
+  color: #888;
+  background: none;
+  border: none;
+  cursor: pointer;
+  border-bottom: 2px solid transparent;
+  margin-bottom: -2px;
+  transition: color .15s, border-color .15s;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+}
+.camp-picker-tab.active { color: #e65100; border-bottom-color: #e65100; }
+.camp-tab-badge {
+  background: #e65100;
+  color: #fff;
+  font-size: 10px;
+  font-weight: 800;
+  border-radius: 999px;
+  padding: 1px 6px;
+  min-width: 18px;
+  text-align: center;
+}
+
 @media (max-width: 680px) {
   .camp-contacts-list { max-height: 220px; }
   .camp-contact-row  { padding: 8px 10px; }

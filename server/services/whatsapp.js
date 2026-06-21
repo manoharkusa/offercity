@@ -10,6 +10,7 @@ const sockets       = {};   // ownerId → sock
 const connStatus    = {};   // ownerId → string
 const qrCodes       = {};   // ownerId → { dataUrl, ts }
 const contactMap    = {};   // ownerId → [{jid, phone, name}]
+const groupMap      = {};   // ownerId → [{jid, name, size}]
 const lidToPhone    = {};   // ownerId → { lidJid → phoneJid } — resolves WA internal IDs
 const activeCamps   = {};   // campaignId → { running: bool }
 const keepAlive     = {};   // ownerId → intervalId
@@ -313,6 +314,20 @@ async function connect(ownerId) {
         try { await sock.sendPresenceUpdate('available'); } catch {}
       }, 30_000);
 
+      // Fetch WhatsApp groups this account participates in
+      try {
+        const raw = await sock.groupFetchAllParticipating();
+        groupMap[ownerId] = Object.values(raw).map(g => ({
+          jid:  g.id,
+          name: g.subject || 'Unnamed Group',
+          size: g.participants?.length || 0,
+        }));
+        console.log(`[WA] Owner ${ownerId} — ${groupMap[ownerId].length} groups loaded`);
+      } catch (e) {
+        console.warn(`[WA] Could not fetch groups for ${ownerId}:`, e.message);
+        groupMap[ownerId] = [];
+      }
+
       resumePendingCampaigns(ownerId);
     }
     if (connection === 'close') {
@@ -348,6 +363,24 @@ async function connect(ownerId) {
   sock.ev.on('contacts.set', ({ contacts }) => { mergeContacts(ownerId, contacts); });
   sock.ev.on('contacts.update', (upd) => { mergeContacts(ownerId, upd); });
   sock.ev.on('messaging-history.set', ({ contacts: c }) => { if (c?.length) mergeContacts(ownerId, c); });
+
+  // Keep group list current when groups are created/updated
+  sock.ev.on('groups-upsert', (groups) => {
+    if (!groupMap[ownerId]) groupMap[ownerId] = [];
+    for (const g of groups) {
+      const idx = groupMap[ownerId].findIndex(x => x.jid === g.id);
+      const entry = { jid: g.id, name: g.subject || 'Unnamed Group', size: g.participants?.length || 0 };
+      if (idx >= 0) groupMap[ownerId][idx] = entry;
+      else groupMap[ownerId].push(entry);
+    }
+  });
+  sock.ev.on('groups-update', (updates) => {
+    if (!groupMap[ownerId]) return;
+    for (const u of updates) {
+      const g = groupMap[ownerId].find(x => x.jid === u.id);
+      if (g && u.subject) g.name = u.subject;
+    }
+  });
 
   // AI chatbot: reply to incoming individual messages
   const ai = require('./aichatbot');
@@ -659,4 +692,6 @@ function startWatchdog() {
   }, 3 * 60 * 1000);
 }
 
-module.exports = { connect, disconnect, getStatus, getContacts, sendWAMessage, runCampaign, activeCamps, connectWithPairingCode, autoReconnectAll, startWatchdog };
+function getGroups(ownerId) { return groupMap[ownerId] || []; }
+
+module.exports = { connect, disconnect, getStatus, getContacts, getGroups, sendWAMessage, runCampaign, activeCamps, connectWithPairingCode, autoReconnectAll, startWatchdog };
