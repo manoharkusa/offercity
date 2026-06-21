@@ -44,3 +44,11 @@ jobs:
           VAPID_PUBLIC_KEY:  ${{ secrets.VAPID_PUBLIC_KEY }}
           VAPID_PRIVATE_KEY: ${{ secrets.VAPID_PRIVATE_KEY }}
         run: python .github/scripts/deploy_ci.py
+
+      - name: Upload node.log artifact
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: node-log
+          path: /tmp/node.log
+          if-no-files-found: ignore

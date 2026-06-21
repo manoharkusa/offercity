@@ -197,9 +197,20 @@ else:
 
 sh(f"curl -s https://offerscity.co.in/api/health", "final health check")
 
-# Always dump the last 80 lines of node.log so we can diagnose crashes from CI output
-print("=== node.log (last 80 lines) ===")
-sh(f"tail -80 {HOME_REMOTE}/node.log 2>/dev/null || echo '(node.log not found)'", "node.log")
+# Download node.log locally so GitHub Actions can upload it as an artifact
+print("=== Downloading node.log ===")
+try:
+    sftp2 = c.open_sftp()
+    sftp2.get(f"{HOME_REMOTE}/node.log", "/tmp/node.log")
+    sftp2.close()
+    print("node.log downloaded to /tmp/node.log")
+    with open("/tmp/node.log", "r", errors="replace") as f:
+        lines = f.readlines()
+    print(f"  ({len(lines)} lines total — last 80:)")
+    for line in lines[-80:]:
+        print(line, end="")
+except Exception as e:
+    print(f"Could not download node.log: {e}")
 
 c.close()
 print("=== Deploy complete ===")
