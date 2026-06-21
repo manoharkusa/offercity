@@ -22,7 +22,7 @@ router.get('/', async (req, res) => {
     const activeClause = `o.is_active = true
         AND (o.valid_until IS NULL OR o.valid_until >= CURDATE())
         AND (o.flash_expires_at IS NULL OR o.flash_expires_at > NOW())
-        AND (s.status = 'approved' OR s.bdo_id IS NULL)`;
+        AND s.status != 'rejected'`;
 
     if (lat && lng) {
       query = `
