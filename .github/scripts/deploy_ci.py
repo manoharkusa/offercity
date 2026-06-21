@@ -197,5 +197,9 @@ else:
 
 sh(f"curl -s https://offerscity.co.in/api/health", "final health check")
 
+# Always dump the last 80 lines of node.log so we can diagnose crashes from CI output
+print("=== node.log (last 80 lines) ===")
+sh(f"tail -80 {HOME_REMOTE}/node.log 2>/dev/null || echo '(node.log not found)'", "node.log")
+
 c.close()
 print("=== Deploy complete ===")
