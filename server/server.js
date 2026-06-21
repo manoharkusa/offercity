@@ -43,6 +43,7 @@ app.use('/api/shops',     require('./routes/shops'));
 app.use('/api/offers',    require('./routes/offers'));
 app.use('/api/reviews',   require('./routes/reviews'));
 app.use('/api/admin',     require('./routes/admin'));
+app.use('/api/bdo',       require('./routes/bdo'));
 app.use('/api/leads',     require('./routes/leads'));
 app.use('/api/campaigns', require('./routes/campaigns'));
 app.use('/api/push',      require('./routes/push'));

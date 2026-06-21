@@ -12,6 +12,7 @@ import Register from './pages/Register';
 const OfferDetails    = lazy(() => import('./pages/OfferDetails'));
 const ShopDashboard   = lazy(() => import('./pages/ShopDashboard'));
 const AdminDashboard  = lazy(() => import('./pages/AdminDashboard'));
+const BDODashboard    = lazy(() => import('./pages/BDODashboard'));
 const SavedOffers     = lazy(() => import('./pages/SavedOffers'));
 const ShopPage        = lazy(() => import('./pages/ShopPage'));
 
@@ -47,6 +48,7 @@ export default function App() {
             <Route path="/saved"         element={<PrivateRoute><SavedOffers /></PrivateRoute>} />
             <Route path="/shop-dashboard" element={<PrivateRoute roles={['shop_owner','admin']}><ShopDashboard /></PrivateRoute>} />
             <Route path="/admin"         element={<PrivateRoute roles={['admin']}><AdminDashboard /></PrivateRoute>} />
+            <Route path="/bdo"           element={<PrivateRoute roles={['bdo']}><BDODashboard /></PrivateRoute>} />
             <Route path="/shop/:slug"    element={<ShopPage />} />
             <Route path="/:city/:slug"   element={<ShopPage />} />
           </Routes>

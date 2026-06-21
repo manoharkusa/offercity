@@ -129,13 +129,32 @@ const createTables = async () => {
     await pool.query(q);
   }
 
+  // BDO areas table — pincodes assigned to each BDO
+  await pool.query(`CREATE TABLE IF NOT EXISTS bdo_areas (
+    id INT AUTO_INCREMENT PRIMARY KEY,
+    bdo_id INT NOT NULL,
+    pincode VARCHAR(10) NOT NULL,
+    area_name VARCHAR(255),
+    UNIQUE KEY unique_bdo_pin (bdo_id, pincode),
+    FOREIGN KEY (bdo_id) REFERENCES users(id) ON DELETE CASCADE
+  ) ENGINE=InnoDB`);
+
   // Add missing columns for upgrades (safe to run every startup)
   const migrations = [
-    ["offers", "is_active", "BOOLEAN DEFAULT true AFTER image"],
-    ["offers", "views",     "INT DEFAULT 0 AFTER is_active"],
-    ["shops",  "slug",      "VARCHAR(150) UNIQUE AFTER name"],
-    ["shops",  "pin_code",  "VARCHAR(10) DEFAULT NULL AFTER city"],
+    ["offers", "is_active",         "BOOLEAN DEFAULT true AFTER image"],
+    ["offers", "views",             "INT DEFAULT 0 AFTER is_active"],
+    ["shops",  "slug",              "VARCHAR(150) UNIQUE AFTER name"],
+    ["shops",  "pin_code",          "VARCHAR(10) DEFAULT NULL AFTER city"],
+    ["shops",  "status",            "ENUM('pending','approved','rejected') DEFAULT 'pending' AFTER pin_code"],
+    ["shops",  "bdo_id",            "INT DEFAULT NULL AFTER status"],
+    ["shops",  "rejection_reason",  "TEXT DEFAULT NULL AFTER bdo_id"],
+    ["shops",  "approved_at",       "TIMESTAMP NULL DEFAULT NULL AFTER rejection_reason"],
   ];
+
+  // Extend users.role enum to include 'bdo'
+  try {
+    await pool.query(`ALTER TABLE users MODIFY COLUMN role ENUM('user','shop_owner','admin','bdo') DEFAULT 'user'`);
+  } catch (_) {}
 
   // push_subscriptions — location-based, no shop dependency
   await pool.query(`CREATE TABLE IF NOT EXISTS push_subscriptions (

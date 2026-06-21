@@ -1,4 +1,5 @@
 const express = require('express');
+const bcrypt  = require('bcryptjs');
 const { getPool } = require('../config/db');
 const { protect, requireRole } = require('../middleware/auth');
 
@@ -81,11 +82,110 @@ router.get('/offers', async (req, res) => {
 // PUT /api/admin/users/:id/role
 router.put('/users/:id/role', async (req, res) => {
   const { role } = req.body;
-  if (!['user', 'shop_owner', 'admin'].includes(role))
+  if (!['user', 'shop_owner', 'admin', 'bdo'].includes(role))
     return res.status(400).json({ message: 'Invalid role' });
   try {
     await getPool().query('UPDATE users SET role = ? WHERE id = ?', [role, req.params.id]);
     res.json({ message: 'Role updated' });
+  } catch (err) {
+    res.status(500).json({ message: err.message });
+  }
+});
+
+// ── BDO Management ────────────────────────────────────────────────────────
+
+// POST /api/admin/bdos — create a new BDO
+router.post('/bdos', async (req, res) => {
+  const { name, email, phone, password, pincodes } = req.body;
+  if (!name || !email || !password) return res.status(400).json({ message: 'Name, email and password required' });
+  try {
+    const pool = getPool();
+    const hash = await bcrypt.hash(password, 10);
+    const [result] = await pool.query(
+      "INSERT INTO users (name, email, password, role) VALUES (?, ?, ?, 'bdo')",
+      [name, email, hash]
+    );
+    const bdoId = result.insertId;
+    if (pincodes && pincodes.length > 0) {
+      for (const { pincode, area_name } of pincodes) {
+        await pool.query(
+          'INSERT IGNORE INTO bdo_areas (bdo_id, pincode, area_name) VALUES (?, ?, ?)',
+          [bdoId, pincode.trim(), area_name || '']
+        );
+      }
+    }
+    res.status(201).json({ id: bdoId, name, email, phone, role: 'bdo' });
+  } catch (err) {
+    if (err.code === 'ER_DUP_ENTRY') return res.status(400).json({ message: 'Email already exists' });
+    res.status(500).json({ message: err.message });
+  }
+});
+
+// GET /api/admin/bdos — list all BDOs with their areas
+router.get('/bdos', async (req, res) => {
+  try {
+    const pool = getPool();
+    const [bdos] = await pool.query(
+      "SELECT id, name, email, created_at FROM users WHERE role = 'bdo' ORDER BY created_at DESC"
+    );
+    for (const bdo of bdos) {
+      const [areas] = await pool.query(
+        'SELECT pincode, area_name FROM bdo_areas WHERE bdo_id = ? ORDER BY area_name',
+        [bdo.id]
+      );
+      bdo.areas = areas;
+      const [[{ pending }]] = await pool.query(
+        `SELECT COUNT(*) AS pending FROM shops WHERE bdo_id = ? AND status = 'pending'`, [bdo.id]
+      );
+      bdo.pending_count = pending;
+    }
+    res.json(bdos);
+  } catch (err) {
+    res.status(500).json({ message: err.message });
+  }
+});
+
+// PUT /api/admin/bdos/:id/areas — replace pincodes for a BDO
+router.put('/bdos/:id/areas', async (req, res) => {
+  const { pincodes } = req.body; // [{ pincode, area_name }]
+  try {
+    const pool = getPool();
+    await pool.query('DELETE FROM bdo_areas WHERE bdo_id = ?', [req.params.id]);
+    for (const { pincode, area_name } of (pincodes || [])) {
+      await pool.query(
+        'INSERT INTO bdo_areas (bdo_id, pincode, area_name) VALUES (?, ?, ?)',
+        [req.params.id, pincode.trim(), area_name || '']
+      );
+    }
+    res.json({ message: 'Areas updated' });
+  } catch (err) {
+    res.status(500).json({ message: err.message });
+  }
+});
+
+// DELETE /api/admin/bdos/:id
+router.delete('/bdos/:id', async (req, res) => {
+  try {
+    await getPool().query("DELETE FROM users WHERE id = ? AND role = 'bdo'", [req.params.id]);
+    res.json({ message: 'BDO deleted' });
+  } catch (err) {
+    res.status(500).json({ message: err.message });
+  }
+});
+
+// GET /api/admin/shops/pending — all pending shops across all areas
+router.get('/shops/pending', async (req, res) => {
+  try {
+    const [shops] = await getPool().query(
+      `SELECT s.*, u.name AS owner_name, u.email AS owner_email,
+              b.name AS bdo_name
+       FROM shops s
+       JOIN users u ON u.id = s.owner_id
+       LEFT JOIN users b ON b.id = s.bdo_id
+       WHERE s.status = 'pending'
+       ORDER BY s.created_at DESC`
+    );
+    res.json(shops);
   } catch (err) {
     res.status(500).json({ message: err.message });
   }

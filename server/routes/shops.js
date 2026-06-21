@@ -87,13 +87,14 @@ router.get('/', async (req, res) => {
           (6371 * ACOS(COS(RADIANS(?)) * COS(RADIANS(s.lat)) *
             COS(RADIANS(s.lng) - RADIANS(?)) + SIN(RADIANS(?)) * SIN(RADIANS(s.lat)))) AS distance
         FROM shops s JOIN users u ON u.id = s.owner_id
+        WHERE s.status = 'approved'
         HAVING distance <= ? ORDER BY distance ASC LIMIT 50
       `;
       params = [lat, lng, lat, parseFloat(radius)];
     } else {
       query = `
         SELECT s.*, u.name AS owner_name FROM shops s JOIN users u ON u.id = s.owner_id
-        WHERE 1=1
+        WHERE s.status = 'approved'
         ${category ? 'AND s.category = ?' : ''}
         ${city ? 'AND s.city LIKE ?' : ''}
         ORDER BY s.created_at DESC LIMIT 50
@@ -125,13 +126,22 @@ router.get('/:id', async (req, res) => {
 router.post('/', protect, requireRole('shop_owner', 'admin'), upload.single('image'), async (req, res) => {
   const { name, description, category, address, city, pin_code, lat, lng } = req.body;
   if (!name || !lat || !lng) return res.status(400).json({ message: 'Name, lat and lng required' });
+  if (!pin_code) return res.status(400).json({ message: 'Pin code is required' });
   try {
     const pool = getPool();
     const slug = await uniqueSlug(pool, makeSlug(name));
     const image = req.file ? `/uploads/${req.file.filename}` : null;
+
+    // Auto-assign BDO by pincode
+    const [bdoRows] = await pool.query(
+      'SELECT bdo_id FROM bdo_areas WHERE pincode = ? LIMIT 1', [pin_code.trim()]
+    );
+    const bdo_id = bdoRows.length > 0 ? bdoRows[0].bdo_id : null;
+    const status = req.user.role === 'admin' ? 'approved' : 'pending';
+
     const [result] = await pool.query(
-      'INSERT INTO shops (owner_id, name, slug, description, category, address, city, pin_code, lat, lng, image) VALUES (?,?,?,?,?,?,?,?,?,?,?)',
-      [req.user.id, name, slug, description, category, address, city, pin_code || null, lat, lng, image]
+      'INSERT INTO shops (owner_id, name, slug, description, category, address, city, pin_code, lat, lng, image, status, bdo_id) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?)',
+      [req.user.id, name, slug, description, category, address, city, pin_code.trim(), lat, lng, image, status, bdo_id]
     );
     const [rows] = await pool.query('SELECT * FROM shops WHERE id = ?', [result.insertId]);
     res.status(201).json(rows[0]);

@@ -15,6 +15,7 @@ export default function Login() {
       const user = await login(form.email, form.password);
       if (user.role === 'admin') navigate('/admin');
       else if (user.role === 'shop_owner') navigate('/shop-dashboard');
+      else if (user.role === 'bdo') navigate('/bdo');
       else navigate('/');
     } catch (err) {
       setError(err.response?.data?.message || 'Login failed');

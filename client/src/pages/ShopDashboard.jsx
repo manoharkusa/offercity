@@ -489,7 +489,24 @@ export default function ShopDashboard() {
                             : <div style={{ width:60, height:60, background:'#ffe0b2', borderRadius:10, display:'flex', alignItems:'center', justifyContent:'center', fontSize:28 }}>🏪</div>
                           }
                           <div>
-                            <h3 style={{ margin:'0 0 4px', color:'#e65100' }}>{s.name}</h3>
+                            <div style={{ display:'flex', alignItems:'center', gap:8, flexWrap:'wrap' }}>
+                              <h3 style={{ margin:'0 0 4px', color:'#e65100' }}>{s.name}</h3>
+                              {s.status === 'pending' && (
+                                <span style={{ background:'#fff3e0', color:'#e65100', border:'1px solid #ffcc80', borderRadius:12, padding:'2px 10px', fontSize:11, fontWeight:700 }}>
+                                  ⏳ Pending BDO Approval
+                                </span>
+                              )}
+                              {s.status === 'rejected' && (
+                                <span style={{ background:'#ffebee', color:'#c62828', border:'1px solid #ef9a9a', borderRadius:12, padding:'2px 10px', fontSize:11, fontWeight:700 }}>
+                                  ❌ Rejected{s.rejection_reason ? ` — ${s.rejection_reason}` : ''}
+                                </span>
+                              )}
+                              {s.status === 'approved' && (
+                                <span style={{ background:'#e8f5e9', color:'#2e7d32', border:'1px solid #a5d6a7', borderRadius:12, padding:'2px 10px', fontSize:11, fontWeight:700 }}>
+                                  ✅ Live
+                                </span>
+                              )}
+                            </div>
                             <p style={{ margin:0, color:'#888', fontSize:13 }}>{s.address} · {s.city}{s.pin_code ? ` – ${s.pin_code}` : ''} · {s.category}</p>
                           </div>
                         </div>
