@@ -103,6 +103,7 @@ server_files = [
     ("server/routes/campaigns.js",   f"{APP}/routes/campaigns.js"),
     ("server/routes/push.js",        f"{APP}/routes/push.js"),
     ("server/routes/admin.js",       f"{APP}/routes/admin.js"),
+    ("server/routes/bdo.js",         f"{APP}/routes/bdo.js"),
     ("server/routes/leads.js",       f"{APP}/routes/leads.js"),
     ("server/services/push.js",      f"{APP}/services/push.js"),
     ("server/services/aichatbot.js", f"{APP}/services/aichatbot.js"),
