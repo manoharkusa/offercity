@@ -44,6 +44,8 @@ app.use('/api/offers',    require('./routes/offers'));
 app.use('/api/reviews',   require('./routes/reviews'));
 app.use('/api/admin',     require('./routes/admin'));
 app.use('/api/bdo',       require('./routes/bdo'));
+app.use('/api/coming',    require('./routes/coming'));
+app.use('/api/stamps',    require('./routes/stamps'));
 app.use('/api/leads',     require('./routes/leads'));
 app.use('/api/campaigns', require('./routes/campaigns'));
 app.use('/api/push',      require('./routes/push'));
