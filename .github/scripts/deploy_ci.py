@@ -158,6 +158,7 @@ def inject_env(key, value, label=""):
     sh(f"""if grep -q '^{key}=' {env_path} 2>/dev/null; then sed -i 's|^{key}=.*|{key}={value}|' {env_path} && echo "Updated"; else echo "{key}={value}" >> {env_path} && echo "Added"; fi""", f"update .env ({key})")
 
 inject_env("GROQ_API_KEY",        os.environ.get("GROQ_API_KEY","").strip(),        "GROQ_API_KEY")
+inject_env("ANTHROPIC_API_KEY",   os.environ.get("ANTHROPIC_API_KEY","").strip(),   "ANTHROPIC_API_KEY")
 inject_env("VAPID_PUBLIC_KEY",    os.environ.get("VAPID_PUBLIC_KEY","").strip(),    "VAPID_PUBLIC_KEY")
 inject_env("VAPID_PRIVATE_KEY",   os.environ.get("VAPID_PRIVATE_KEY","").strip(),   "VAPID_PRIVATE_KEY")
 
