@@ -197,8 +197,13 @@ async function isKnownCustomer(ownerId, jid) {
        LIMIT 1`,
       [ownerId, last10]
     );
-    return rows.length > 0;
-  } catch { return false; }
+    const found = rows.length > 0;
+    console.log(`[AI] isKnownCustomer phone=${last10} owner=${ownerId} → ${found ? 'FOUND in campaign_logs' : 'NOT in campaign_logs'}`);
+    return found;
+  } catch (err) {
+    console.log(`[AI] isKnownCustomer DB error: ${err.message} — blocking reply`);
+    return false;
+  }
 }
 
 function callClaudeAI(systemPrompt, userMessage) {
