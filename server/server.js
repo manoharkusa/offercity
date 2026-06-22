@@ -113,7 +113,7 @@ for (const [prefix, mod] of routes) {
 
 // ── Health ────────────────────────────────────────────────────────────────────
 app.get('/api/health', (req, res) => {
-  res.json({ status: 'OfferCity API running', port: process.env.PORT || 5000, pid: process.pid });
+  res.json({ status: 'OfferCity API running', port: process.env.PORT || 5000, pid: process.pid, v: '2.1' });
 });
 
 // ── Deploy restart ────────────────────────────────────────────────────────────
