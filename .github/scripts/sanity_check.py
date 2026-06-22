@@ -6,6 +6,7 @@ Tests: server health, DB, Claude API, web chat, scope restriction (incl. prompt 
 Uses Claude-as-judge to evaluate chatbot responses.
 """
 import os, sys, json, time, urllib.request, urllib.error
+sys.stdout.reconfigure(encoding='utf-8') if hasattr(sys.stdout, 'reconfigure') else None
 
 BASE_URL      = "https://offerscity.co.in"
 ANTHROPIC_KEY = os.environ.get("ANTHROPIC_API_KEY", "")
@@ -20,9 +21,12 @@ def log(status, name, detail=""):
     results.append({"status": status, "name": name, "detail": detail})
 
 # ── HTTP helpers ───────────────────────────────────────────────────────────────
+HEADERS = {"Accept": "application/json", "User-Agent": "OfferCity-SanityCheck/1.0"}
+
 def get(path, timeout=10):
     try:
-        with urllib.request.urlopen(f"{BASE_URL}{path}", timeout=timeout) as r:
+        req = urllib.request.Request(f"{BASE_URL}{path}", headers=HEADERS)
+        with urllib.request.urlopen(req, timeout=timeout) as r:
             return json.loads(r.read().decode("utf-8")), r.status
     except urllib.error.HTTPError as e:
         return None, e.code
@@ -33,7 +37,9 @@ def post(path, body, timeout=20):
     try:
         data = json.dumps(body).encode("utf-8")
         req  = urllib.request.Request(f"{BASE_URL}{path}", data=data,
-               headers={"Content-Type": "application/json"})
+               headers={"Content-Type": "application/json",
+                        "Accept": "application/json",
+                        "User-Agent": "OfferCity-SanityCheck/1.0"})
         with urllib.request.urlopen(req, timeout=timeout) as r:
             return json.loads(r.read().decode("utf-8")), r.status
     except urllib.error.HTTPError as e:
