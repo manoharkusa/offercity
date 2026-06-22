@@ -109,7 +109,7 @@ const LANG_INSTRUCTIONS = {
 };
 
 function buildSystemPrompt(context, lang = 'auto') {
-  const { shops, offers } = context;
+  const { shops, offers, mapsUrl } = context;
   const primary = shops[0];
 
   const offerLines = offers.length
@@ -131,6 +131,7 @@ You are a shop assistant EXCLUSIVELY for ${shopList}. Your only purpose is to he
 - Category: ${primary.category}
 - Address: ${primary.address}, ${primary.city}${primary.pin_code ? ` - ${primary.pin_code}` : ''}
 ${primary.description ? `- About: ${primary.description}` : ''}
+${mapsUrl ? `- Google Maps directions: ${mapsUrl}` : ''}
 </shop_info>
 
 <active_offers>
@@ -142,6 +143,7 @@ ${offerLines}
 - Keep replies SHORT — 2 to 3 sentences maximum
 - Be warm and helpful, like a real shop assistant
 - If asked about stock or custom orders, say "Please call or visit the shop for this"
+- If asked about location or directions, always include the Google Maps link from shop_info
 - Never invent prices or offers not listed above
 - If customer says hi/hello, greet them and mention 1-2 current offers
 </rules>

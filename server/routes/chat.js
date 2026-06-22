@@ -32,7 +32,7 @@ router.post('/ask', async (req, res) => {
   try {
     const pool = getPool();
     const [shops] = await pool.query(
-      `SELECT id, name, category, address, city, pin_code, description, owner_id FROM shops WHERE id = ? LIMIT 1`,
+      `SELECT id, name, category, address, city, pin_code, description, owner_id, lat, lng FROM shops WHERE id = ? LIMIT 1`,
       [shop_id]
     );
     if (!shops.length) return res.status(404).json({ message: 'Shop not found' });
@@ -46,7 +46,10 @@ router.post('/ask', async (req, res) => {
       [shop_id]
     );
 
-    const systemPrompt = buildSystemPromptForShop({ shops: [shop], offers }, 'auto');
+    const mapsUrl = (shop.lat && shop.lng)
+      ? `https://www.google.com/maps?q=${shop.lat},${shop.lng}`
+      : null;
+    const systemPrompt = buildSystemPromptForShop({ shops: [shop], offers, mapsUrl }, 'auto');
 
     // Include last 6 turns of conversation history for context
     const messages = [
