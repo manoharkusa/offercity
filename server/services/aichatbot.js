@@ -166,11 +166,11 @@ function callAI(systemPrompt, userMessage) {
         'Content-Length': Buffer.byteLength(body)
       }
     }, (res) => {
-      let raw = '';
-      res.on('data', chunk => raw += chunk);
+      const chunks = [];
+      res.on('data', chunk => chunks.push(chunk));
       res.on('end', () => {
         try {
-          const parsed = JSON.parse(raw);
+          const parsed = JSON.parse(Buffer.concat(chunks).toString('utf8'));
           resolve(parsed.choices?.[0]?.message?.content?.trim() || '');
         } catch (e) { reject(e); }
       });
@@ -223,11 +223,11 @@ function callClaudeAI(systemPrompt, userMessage) {
         'Content-Length': Buffer.byteLength(body)
       }
     }, (res) => {
-      let raw = '';
-      res.on('data', chunk => raw += chunk);
+      const chunks = [];
+      res.on('data', chunk => chunks.push(chunk));
       res.on('end', () => {
         try {
-          const parsed = JSON.parse(raw);
+          const parsed = JSON.parse(Buffer.concat(chunks).toString('utf8'));
           resolve(parsed.content?.[0]?.text?.trim() || '');
         } catch (e) { reject(e); }
       });
