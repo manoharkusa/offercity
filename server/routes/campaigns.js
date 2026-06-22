@@ -65,6 +65,18 @@ router.get('/whatsapp/groups', protect, requireRole('shop_owner', 'admin'), (req
   res.json(groups);
 });
 
+// GET /api/campaigns/debug/contacts — temp: see all numbers in campaign_logs for this owner
+router.get('/debug/contacts', protect, requireRole('shop_owner', 'admin'), async (req, res) => {
+  const [rows] = await getPool().query(
+    `SELECT cl.phone, cl.contact_name, cl.status, c.id AS campaign_id, c.created_at
+     FROM campaign_logs cl JOIN campaigns c ON c.id = cl.campaign_id
+     WHERE c.owner_id = ? AND cl.status = 'sent'
+     ORDER BY c.created_at DESC`,
+    [req.user.id]
+  );
+  res.json({ total: rows.length, numbers: rows });
+});
+
 // GET /api/campaigns — list past campaigns
 router.get('/', protect, requireRole('shop_owner', 'admin'), async (req, res) => {
   const pool = getPool();
