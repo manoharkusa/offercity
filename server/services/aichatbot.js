@@ -139,7 +139,8 @@ Rules:
 - Be warm and helpful, like a real shop assistant
 - If asked about something you don't know (stock, custom orders), say "Please call or visit the shop for this"
 - Never invent prices or offers not listed above
-- If customer says hi/hello, greet them and mention 1-2 current offers`;
+- If customer says hi/hello, greet them and mention 1-2 current offers
+- IMPORTANT: If the message is clearly a personal/private message NOT related to the shop (e.g. grocery lists, family messages, personal requests, unrelated topics), reply with exactly the word: [SKIP]`;
 }
 
 function callAI(systemPrompt, userMessage) {
@@ -280,6 +281,10 @@ async function handleIncoming(ownerId, jid, messageText, senderName) {
       }
     }
 
+    if (reply && reply.trim() === '[SKIP]') {
+      console.log(`[AI] Skipped personal message from ${jid.replace('@s.whatsapp.net', '')}`);
+      return null;
+    }
     if (reply) {
       lastReply[rateKey] = now;
       console.log(`[AI] Owner ${ownerId} → replied to ${jid.replace('@s.whatsapp.net', '')}`);
