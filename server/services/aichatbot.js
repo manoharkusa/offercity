@@ -147,7 +147,7 @@ function callAI(systemPrompt, userMessage) {
   if (!apiKey) throw new Error('GROQ_API_KEY not set in .env');
 
   const body = JSON.stringify({
-    model: 'llama-3.1-8b-instant',
+    model: 'llama-3.3-70b-versatile',
     max_tokens: 280,
     messages: [
       { role: 'system', content: systemPrompt },
@@ -263,15 +263,20 @@ async function handleIncoming(ownerId, jid, messageText, senderName) {
 
     let reply = null;
 
-    // Try Groq first, fall back to Claude if Groq fails or key missing
-    try {
-      reply = await callAI(systemPrompt, input);
-    } catch (groqErr) {
-      console.log(`[AI] Groq failed (${groqErr.message}) — trying Claude fallback`);
+    if (process.env.ANTHROPIC_API_KEY) {
+      // Claude is primary when API key is set — better Telugu/Hindi/regional language quality
       try {
         reply = await callClaudeAI(systemPrompt, input);
       } catch (claudeErr) {
-        console.error('[AI] Claude fallback also failed:', claudeErr.message);
+        console.log(`[AI] Claude failed (${claudeErr.message}) — falling back to Groq`);
+        try { reply = await callAI(systemPrompt, input); } catch (_) {}
+      }
+    } else {
+      // Groq only (free tier, llama-3.3-70b)
+      try {
+        reply = await callAI(systemPrompt, input);
+      } catch (groqErr) {
+        console.error('[AI] Groq failed:', groqErr.message);
       }
     }
 
