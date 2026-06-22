@@ -1,6 +1,8 @@
 // ── Bootstrap logger — must be first, before ANY require that could crash ─────
-const fs = require('fs');
-const LOG_FILE = '/home1/a1751tyi/node.log';
+const fs   = require('fs');
+const path0 = require('path');
+// Write log next to server.js so cPanel File Manager can find it at public_html/server/node.log
+const LOG_FILE = path0.join(__dirname, 'node.log');
 function flog(level, msg) {
   const line = `[${new Date().toISOString().slice(0,19).replace('T',' ')}] [${level}] ${msg}\n`;
   process.stdout.write(line);

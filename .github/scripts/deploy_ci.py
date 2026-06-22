@@ -202,27 +202,26 @@ else:
             break
         print(f"  {(i+1)*5}s — still starting…")
 
+    # Always download node.log before potentially exiting — gives crash diagnosis
+    print("=== Downloading node.log ===")
+    try:
+        sftp2 = c.open_sftp()
+        # node.log now lives next to server.js at public_html/server/node.log
+        sftp2.get(f"{APP}/node.log", "/tmp/node.log")
+        sftp2.close()
+        with open("/tmp/node.log", "r", errors="replace") as f:
+            lines = f.readlines()
+        print(f"  ({len(lines)} lines total — last 100:)")
+        for line in lines[-100:]:
+            print(line, end="")
+    except Exception as e:
+        print(f"Could not download node.log: {e}")
+
     if not up:
         print("❌ ERROR: Server did not come up within 75s after deploy!")
-        # Exit non-zero so CI is marked failed and team is alerted
         import sys; sys.exit(1)
 
 sh(f"curl -s https://offerscity.co.in/api/health", "final health check")
-
-# Download node.log locally so GitHub Actions can upload it as an artifact
-print("=== Downloading node.log ===")
-try:
-    sftp2 = c.open_sftp()
-    sftp2.get(f"{HOME_REMOTE}/node.log", "/tmp/node.log")
-    sftp2.close()
-    print("node.log downloaded to /tmp/node.log")
-    with open("/tmp/node.log", "r", errors="replace") as f:
-        lines = f.readlines()
-    print(f"  ({len(lines)} lines total — last 80:)")
-    for line in lines[-80:]:
-        print(line, end="")
-except Exception as e:
-    print(f"Could not download node.log: {e}")
 
 c.close()
 print("=== Deploy complete ===")
