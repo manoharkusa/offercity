@@ -1,0 +1,29 @@
+name: Daily Sanity Check
+
+on:
+  schedule:
+    - cron: '30 2 * * *'   # 8:00 AM IST = 2:30 AM UTC, every day
+  workflow_dispatch:        # Manual trigger from GitHub Actions UI anytime
+
+jobs:
+  sanity:
+    name: OfferCity Chatbot Sanity Check
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Run sanity check
+        env:
+          ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+        run: python3 .github/scripts/sanity_check.py
+
+      - name: Upload report as artifact
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: sanity-report-${{ github.run_id }}
+          if-no-files-found: ignore
+          path: /tmp/sanity_report.txt
