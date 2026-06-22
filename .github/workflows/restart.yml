@@ -1,6 +1,8 @@
-name: Emergency Restart
+name: Keep Alive / Emergency Restart
 
 on:
+  schedule:
+    - cron: '*/5 * * * *'   # every 5 minutes — auto-restart if server is down
   workflow_dispatch:
     inputs:
       action:
@@ -13,8 +15,9 @@ on:
           - status
 
 jobs:
-  restart:
+  keep-alive:
     runs-on: ubuntu-latest
+    timeout-minutes: 5
 
     steps:
       - name: Write SSH key
@@ -27,30 +30,42 @@ jobs:
       - name: Install paramiko
         run: pip install paramiko
 
-      - name: Run action via SSH
+      - name: Check and restart if needed
         env:
-          SSH_HOST:     ${{ secrets.SSH_HOST }}
-          SSH_USER:     ${{ secrets.SSH_USER }}
-          SSH_KEY_PATH: /tmp/ci_key
+          SSH_HOST:      ${{ secrets.SSH_HOST }}
+          SSH_USER:      ${{ secrets.SSH_USER }}
+          SSH_KEY_PATH:  /tmp/ci_key
           DEPLOY_SECRET: ${{ secrets.DEPLOY_SECRET }}
-          ACTION: ${{ github.event.inputs.action }}
+          ACTION:        ${{ github.event.inputs.action || 'auto' }}
         run: |
           python - <<'PYEOF'
-          import os, time, paramiko
+          import os, time, paramiko, urllib.request
 
           HOST     = os.environ["SSH_HOST"].strip()
           USER     = os.environ["SSH_USER"].strip()
           KEY_PATH = os.environ.get("SSH_KEY_PATH", "/tmp/ci_key").strip()
-          ACTION   = os.environ.get("ACTION", "restart")
+          ACTION   = os.environ.get("ACTION", "auto")
           SECRET   = os.environ.get("DEPLOY_SECRET", "offerscity-deploy-2025")
           HOME     = "/home1/a1751tyi"
-          WEB      = f"{HOME}/public_html/server"
+          APP      = f"{HOME}/public_html/server"
 
+          def health_ok():
+              try:
+                  r = urllib.request.urlopen("https://offerscity.co.in/api/health", timeout=8)
+                  return b"OfferCity" in r.read()
+              except:
+                  return False
+
+          # In auto mode (scheduled): only connect if server is actually down
+          if ACTION == "auto" and health_ok():
+              print("✅ Server is UP — no action needed.")
+              exit(0)
+
+          print(f"Action={ACTION}  Connecting via SSH…")
           key = paramiko.Ed25519Key.from_private_key_file(KEY_PATH)
           c = paramiko.SSHClient()
           c.set_missing_host_key_policy(paramiko.AutoAddPolicy())
           c.connect(hostname=HOST, username=USER, pkey=key, port=22, timeout=30)
-          print(f"Connected. Action={ACTION}")
 
           def sh(cmd, label=""):
               if label: print(f"\n--- {label} ---")
@@ -62,40 +77,46 @@ jobs:
 
           if ACTION == "status":
               sh("ps aux | grep -i node | grep -v grep", "node processes")
-              sh(f"tail -30 {HOME}/node.log 2>/dev/null || echo 'no log'", "last 30 log lines")
+              sh(f"tail -40 {APP}/node.log 2>/dev/null || tail -40 {HOME}/node.log 2>/dev/null || echo 'no log found'", "last 40 log lines")
               sh(f"curl -sf http://localhost:5008/api/health || curl -sf http://localhost:5000/api/health || echo 'no response on localhost'", "localhost health")
               sh(f"curl -sf https://offerscity.co.in/api/health || echo '502 from public url'", "public health")
 
-          elif ACTION == "restart":
-              # 1. Try the soft endpoint first (if server happens to be alive)
+          else:
+              # restart (manual) or auto (server was down)
+              print("\n=== Server is DOWN — attempting restart ===")
+
+              # Show last log lines for diagnosis
+              sh(f"tail -30 {APP}/node.log 2>/dev/null || tail -30 {HOME}/node.log 2>/dev/null || echo 'no log'", "crash log")
+
+              # 1. Soft restart via HTTP if server is partially alive
               sh(
                   f"PORT=$(cat {HOME}/node_port.txt 2>/dev/null || echo 5008); "
                   f"curl -sf -X POST http://localhost:$PORT/api/deploy-restart "
                   f"  -H 'x-deploy-secret: {SECRET}' -H 'Content-Type: application/json' "
-                  f"&& echo 'soft restart OK' || echo 'soft restart not available'",
+                  f"&& echo 'soft restart OK' || echo 'soft restart skipped (server was already down)'",
                   "soft restart"
               )
               time.sleep(3)
 
-              # 2. Kill all node processes owned by this user (clears Passenger crash protection)
-              sh(f"pkill -u {USER} -f 'node.*server' && echo 'killed node server' || echo 'no node server process found'", "kill node")
-              sh(f"pkill -u {USER} node && echo 'killed node' || echo 'no node found'", "kill node (fallback)")
-              time.sleep(5)
+              # 2. Kill any stuck node process (resets Passenger crash protection)
+              sh(f"pkill -u {USER} -f 'node.*server.js' && echo 'killed node server.js' || echo 'no node server.js found'", "kill stuck process")
+              time.sleep(6)
 
-              # 3. Check log
-              sh(f"tail -10 {HOME}/node.log 2>/dev/null || echo 'no log yet'", "log after kill")
-
-              # 4. Poll health until up (max 60s)
-              print("\n--- waiting for Passenger to spawn fresh process ---")
-              for i in range(12):
+              # 3. Wait up to 90s for Passenger to spawn a fresh worker
+              print("\n--- waiting for server to come back up ---")
+              up = False
+              for i in range(18):
                   time.sleep(5)
                   r = sh(f"curl -sf https://offerscity.co.in/api/health || echo 'still down'")
                   if 'OfferCity' in r or 'running' in r:
-                      print(f"Server UP after {(i+1)*5}s")
+                      print(f"\n✅ Server is UP after {(i+1)*5}s")
+                      up = True
                       break
-                  print(f"  {(i+1)*5}s: still down")
-              else:
-                  print("Server did not come up within 60s — check cPanel manually")
+                  print(f"  {(i+1)*5}s: still starting…")
+
+              if not up:
+                  print("⚠️  Server did not respond within 90s — may need cPanel manual restart")
+                  sh(f"tail -20 {APP}/node.log 2>/dev/null || echo 'no log'", "final log check")
 
           c.close()
           print("\nDone.")
