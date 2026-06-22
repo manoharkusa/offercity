@@ -181,12 +181,76 @@ function callAI(systemPrompt, userMessage) {
   });
 }
 
+// Only auto-reply to numbers the owner previously messaged via campaigns (= customers).
+// Personal friends who message the owner's WhatsApp are NOT in campaign_logs → skipped.
+async function isKnownCustomer(ownerId, jid) {
+  try {
+    const phone = jid.replace('@s.whatsapp.net', '').replace(/\D/g, '');
+    if (!phone) return false;
+    const last10 = phone.slice(-10);
+    const { getPool } = require('../config/db');
+    const [rows] = await getPool().query(
+      `SELECT 1 FROM campaign_logs cl
+       JOIN campaigns c ON c.id = cl.campaign_id
+       WHERE c.owner_id = ? AND RIGHT(REPLACE(cl.phone,'+',''), 10) = ?
+       LIMIT 1`,
+      [ownerId, last10]
+    );
+    return rows.length > 0;
+  } catch { return false; }
+}
+
+function callClaudeAI(systemPrompt, userMessage) {
+  const apiKey = process.env.ANTHROPIC_API_KEY;
+  if (!apiKey) throw new Error('ANTHROPIC_API_KEY not set');
+
+  const body = JSON.stringify({
+    model: 'claude-haiku-4-5-20251001',
+    max_tokens: 280,
+    system: systemPrompt,
+    messages: [{ role: 'user', content: userMessage }]
+  });
+
+  return new Promise((resolve, reject) => {
+    const req = https.request({
+      hostname: 'api.anthropic.com',
+      path: '/v1/messages',
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'x-api-key': apiKey,
+        'anthropic-version': '2023-06-01',
+        'Content-Length': Buffer.byteLength(body)
+      }
+    }, (res) => {
+      let raw = '';
+      res.on('data', chunk => raw += chunk);
+      res.on('end', () => {
+        try {
+          const parsed = JSON.parse(raw);
+          resolve(parsed.content?.[0]?.text?.trim() || '');
+        } catch (e) { reject(e); }
+      });
+    });
+    req.on('error', reject);
+    req.write(body);
+    req.end();
+  });
+}
+
 async function handleIncoming(ownerId, jid, messageText, senderName) {
   if (!isEnabled(ownerId)) return null;
 
   const rateKey = `${ownerId}:${jid}`;
   const now = Date.now();
   if (lastReply[rateKey] && now - lastReply[rateKey] < RATE_LIMIT_MS) return null;
+
+  // Only reply to known customers — skip personal contacts
+  const customer = await isKnownCustomer(ownerId, jid);
+  if (!customer) {
+    console.log(`[AI] Skipped ${jid.replace('@s.whatsapp.net','')} — not a campaign contact`);
+    return null;
+  }
 
   try {
     const context = await getShopContext(ownerId);
@@ -195,7 +259,21 @@ async function handleIncoming(ownerId, jid, messageText, senderName) {
     const lang = getLang(ownerId);
     const systemPrompt = buildSystemPrompt(context, lang);
     const greeting = senderName ? `(Customer name: ${senderName})\n` : '';
-    const reply = await callAI(systemPrompt, greeting + messageText);
+    const input = greeting + messageText;
+
+    let reply = null;
+
+    // Try Groq first, fall back to Claude if Groq fails or key missing
+    try {
+      reply = await callAI(systemPrompt, input);
+    } catch (groqErr) {
+      console.log(`[AI] Groq failed (${groqErr.message}) — trying Claude fallback`);
+      try {
+        reply = await callClaudeAI(systemPrompt, input);
+      } catch (claudeErr) {
+        console.error('[AI] Claude fallback also failed:', claudeErr.message);
+      }
+    }
 
     if (reply) {
       lastReply[rateKey] = now;
