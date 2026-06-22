@@ -110,6 +110,7 @@ server_files = [
     ("server/routes/leads.js",       f"{APP}/routes/leads.js"),
     ("server/services/push.js",      f"{APP}/services/push.js"),
     ("server/services/aichatbot.js", f"{APP}/services/aichatbot.js"),
+    ("server/routes/chat.js",        f"{APP}/routes/chat.js"),
     ("server/services/whatsapp.js",  f"{APP}/services/whatsapp.js"),
 ]
 

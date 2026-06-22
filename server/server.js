@@ -95,6 +95,7 @@ const routes = [
   ['/api/leads',     './routes/leads'],
   ['/api/campaigns', './routes/campaigns'],
   ['/api/push',      './routes/push'],
+  ['/api/chat',      './routes/chat'],
 ];
 
 for (const [prefix, mod] of routes) {

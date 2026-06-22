@@ -3,6 +3,7 @@ import { useParams } from 'react-router-dom';
 import api from '../services/api';
 import { useAuth } from '../context/AuthContext';
 import MapView from '../components/MapView';
+import ChatWidget from '../components/ChatWidget';
 
 export default function OfferDetails() {
   const { id } = useParams();
@@ -180,6 +181,7 @@ export default function OfferDetails() {
           ))
         }
       </div>
+      {offer?.shop_id && <ChatWidget shopId={offer.shop_id} shopName={offer.shop_name} />}
     </div>
   );
 }

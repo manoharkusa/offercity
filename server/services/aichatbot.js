@@ -140,7 +140,8 @@ Rules:
 - If asked about something you don't know (stock, custom orders), say "Please call or visit the shop for this"
 - Never invent prices or offers not listed above
 - If customer says hi/hello, greet them and mention 1-2 current offers
-- IMPORTANT: If the message is clearly a personal/private message NOT related to the shop (e.g. grocery lists, family messages, personal requests, unrelated topics), reply with exactly one word only: SKIP`;
+- STRICT SCOPE: You ONLY answer questions about ${primary.name} — its offers, prices, timings, location, and products. If asked about ANY other topic (other shops, general knowledge, cooking, politics, personal matters, or anything unrelated to this shop), reply in the customer's language: "I can only help with questions about ${primary.name}. What would you like to know about our offers or services?"
+- If the message is clearly personal/private (grocery lists, family talk, unrelated requests), reply with exactly one word only: SKIP`;
 }
 
 function callAI(systemPrompt, userMessage) {
@@ -305,4 +306,50 @@ function invalidateCache(ownerId) {
   delete contextCache[ownerId];
 }
 
-module.exports = { handleIncoming, setEnabled, loadEnabled, isEnabled, invalidateCache, setLang, getLang };
+// Web chat uses multi-turn messages array instead of single string
+function callClaudeAI_multi(systemPrompt, messages) {
+  const apiKey = process.env.ANTHROPIC_API_KEY;
+  if (!apiKey) throw new Error('ANTHROPIC_API_KEY not set');
+  const body = JSON.stringify({ model: 'claude-haiku-4-5-20251001', max_tokens: 300, system: systemPrompt, messages });
+  return new Promise((resolve, reject) => {
+    const req = https.request({
+      hostname: 'api.anthropic.com', path: '/v1/messages', method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'x-api-key': apiKey, 'anthropic-version': '2023-06-01', 'Content-Length': Buffer.byteLength(body) }
+    }, (res) => {
+      const chunks = [];
+      res.on('data', c => chunks.push(c));
+      res.on('end', () => {
+        try { resolve(JSON.parse(Buffer.concat(chunks).toString('utf8')).content?.[0]?.text?.trim() || ''); }
+        catch (e) { reject(e); }
+      });
+    });
+    req.on('error', reject); req.write(body); req.end();
+  });
+}
+
+function callGroqAI_multi(systemPrompt, messages) {
+  const apiKey = process.env.GROQ_API_KEY;
+  if (!apiKey) throw new Error('GROQ_API_KEY not set');
+  const body = JSON.stringify({ model: 'llama-3.3-70b-versatile', max_tokens: 300, messages: [{ role: 'system', content: systemPrompt }, ...messages] });
+  return new Promise((resolve, reject) => {
+    const req = https.request({
+      hostname: 'api.groq.com', path: '/openai/v1/chat/completions', method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${apiKey}`, 'Content-Length': Buffer.byteLength(body) }
+    }, (res) => {
+      const chunks = [];
+      res.on('data', c => chunks.push(c));
+      res.on('end', () => {
+        try { resolve(JSON.parse(Buffer.concat(chunks).toString('utf8')).choices?.[0]?.message?.content?.trim() || ''); }
+        catch (e) { reject(e); }
+      });
+    });
+    req.on('error', reject); req.write(body); req.end();
+  });
+}
+
+module.exports = {
+  handleIncoming, setEnabled, loadEnabled, isEnabled, invalidateCache, setLang, getLang,
+  callClaudeAI: callClaudeAI_multi,
+  callGroqAI: callGroqAI_multi,
+  buildSystemPromptForShop: buildSystemPrompt,
+};
