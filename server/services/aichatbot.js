@@ -73,18 +73,22 @@ function isEnabled(ownerId) {
   return chatbotEnabled[ownerId] === true;
 }
 
-async function getShopContext(ownerId) {
+async function getShopContext(ownerId, shopId = null) {
+  const cacheKey = shopId ? `${ownerId}:${shopId}` : ownerId;
   const now = Date.now();
-  if (contextCache[ownerId] && now - contextCache[ownerId].ts < CACHE_TTL) {
-    return contextCache[ownerId].data;
+  if (contextCache[cacheKey] && now - contextCache[cacheKey].ts < CACHE_TTL) {
+    return contextCache[cacheKey].data;
   }
   const { getPool } = require('../config/db');
   const pool = getPool();
 
-  const [shops] = await pool.query(
-    `SELECT id, name, category, address, city, pin_code, description FROM shops WHERE owner_id = ? LIMIT 3`,
-    [ownerId]
-  );
+  const [shops] = shopId
+    ? await pool.query(
+        `SELECT id, name, category, address, city, pin_code, description FROM shops WHERE owner_id = ? AND id = ? LIMIT 1`,
+        [ownerId, shopId])
+    : await pool.query(
+        `SELECT id, name, category, address, city, pin_code, description FROM shops WHERE owner_id = ? LIMIT 3`,
+        [ownerId]);
   if (!shops.length) return null;
 
   const shopIds = shops.map(s => s.id);
@@ -97,8 +101,46 @@ async function getShopContext(ownerId) {
   );
 
   const data = { shops, offers };
-  contextCache[ownerId] = { data, ts: now };
+  contextCache[cacheKey] = { data, ts: now };
   return data;
+}
+
+// Returns the most recently sent campaign info for this contact, or null if none / too old.
+// Also ensures shop uniqueness: if owner has multiple shops, bot replies as the shop
+// that most recently messaged this contact.
+async function getLastCampaign(ownerId, jid) {
+  try {
+    const phone = jid.replace('@s.whatsapp.net', '').replace(/\D/g, '');
+    if (!phone) return null;
+    const last10 = phone.slice(-10);
+    const { getPool } = require('../config/db');
+    const [rows] = await getPool().query(
+      `SELECT c.shop_id, c.created_at
+       FROM campaign_logs cl
+       JOIN campaigns c ON c.id = cl.campaign_id
+       WHERE c.owner_id = ?
+         AND RIGHT(REPLACE(cl.phone,'+',''), 10) = ?
+         AND cl.status = 'sent'
+       ORDER BY c.created_at DESC
+       LIMIT 1`,
+      [ownerId, last10]
+    );
+    if (!rows.length) {
+      console.log(`[AI] ${last10} owner=${ownerId} → NOT in campaign_logs`);
+      return null;
+    }
+    const { shop_id, created_at } = rows[0];
+    const daysSince = (Date.now() - new Date(created_at)) / (1000 * 60 * 60 * 24);
+    if (daysSince > 60) {
+      console.log(`[AI] ${last10} owner=${ownerId} → campaign ${Math.floor(daysSince)}d ago — too old, skipping`);
+      return null;
+    }
+    console.log(`[AI] ${last10} owner=${ownerId} → shop_id=${shop_id}, ${Math.floor(daysSince)}d ago ✓`);
+    return { shop_id };
+  } catch (err) {
+    console.log(`[AI] getLastCampaign DB error: ${err.message} — blocking reply`);
+    return null;
+  }
 }
 
 const LANG_INSTRUCTIONS = {
@@ -197,29 +239,6 @@ function callAI(systemPrompt, userMessage) {
   });
 }
 
-// Only auto-reply to numbers the owner previously messaged via campaigns (= customers).
-// Personal friends who message the owner's WhatsApp are NOT in campaign_logs → skipped.
-async function isKnownCustomer(ownerId, jid) {
-  try {
-    const phone = jid.replace('@s.whatsapp.net', '').replace(/\D/g, '');
-    if (!phone) return false;
-    const last10 = phone.slice(-10);
-    const { getPool } = require('../config/db');
-    const [rows] = await getPool().query(
-      `SELECT 1 FROM campaign_logs cl
-       JOIN campaigns c ON c.id = cl.campaign_id
-       WHERE c.owner_id = ? AND RIGHT(REPLACE(cl.phone,'+',''), 10) = ?
-       LIMIT 1`,
-      [ownerId, last10]
-    );
-    const found = rows.length > 0;
-    console.log(`[AI] isKnownCustomer phone=${last10} owner=${ownerId} → ${found ? 'FOUND in campaign_logs' : 'NOT in campaign_logs'}`);
-    return found;
-  } catch (err) {
-    console.log(`[AI] isKnownCustomer DB error: ${err.message} — blocking reply`);
-    return false;
-  }
-}
 
 function callClaudeAI(systemPrompt, userMessage) {
   const apiKey = process.env.ANTHROPIC_API_KEY;
@@ -266,15 +285,15 @@ async function handleIncoming(ownerId, jid, messageText, senderName) {
   const now = Date.now();
   if (lastReply[rateKey] && now - lastReply[rateKey] < RATE_LIMIT_MS) return null;
 
-  // Only reply to known customers — skip personal contacts
-  const customer = await isKnownCustomer(ownerId, jid);
-  if (!customer) {
-    console.log(`[AI] Skipped ${jid.replace('@s.whatsapp.net','')} — not a campaign contact`);
+  // Only reply to contacts who received a campaign recently (within 60 days)
+  // Also pins bot to the exact shop that last messaged this contact
+  const campaign = await getLastCampaign(ownerId, jid);
+  if (!campaign) {
     return null;
   }
 
   try {
-    const context = await getShopContext(ownerId);
+    const context = await getShopContext(ownerId, campaign.shop_id);
     if (!context) return null;
 
     const lang = getLang(ownerId);
