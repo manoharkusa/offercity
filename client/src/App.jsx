@@ -1,6 +1,7 @@
 import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
 import { lazy, Suspense } from 'react';
 import { AuthProvider, useAuth } from './context/AuthContext';
+import useNearbyAlerts from './hooks/useNearbyAlerts';
 import Navbar from './components/Navbar';
 import LoginNudge from './components/LoginNudge';
 import Footer from './components/Footer';
@@ -34,10 +35,16 @@ function PrivateRoute({ children, roles }) {
   return children;
 }
 
+function NearbyAlerts() {
+  useNearbyAlerts();
+  return null;
+}
+
 export default function App() {
   return (
     <AuthProvider>
       <BrowserRouter>
+        <NearbyAlerts />
         <Navbar />
         <LoginNudge />
         <Suspense fallback={<PageLoader />}>
