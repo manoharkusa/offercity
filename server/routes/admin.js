@@ -173,12 +173,16 @@ router.delete('/bdos/:id', async (req, res) => {
   }
 });
 
-// GET /api/admin/shops/pending — all pending shops across all areas
+// GET /api/admin/shops/pending — all pending shops with payment & Aadhar info
 router.get('/shops/pending', async (req, res) => {
   try {
     const [shops] = await getPool().query(
-      `SELECT s.*, u.name AS owner_name, u.email AS owner_email,
-              b.name AS bdo_name
+      `SELECT s.id, s.name, s.category, s.address, s.city, s.pin_code,
+              s.description, s.status, s.created_at,
+              s.owner_phone, s.owner_aadhar_number, s.owner_aadhar_photo,
+              s.payment_screenshot, s.payment_amount, s.rejection_reason,
+              u.name AS owner_name, u.email AS owner_email,
+              b.name AS bdo_name, b.id AS bdo_id
        FROM shops s
        JOIN users u ON u.id = s.owner_id
        LEFT JOIN users b ON b.id = s.bdo_id
@@ -186,6 +190,57 @@ router.get('/shops/pending', async (req, res) => {
        ORDER BY s.created_at DESC`
     );
     res.json(shops);
+  } catch (err) {
+    res.status(500).json({ message: err.message });
+  }
+});
+
+// PUT /api/admin/shops/:id/approve — approve + generate fresh credentials for shop owner
+router.put('/shops/:id/approve', async (req, res) => {
+  try {
+    const pool = getPool();
+    const [rows] = await pool.query(
+      'SELECT s.*, u.email AS owner_email, u.name AS owner_name FROM shops s JOIN users u ON u.id = s.owner_id WHERE s.id = ?',
+      [req.params.id]
+    );
+    if (!rows.length) return res.status(404).json({ message: 'Shop not found' });
+
+    // Generate a new password for the shop owner
+    const chars = 'ABCDEFGHJKMNPQRSTUVWXYZabcdefghjkmnpqrstuvwxyz23456789';
+    const newPassword = Array.from({ length: 10 }, () => chars[Math.floor(Math.random() * chars.length)]).join('');
+    const hash = await bcrypt.hash(newPassword, 10);
+
+    await pool.query('UPDATE users SET password = ? WHERE id = ?', [hash, rows[0].owner_id]);
+    await pool.query(
+      "UPDATE shops SET status='approved', approved_at=NOW(), rejection_reason=NULL WHERE id=?",
+      [req.params.id]
+    );
+
+    res.json({
+      message: 'Shop approved and live.',
+      credentials: {
+        shop_name:  rows[0].name,
+        owner_name: rows[0].owner_name,
+        email:      rows[0].owner_email,
+        password:   newPassword,
+        login_url:  'https://offerscity.co.in/login',
+      }
+    });
+  } catch (err) {
+    res.status(500).json({ message: err.message });
+  }
+});
+
+// PUT /api/admin/shops/:id/reject
+router.put('/shops/:id/reject', async (req, res) => {
+  const { reason } = req.body;
+  if (!reason) return res.status(400).json({ message: 'Rejection reason required' });
+  try {
+    await getPool().query(
+      "UPDATE shops SET status='rejected', rejection_reason=? WHERE id=?",
+      [reason, req.params.id]
+    );
+    res.json({ message: 'Shop rejected.' });
   } catch (err) {
     res.status(500).json({ message: err.message });
   }

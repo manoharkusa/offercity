@@ -162,7 +162,18 @@ const createTables = async () => {
     ["shops",  "area",              "VARCHAR(150) DEFAULT NULL AFTER bdo_id"],
     ["shops",  "rejection_reason",  "TEXT DEFAULT NULL AFTER area"],
     ["shops",  "approved_at",        "TIMESTAMP NULL DEFAULT NULL AFTER rejection_reason"],
-    ["offers", "flash_expires_at",  "TIMESTAMP NULL DEFAULT NULL AFTER valid_until"],
+    ["offers", "flash_expires_at",       "TIMESTAMP NULL DEFAULT NULL AFTER valid_until"],
+    // BDO profile fields
+    ["users",  "phone",                  "VARCHAR(20) DEFAULT NULL"],
+    ["users",  "aadhar_number",          "VARCHAR(20) DEFAULT NULL"],
+    ["users",  "aadhar_photo",           "VARCHAR(255) DEFAULT NULL"],
+    ["users",  "photo",                  "VARCHAR(255) DEFAULT NULL"],
+    // Shop onboarding by BDO
+    ["shops",  "owner_aadhar_number",    "VARCHAR(20) DEFAULT NULL"],
+    ["shops",  "owner_aadhar_photo",     "VARCHAR(255) DEFAULT NULL"],
+    ["shops",  "payment_screenshot",     "VARCHAR(255) DEFAULT NULL"],
+    ["shops",  "payment_amount",         "DECIMAL(10,2) DEFAULT NULL"],
+    ["shops",  "owner_phone",            "VARCHAR(20) DEFAULT NULL"],
   ];
 
   // "I'm Coming" reservations

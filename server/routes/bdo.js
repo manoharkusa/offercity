@@ -1,11 +1,19 @@
 const express = require('express');
 const bcrypt  = require('bcryptjs');
 const jwt     = require('jsonwebtoken');
+const multer  = require('multer');
+const path    = require('path');
 const { getPool } = require('../config/db');
 const { protect, requireRole } = require('../middleware/auth');
 
 const router = express.Router();
 const bdoOnly = [protect, requireRole('bdo')];
+
+const storage = multer.diskStorage({
+  destination: (req, file, cb) => cb(null, path.join(__dirname, '../uploads')),
+  filename:    (req, file, cb) => cb(null, Date.now() + '-' + file.fieldname + path.extname(file.originalname))
+});
+const upload = multer({ storage, limits: { fileSize: 8 * 1024 * 1024 } });
 
 // POST /api/bdo/login
 router.post('/login', async (req, res) => {
@@ -128,6 +136,102 @@ router.put('/shops/:id/reject', ...bdoOnly, async (req, res) => {
       [req.user.id, reason, req.params.id]
     );
     res.json({ message: 'Shop rejected' });
+  } catch (err) {
+    res.status(500).json({ message: err.message });
+  }
+});
+
+// POST /api/bdo/register-shop
+// BDO fills shop details, captures owner Aadhar + payment screenshot
+const registerFields = upload.fields([
+  { name: 'owner_aadhar_photo',  maxCount: 1 },
+  { name: 'payment_screenshot',  maxCount: 1 },
+]);
+router.post('/register-shop', ...bdoOnly, registerFields, async (req, res) => {
+  const {
+    owner_name, owner_email, owner_phone,
+    owner_aadhar_number,
+    shop_name, category, address, city, pin_code, description,
+    payment_amount,
+  } = req.body;
+
+  if (!owner_name || !owner_email || !shop_name || !category || !address || !city) {
+    return res.status(400).json({ message: 'owner_name, owner_email, shop_name, category, address, city are required' });
+  }
+
+  const aadharPhoto      = req.files?.owner_aadhar_photo?.[0]?.filename || null;
+  const paymentScreenshot = req.files?.payment_screenshot?.[0]?.filename || null;
+
+  if (!paymentScreenshot) {
+    return res.status(400).json({ message: 'Payment screenshot is required' });
+  }
+
+  try {
+    const pool = getPool();
+
+    // Check if owner email already exists
+    const [existing] = await pool.query('SELECT id FROM users WHERE email = ?', [owner_email]);
+    let ownerId;
+
+    if (existing.length > 0) {
+      ownerId = existing[0].id;
+    } else {
+      // Create a temporary password — will be reset by admin on approval
+      const tempPass = Math.random().toString(36).slice(-8) + 'Oc1!';
+      const hash = await bcrypt.hash(tempPass, 10);
+      const [result] = await pool.query(
+        "INSERT INTO users (name, email, password, role, phone) VALUES (?, ?, ?, 'shop_owner', ?)",
+        [owner_name, owner_email, hash, owner_phone || null]
+      );
+      ownerId = result.insertId;
+    }
+
+    // Generate slug
+    const base = shop_name.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '').slice(0, 60);
+    let slug = base, n = 1;
+    while (true) {
+      const [rows] = await pool.query('SELECT id FROM shops WHERE slug = ?', [slug]);
+      if (!rows.length) break;
+      slug = base + n++;
+    }
+
+    const [shopResult] = await pool.query(
+      `INSERT INTO shops
+         (name, slug, category, address, city, pin_code, description, owner_id,
+          bdo_id, status,
+          owner_phone, owner_aadhar_number, owner_aadhar_photo,
+          payment_screenshot, payment_amount)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, 'pending', ?, ?, ?, ?, ?)`,
+      [
+        shop_name, slug, category, address, city, pin_code || null, description || null, ownerId,
+        req.user.id,
+        owner_phone || null, owner_aadhar_number || null, aadharPhoto,
+        paymentScreenshot, payment_amount || null,
+      ]
+    );
+
+    res.status(201).json({
+      message: 'Shop registered successfully. Pending admin approval.',
+      shop_id: shopResult.insertId,
+      owner_id: ownerId,
+    });
+  } catch (err) {
+    res.status(500).json({ message: err.message });
+  }
+});
+
+// GET /api/bdo/my-shops — shops created by this BDO
+router.get('/my-shops', ...bdoOnly, async (req, res) => {
+  try {
+    const [shops] = await getPool().query(
+      `SELECT s.id, s.name, s.category, s.city, s.status, s.created_at,
+              u.name AS owner_name, u.email AS owner_email, s.owner_phone
+       FROM shops s JOIN users u ON u.id = s.owner_id
+       WHERE s.bdo_id = ?
+       ORDER BY s.created_at DESC`,
+      [req.user.id]
+    );
+    res.json(shops);
   } catch (err) {
     res.status(500).json({ message: err.message });
   }

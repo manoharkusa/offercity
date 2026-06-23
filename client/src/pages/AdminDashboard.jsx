@@ -23,7 +23,10 @@ export default function AdminDashboard() {
   const [bdos,    setBdos]    = useState([]);
   const [bdoForm, setBdoForm] = useState({ name:'', email:'', phone:'', password:'', pincodes:'' });
   const [bdoMsg,  setBdoMsg]  = useState('');
-  const [editAreas, setEditAreas] = useState(null); // { bdoId, pincodes }
+  const [editAreas, setEditAreas] = useState(null);
+  const [credentials, setCredentials] = useState(null); // shown after approve
+  const [rejectModal, setRejectModal] = useState(null); // { shopId, shopName, reason }
+  const [rejectMsg,   setRejectMsg]   = useState('');
 
   useEffect(() => { api.get('/admin/stats').then(r => setStats(r.data)); }, []);
 
@@ -37,6 +40,27 @@ export default function AdminDashboard() {
   const deleteShop = async (id) => {
     await api.delete(`/admin/shops/${id}`);
     setPending(p => p.filter(s => s.id !== id));
+  };
+
+  const approveShop = async (id) => {
+    try {
+      const r = await api.put(`/admin/shops/${id}/approve`);
+      setCredentials(r.data.credentials);
+      setPending(p => p.filter(s => s.id !== id));
+    } catch (err) {
+      alert(err.response?.data?.message || 'Approval failed');
+    }
+  };
+
+  const submitReject = async () => {
+    if (!rejectModal?.reason?.trim()) return;
+    try {
+      await api.put(`/admin/shops/${rejectModal.shopId}/reject`, { reason: rejectModal.reason });
+      setPending(p => p.filter(s => s.id !== rejectModal.shopId));
+      setRejectModal(null);
+    } catch (err) {
+      setRejectMsg(err.response?.data?.message || 'Error');
+    }
   };
 
   const deleteUser = async (id) => {
@@ -202,22 +226,126 @@ export default function AdminDashboard() {
             <>
               <h2>Pending Shop Approvals</h2>
               {pending.length === 0 ? <p style={{ color:'#888' }}>No pending shops.</p> : (
-                <div className="table-scroll">
-                  <table className="data-table">
-                    <thead><tr><th>Shop</th><th>Owner</th><th>Pincode</th><th>BDO Assigned</th><th>Created</th><th>Action</th></tr></thead>
-                    <tbody>
-                      {pending.map(s => (
-                        <tr key={s.id}>
-                          <td style={{ fontWeight:600 }}>{s.name}</td>
-                          <td>{s.owner_name}<br /><span style={{ fontSize:12, color:'#888' }}>{s.owner_email}</span></td>
-                          <td>{s.pin_code || '—'}</td>
-                          <td>{s.bdo_name ? <span style={{ color:'#1565c0', fontWeight:600 }}>{s.bdo_name}</span> : <span style={{ color:'#e65100', fontSize:13 }}>No BDO for this pincode</span>}</td>
-                          <td style={{ fontSize:12 }}>{new Date(s.created_at).toLocaleDateString('en-IN')}</td>
-                          <td><button onClick={() => deleteShop(s.id)} style={btn('#c62828')}>Delete</button></td>
-                        </tr>
-                      ))}
-                    </tbody>
-                  </table>
+                <div style={{ display:'flex', flexDirection:'column', gap:16 }}>
+                  {pending.map(s => (
+                    <div key={s.id} style={{ background:'#fff', borderRadius:14, padding:20, boxShadow:'0 2px 10px rgba(0,0,0,0.08)', border:'1px solid #eee' }}>
+                      {/* Shop + BDO header */}
+                      <div style={{ display:'flex', justifyContent:'space-between', flexWrap:'wrap', gap:8, marginBottom:14 }}>
+                        <div>
+                          <div style={{ fontWeight:700, fontSize:17 }}>{s.name}</div>
+                          <div style={{ fontSize:13, color:'#888' }}>{s.category} · {s.city}{s.pin_code ? ` · ${s.pin_code}` : ''}</div>
+                          {s.bdo_name && <div style={{ fontSize:12, color:'#1565c0', marginTop:2 }}>BDO: {s.bdo_name}</div>}
+                        </div>
+                        <div style={{ fontSize:12, color:'#aaa' }}>{new Date(s.created_at).toLocaleDateString('en-IN', { day:'numeric', month:'short', year:'numeric' })}</div>
+                      </div>
+
+                      {/* Owner + Aadhar */}
+                      <div style={{ display:'grid', gridTemplateColumns:'repeat(auto-fit, minmax(200px,1fr))', gap:14, marginBottom:14 }}>
+                        <div style={{ background:'#f8f9fa', borderRadius:8, padding:12 }}>
+                          <div style={{ fontSize:12, fontWeight:700, color:'#555', marginBottom:6 }}>SHOP OWNER</div>
+                          <div style={{ fontWeight:600 }}>{s.owner_name}</div>
+                          <div style={{ fontSize:13, color:'#555' }}>{s.owner_email}</div>
+                          {s.owner_phone && <div style={{ fontSize:13, color:'#555' }}>📞 {s.owner_phone}</div>}
+                          {s.owner_aadhar_number && <div style={{ fontSize:13, color:'#555' }}>🪪 Aadhar: {s.owner_aadhar_number}</div>}
+                        </div>
+
+                        {/* Aadhar Photo */}
+                        {s.owner_aadhar_photo && (
+                          <div style={{ background:'#f8f9fa', borderRadius:8, padding:12 }}>
+                            <div style={{ fontSize:12, fontWeight:700, color:'#555', marginBottom:6 }}>AADHAR PHOTO</div>
+                            <a href={`/uploads/${s.owner_aadhar_photo}`} target="_blank" rel="noreferrer">
+                              <img src={`/uploads/${s.owner_aadhar_photo}`} alt="Aadhar"
+                                style={{ width:'100%', maxHeight:90, objectFit:'cover', borderRadius:6, cursor:'pointer' }} />
+                            </a>
+                          </div>
+                        )}
+
+                        {/* Payment Screenshot */}
+                        {s.payment_screenshot && (
+                          <div style={{ background:'#fff8e1', borderRadius:8, padding:12, border:'1px solid #ffe082' }}>
+                            <div style={{ fontSize:12, fontWeight:700, color:'#f57c00', marginBottom:6 }}>
+                              PAYMENT SCREENSHOT{s.payment_amount ? ` — ₹${s.payment_amount}` : ''}
+                            </div>
+                            <a href={`/uploads/${s.payment_screenshot}`} target="_blank" rel="noreferrer">
+                              <img src={`/uploads/${s.payment_screenshot}`} alt="Payment"
+                                style={{ width:'100%', maxHeight:90, objectFit:'cover', borderRadius:6, cursor:'pointer' }} />
+                            </a>
+                            <div style={{ fontSize:11, color:'#888', marginTop:4 }}>Click to enlarge</div>
+                          </div>
+                        )}
+                      </div>
+
+                      {/* Actions */}
+                      <div style={{ display:'flex', gap:10, flexWrap:'wrap' }}>
+                        <button onClick={() => approveShop(s.id)}
+                          style={{ padding:'10px 24px', background:'#2e7d32', color:'#fff', border:'none', borderRadius:8, fontWeight:700, cursor:'pointer', fontSize:14 }}>
+                          ✅ Approve & Generate Credentials
+                        </button>
+                        <button onClick={() => setRejectModal({ shopId:s.id, shopName:s.name, reason:'' })}
+                          style={{ padding:'10px 24px', background:'#c62828', color:'#fff', border:'none', borderRadius:8, fontWeight:700, cursor:'pointer', fontSize:14 }}>
+                          ❌ Reject
+                        </button>
+                        <button onClick={() => deleteShop(s.id)}
+                          style={{ padding:'10px 16px', background:'none', color:'#999', border:'1px solid #ddd', borderRadius:8, cursor:'pointer', fontSize:13 }}>
+                          🗑 Delete
+                        </button>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
+
+              {/* Credentials Modal */}
+              {credentials && (
+                <div style={{ position:'fixed', inset:0, background:'rgba(0,0,0,0.6)', display:'flex', alignItems:'center', justifyContent:'center', zIndex:1000, padding:16 }}>
+                  <div style={{ background:'#fff', borderRadius:16, padding:28, width:440, maxWidth:'100%' }}>
+                    <h3 style={{ margin:'0 0 6px', color:'#2e7d32' }}>✅ Shop Approved!</h3>
+                    <p style={{ margin:'0 0 18px', color:'#555', fontSize:14 }}>Share these credentials with the shop owner:</p>
+                    <div style={{ background:'#f1f8e9', borderRadius:10, padding:16, fontFamily:'monospace', fontSize:14, lineHeight:2 }}>
+                      <div>🏪 Shop: <strong>{credentials.shop_name}</strong></div>
+                      <div>👤 Name: <strong>{credentials.owner_name}</strong></div>
+                      <div>📧 Email: <strong>{credentials.email}</strong></div>
+                      <div>🔑 Password: <strong style={{ fontSize:16, color:'#1565c0' }}>{credentials.password}</strong></div>
+                      <div>🌐 Login: <strong>{credentials.login_url}</strong></div>
+                    </div>
+                    <button onClick={() => {
+                      navigator.clipboard?.writeText(
+                        `OfferCity Login\nEmail: ${credentials.email}\nPassword: ${credentials.password}\nURL: ${credentials.login_url}`
+                      );
+                    }}
+                      style={{ width:'100%', marginTop:14, padding:10, background:'#1565c0', color:'#fff', border:'none', borderRadius:8, fontWeight:700, cursor:'pointer', fontSize:14 }}>
+                      📋 Copy Credentials
+                    </button>
+                    <button onClick={() => setCredentials(null)}
+                      style={{ width:'100%', marginTop:8, padding:10, background:'#eee', border:'none', borderRadius:8, cursor:'pointer', fontWeight:600 }}>
+                      Close
+                    </button>
+                  </div>
+                </div>
+              )}
+
+              {/* Reject Modal */}
+              {rejectModal && (
+                <div style={{ position:'fixed', inset:0, background:'rgba(0,0,0,0.5)', display:'flex', alignItems:'center', justifyContent:'center', zIndex:1000, padding:16 }}>
+                  <div style={{ background:'#fff', borderRadius:14, padding:28, width:420, maxWidth:'100%' }}>
+                    <h3 style={{ margin:'0 0 6px', color:'#c62828' }}>Reject Shop</h3>
+                    <p style={{ margin:'0 0 14px', color:'#555', fontSize:14 }}><strong>{rejectModal.shopName}</strong></p>
+                    <textarea rows={4} placeholder="Reason for rejection..."
+                      value={rejectModal.reason}
+                      onChange={e => setRejectModal(m => ({ ...m, reason: e.target.value }))}
+                      style={{ width:'100%', padding:10, border:'1px solid #ddd', borderRadius:8, fontSize:14, resize:'vertical', boxSizing:'border-box' }} />
+                    {rejectMsg && <div style={{ color:'#c62828', fontSize:13, marginTop:6 }}>{rejectMsg}</div>}
+                    <div style={{ display:'flex', gap:10, marginTop:14 }}>
+                      <button onClick={submitReject}
+                        style={{ flex:1, background:'#c62828', color:'#fff', border:'none', borderRadius:8, padding:11, fontWeight:700, cursor:'pointer' }}>
+                        Confirm Reject
+                      </button>
+                      <button onClick={() => { setRejectModal(null); setRejectMsg(''); }}
+                        style={{ flex:1, background:'#eee', border:'none', borderRadius:8, padding:11, cursor:'pointer', fontWeight:600 }}>
+                        Cancel
+                      </button>
+                    </div>
+                  </div>
                 </div>
               )}
             </>
