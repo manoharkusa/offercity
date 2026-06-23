@@ -28,10 +28,15 @@ export default function ShopPage() {
   const [reviewForm, setReviewForm] = useState({ rating: 5, comment: '' });
   const [reviewMsg, setReviewMsg] = useState('');
   const [pushState, setPushState] = useState('idle');
+  const [catalog, setCatalog] = useState([]);
 
   useEffect(() => {
     api.get(`/shops/slug/${slug}`)
-      .then(r => { setShop(r.data); setLoading(false); })
+      .then(r => {
+        setShop(r.data);
+        setLoading(false);
+        api.get(`/shops/${r.data.id}/catalog`).then(c => setCatalog(c.data)).catch(() => {});
+      })
       .catch(() => { setLoading(false); });
   }, [slug]);
 
@@ -252,6 +257,37 @@ export default function ShopPage() {
             <OfferCard key={offer.id} offer={{ ...offer, shop_name: shop.name, category: shop.category }} />
           ))}
         </div>
+      )}
+
+      {/* Catalog / Services */}
+      {catalog.length > 0 && (
+        <>
+          <h2 style={{ color: '#e65100', marginBottom: 16 }}>📋 Services &amp; Pricing</h2>
+          <div style={{ background: '#fff', borderRadius: 12, overflow: 'hidden', boxShadow: '0 2px 8px rgba(0,0,0,0.07)', marginBottom: 32 }}>
+            <table style={{ width: '100%', borderCollapse: 'collapse' }}>
+              <thead>
+                <tr style={{ background: '#fff3e0' }}>
+                  <th style={{ padding: '10px 16px', textAlign: 'left', fontSize: 13, color: '#e65100', fontWeight: 700 }}>#</th>
+                  <th style={{ padding: '10px 16px', textAlign: 'left', fontSize: 13, color: '#e65100', fontWeight: 700 }}>Service / Item</th>
+                  <th style={{ padding: '10px 16px', textAlign: 'left', fontSize: 13, color: '#e65100', fontWeight: 700 }}>Description</th>
+                  <th style={{ padding: '10px 16px', textAlign: 'right', fontSize: 13, color: '#e65100', fontWeight: 700 }}>Price</th>
+                </tr>
+              </thead>
+              <tbody>
+                {catalog.map((item, i) => (
+                  <tr key={item.id} style={{ borderTop: '1px solid #f0e6d6', background: i % 2 === 0 ? '#fff' : '#fffaf7' }}>
+                    <td style={{ padding: '10px 16px', fontSize: 13, color: '#aaa' }}>{i + 1}</td>
+                    <td style={{ padding: '10px 16px', fontWeight: 600, fontSize: 14 }}>{item.name}</td>
+                    <td style={{ padding: '10px 16px', fontSize: 13, color: '#666' }}>{item.description || '—'}</td>
+                    <td style={{ padding: '10px 16px', textAlign: 'right', fontWeight: 700, color: item.price ? '#2e7d32' : '#aaa', fontSize: 14 }}>
+                      {item.price ? `₹${Number(item.price).toLocaleString('en-IN')}` : '—'}
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </>
       )}
 
       {/* Reviews */}

@@ -24,6 +24,92 @@ const compressImage = (file, maxWidth = 900, quality = 0.82) =>
     img.src = url;
   });
 
+// ── Catalog management sub-component ────────────────────────────────────────
+function CatalogTab({ shops, flash }) {
+  const [shopId,  setShopId]  = useState('');
+  const [items,   setItems]   = useState([]);
+  const [loading, setLoading] = useState(false);
+  const [saving,  setSaving]  = useState(false);
+
+  const loadCatalog = async (id) => {
+    setShopId(id);
+    if (!id) { setItems([]); return; }
+    setLoading(true);
+    try {
+      const { data } = await api.get(`/shops/${id}/catalog`);
+      setItems(data.length ? data : [{ name: '', price: '', description: '' }]);
+    } catch { flash('Could not load catalog', 'err'); }
+    setLoading(false);
+  };
+
+  const setItem = (i, key, val) => setItems(prev => prev.map((x, j) => j === i ? { ...x, [key]: val } : x));
+
+  const save = async () => {
+    if (!shopId) return;
+    setSaving(true);
+    try {
+      const valid = items.filter(x => x.name?.trim());
+      await api.put(`/shops/${shopId}/catalog`, { items: valid });
+      flash(`✅ Catalog saved — ${valid.length} items`);
+    } catch (err) { flash(err.response?.data?.message || 'Save failed', 'err'); }
+    setSaving(false);
+  };
+
+  const inp = { padding: '8px 10px', border: '1px solid #ddd', borderRadius: 7, fontSize: 13, width: '100%', boxSizing: 'border-box' };
+
+  return (
+    <div>
+      <h2>📋 Services &amp; Catalog</h2>
+      <div style={{ marginBottom: 16 }}>
+        <select value={shopId} onChange={e => loadCatalog(e.target.value)}
+          style={{ padding: '9px 14px', borderRadius: 8, border: '1px solid #ddd', fontSize: 14, minWidth: 220 }}>
+          <option value="">— Select a shop —</option>
+          {shops.map(s => <option key={s.id} value={s.id}>{s.name}</option>)}
+        </select>
+      </div>
+
+      {shopId && !loading && (
+        <>
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr 110px 1fr 32px', gap: 8, marginBottom: 8, padding: '0 4px' }}>
+            <span style={{ fontSize: 12, fontWeight: 700, color: '#555' }}>Service / Item *</span>
+            <span style={{ fontSize: 12, fontWeight: 700, color: '#555' }}>Price (₹)</span>
+            <span style={{ fontSize: 12, fontWeight: 700, color: '#555' }}>Description</span>
+            <span />
+          </div>
+
+          {items.map((item, i) => (
+            <div key={i} style={{ display: 'grid', gridTemplateColumns: '1fr 110px 1fr 32px', gap: 8, marginBottom: 8, alignItems: 'center' }}>
+              <input value={item.name || ''} placeholder={`Item ${i + 1}`}
+                onChange={e => setItem(i, 'name', e.target.value)} style={inp} />
+              <input type="number" value={item.price || ''} placeholder="0.00"
+                onChange={e => setItem(i, 'price', e.target.value)} style={inp} />
+              <input value={item.description || ''} placeholder="Optional"
+                onChange={e => setItem(i, 'description', e.target.value)} style={inp} />
+              <button type="button" onClick={() => setItems(p => p.filter((_, j) => j !== i))}
+                style={{ width: 30, height: 30, background: '#ffebee', color: '#c62828', border: 'none', borderRadius: 6, cursor: 'pointer', fontSize: 16 }}>×</button>
+            </div>
+          ))}
+
+          <div style={{ display: 'flex', gap: 12, marginTop: 14, alignItems: 'center', flexWrap: 'wrap' }}>
+            {items.length < 25 && (
+              <button type="button" onClick={() => setItems(p => [...p, { name: '', price: '', description: '' }])}
+                style={{ padding: '8px 18px', background: '#6a1b9a', color: '#fff', border: 'none', borderRadius: 8, cursor: 'pointer', fontWeight: 600, fontSize: 13 }}>
+                + Add Item
+              </button>
+            )}
+            <button type="button" onClick={save} disabled={saving}
+              style={{ padding: '8px 22px', background: saving ? '#aaa' : '#e65100', color: '#fff', border: 'none', borderRadius: 8, cursor: saving ? 'not-allowed' : 'pointer', fontWeight: 700, fontSize: 13 }}>
+              {saving ? 'Saving…' : '💾 Save Catalog'}
+            </button>
+            <span style={{ fontSize: 12, color: '#aaa' }}>{items.filter(x => x.name?.trim()).length}/25 items</span>
+          </div>
+        </>
+      )}
+      {loading && <p style={{ color: '#aaa' }}>Loading…</p>}
+    </div>
+  );
+}
+
 export default function ShopDashboard() {
   const [tab, setTab]             = useState('shops');
   const [shops, setShops]         = useState([]);
@@ -510,6 +596,7 @@ export default function ShopDashboard() {
           {[
             ['shops',    '🏪 My Shops'],
             ['add-shop', '➕ Add Shop'],
+            ['catalog',  '📋 Catalog'],
             ['offers',   '🏷 My Offers'],
             ['add-offer', editingOffer ? '✏️ Edit Offer' : '➕ Add Offer'],
             ['campaign', '📣 Campaign'],
@@ -722,6 +809,11 @@ export default function ShopDashboard() {
                 </button>
               </form>
             </>
+          )}
+
+          {/* ── Catalog ── */}
+          {tab === 'catalog' && (
+            <CatalogTab shops={shops} flash={flash} />
           )}
 
           {/* ── My Offers ── */}

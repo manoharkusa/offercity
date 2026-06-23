@@ -9,6 +9,7 @@ const BLANK_FORM = {
   owner_name: '', owner_email: '', owner_phone: '', owner_aadhar_number: '',
   shop_name: '', category: '', address: '', city: '', pin_code: '', description: '', payment_amount: '',
 };
+const BLANK_ITEM = { name: '', price: '', description: '' };
 
 export default function BDODashboard() {
   const { user } = useAuth();
@@ -19,9 +20,10 @@ export default function BDODashboard() {
   const [msg,     setMsg]    = useState({ text: '', ok: true });
 
   // Register form state
-  const [form,    setForm]   = useState(BLANK_FORM);
-  const [files,   setFiles]  = useState({ owner_aadhar_photo: null, payment_screenshot: null });
-  const [saving,  setSaving] = useState(false);
+  const [form,    setForm]    = useState(BLANK_FORM);
+  const [files,   setFiles]   = useState({ owner_aadhar_photo: null, payment_screenshot: null });
+  const [catalog, setCatalog] = useState([{ ...BLANK_ITEM }]);
+  const [saving,  setSaving]  = useState(false);
 
   useEffect(() => {
     api.get('/bdo/me').then(r => setProfile(r.data));
@@ -48,11 +50,14 @@ export default function BDODashboard() {
       Object.entries(form).forEach(([k, v]) => fd.append(k, v));
       if (files.owner_aadhar_photo)  fd.append('owner_aadhar_photo',  files.owner_aadhar_photo);
       if (files.payment_screenshot)  fd.append('payment_screenshot',  files.payment_screenshot);
+      const validItems = catalog.filter(i => i.name.trim());
+      fd.append('catalog', JSON.stringify(validItems));
 
       await api.post('/bdo/register-shop', fd, { headers: { 'Content-Type': 'multipart/form-data' } });
       setMsg({ text: '✅ Shop registered! Submitted for admin approval.', ok: true });
       setForm(BLANK_FORM);
       setFiles({ owner_aadhar_photo: null, payment_screenshot: null });
+      setCatalog([{ ...BLANK_ITEM }]);
       api.get('/bdo/stats').then(r => setStats(r.data));
     } catch (err) {
       setMsg({ text: err.response?.data?.message || 'Registration failed.', ok: false });
@@ -186,6 +191,52 @@ export default function BDODashboard() {
                 placeholder="Products, services, specialties..."
                 style={{ ...inputStyle, resize: 'vertical' }} />
             </div>
+          </div>
+
+          {/* Section: Catalog */}
+          <div style={{ background: '#f3e5f5', borderRadius: 10, padding: 16, marginBottom: 20, border: '1px solid #ce93d8' }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 14 }}>
+              <div style={{ fontWeight: 700, color: '#6a1b9a', fontSize: 15 }}>
+                📋 Services / Catalog &nbsp;<span style={{ fontWeight: 400, fontSize: 12, color: '#888' }}>({catalog.length}/25 items)</span>
+              </div>
+              {catalog.length < 25 && (
+                <button type="button"
+                  onClick={() => setCatalog(c => [...c, { ...BLANK_ITEM }])}
+                  style={{ padding: '5px 14px', background: '#6a1b9a', color: '#fff', border: 'none', borderRadius: 8, cursor: 'pointer', fontSize: 13, fontWeight: 600 }}>
+                  + Add Item
+                </button>
+              )}
+            </div>
+
+            {/* Header row */}
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 100px 1fr 32px', gap: 8, marginBottom: 6 }}>
+              <span style={{ fontSize: 12, fontWeight: 700, color: '#555' }}>Service / Item Name *</span>
+              <span style={{ fontSize: 12, fontWeight: 700, color: '#555' }}>Price (₹)</span>
+              <span style={{ fontSize: 12, fontWeight: 700, color: '#555' }}>Description</span>
+              <span />
+            </div>
+
+            {catalog.map((item, i) => (
+              <div key={i} style={{ display: 'grid', gridTemplateColumns: '1fr 100px 1fr 32px', gap: 8, marginBottom: 8, alignItems: 'center' }}>
+                <input placeholder={`Item ${i + 1}`} value={item.name}
+                  onChange={e => setCatalog(c => c.map((x, j) => j === i ? { ...x, name: e.target.value } : x))}
+                  style={{ ...inputStyle, fontSize: 13 }} />
+                <input type="number" placeholder="0.00" value={item.price}
+                  onChange={e => setCatalog(c => c.map((x, j) => j === i ? { ...x, price: e.target.value } : x))}
+                  style={{ ...inputStyle, fontSize: 13 }} />
+                <input placeholder="Optional details" value={item.description}
+                  onChange={e => setCatalog(c => c.map((x, j) => j === i ? { ...x, description: e.target.value } : x))}
+                  style={{ ...inputStyle, fontSize: 13 }} />
+                <button type="button" onClick={() => setCatalog(c => c.filter((_, j) => j !== i))}
+                  style={{ width: 30, height: 30, background: '#ffebee', color: '#c62828', border: 'none', borderRadius: 6, cursor: 'pointer', fontSize: 16, fontWeight: 700 }}>
+                  ×
+                </button>
+              </div>
+            ))}
+
+            {catalog.length === 0 && (
+              <p style={{ color: '#aaa', fontSize: 13, margin: 0 }}>No items added yet. Click "+ Add Item" to start.</p>
+            )}
           </div>
 
           {/* Section: Payment */}

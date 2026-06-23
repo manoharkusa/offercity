@@ -217,6 +217,17 @@ const createTables = async () => {
     FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
   ) ENGINE=InnoDB`);
 
+  // Shop catalog — services/items list (max 25 per shop)
+  await pool.query(`CREATE TABLE IF NOT EXISTS shop_catalog (
+    id          INT AUTO_INCREMENT PRIMARY KEY,
+    shop_id     INT NOT NULL,
+    name        VARCHAR(255) NOT NULL,
+    price       DECIMAL(10,2) DEFAULT NULL,
+    description VARCHAR(500) DEFAULT NULL,
+    sort_order  INT DEFAULT 0,
+    FOREIGN KEY (shop_id) REFERENCES shops(id) ON DELETE CASCADE
+  ) ENGINE=InnoDB`);
+
   // Extend users.role enum to include 'bdo'
   try {
     await pool.query(`ALTER TABLE users MODIFY COLUMN role ENUM('user','shop_owner','admin','bdo') DEFAULT 'user'`);

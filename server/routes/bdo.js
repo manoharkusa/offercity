@@ -210,9 +210,22 @@ router.post('/register-shop', ...bdoOnly, registerFields, async (req, res) => {
       ]
     );
 
+    // Save catalog items if provided
+    const shopId = shopResult.insertId;
+    let catalogItems = [];
+    try { catalogItems = JSON.parse(req.body.catalog || '[]'); } catch {}
+    for (let i = 0; i < Math.min(catalogItems.length, 25); i++) {
+      const { name, price, description } = catalogItems[i];
+      if (!name?.trim()) continue;
+      await pool.query(
+        'INSERT INTO shop_catalog (shop_id, name, price, description, sort_order) VALUES (?, ?, ?, ?, ?)',
+        [shopId, name.trim(), price || null, description?.trim() || null, i]
+      );
+    }
+
     res.status(201).json({
       message: 'Shop registered successfully. Pending admin approval.',
-      shop_id: shopResult.insertId,
+      shop_id: shopId,
       owner_id: ownerId,
     });
   } catch (err) {

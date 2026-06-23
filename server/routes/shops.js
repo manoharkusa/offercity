@@ -180,6 +180,42 @@ router.put('/:id', protect, requireRole('shop_owner', 'admin'), upload.single('i
   }
 });
 
+// GET /api/shops/:id/catalog
+router.get('/:id/catalog', async (req, res) => {
+  try {
+    const [rows] = await getPool().query(
+      'SELECT id, name, price, description, sort_order FROM shop_catalog WHERE shop_id = ? ORDER BY sort_order, id',
+      [req.params.id]
+    );
+    res.json(rows);
+  } catch (err) { res.status(500).json({ message: err.message }); }
+});
+
+// PUT /api/shops/:id/catalog — replace entire catalog (owner or admin)
+router.put('/:id/catalog', protect, requireRole('shop_owner', 'admin'), async (req, res) => {
+  const { items } = req.body; // [{ name, price, description }]
+  if (!Array.isArray(items)) return res.status(400).json({ message: 'items array required' });
+  if (items.length > 25) return res.status(400).json({ message: 'Maximum 25 catalog items allowed' });
+  try {
+    const pool = getPool();
+    const [rows] = await pool.query('SELECT owner_id FROM shops WHERE id = ?', [req.params.id]);
+    if (!rows.length) return res.status(404).json({ message: 'Shop not found' });
+    if (req.user.role !== 'admin' && rows[0].owner_id !== req.user.id)
+      return res.status(403).json({ message: 'Not your shop' });
+
+    await pool.query('DELETE FROM shop_catalog WHERE shop_id = ?', [req.params.id]);
+    for (let i = 0; i < items.length; i++) {
+      const { name, price, description } = items[i];
+      if (!name?.trim()) continue;
+      await pool.query(
+        'INSERT INTO shop_catalog (shop_id, name, price, description, sort_order) VALUES (?, ?, ?, ?, ?)',
+        [req.params.id, name.trim(), price || null, description?.trim() || null, i]
+      );
+    }
+    res.json({ ok: true, saved: items.length });
+  } catch (err) { res.status(500).json({ message: err.message }); }
+});
+
 // PUT /api/shops/:id/location — shop owner saves their GPS coordinates
 router.put('/:id/location', protect, requireRole('shop_owner', 'admin'), async (req, res) => {
   const { lat, lng } = req.body;
