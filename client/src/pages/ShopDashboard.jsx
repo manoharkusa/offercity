@@ -29,38 +29,65 @@ function CatalogTab({ shops, flash }) {
   const [shopId,  setShopId]  = useState('');
   const [items,   setItems]   = useState([]);
   const [loading, setLoading] = useState(false);
-  const [saving,  setSaving]  = useState(false);
+  const [editing, setEditing] = useState(null); // itemId being edited
+  const [editBuf, setEditBuf] = useState({});   // draft values for the row being edited
+  const [newItem, setNewItem] = useState({ name: '', price: '', description: '' });
+  const [adding,  setAdding]  = useState(false);
 
   const loadCatalog = async (id) => {
-    setShopId(id);
-    if (!id) { setItems([]); return; }
+    setShopId(id); setEditing(null); setItems([]);
+    if (!id) return;
     setLoading(true);
     try {
       const { data } = await api.get(`/shops/${id}/catalog`);
-      setItems(data.length ? data : [{ name: '', price: '', description: '' }]);
+      setItems(data);
     } catch { flash('Could not load catalog', 'err'); }
     setLoading(false);
   };
 
-  const setItem = (i, key, val) => setItems(prev => prev.map((x, j) => j === i ? { ...x, [key]: val } : x));
-
-  const save = async () => {
-    if (!shopId) return;
-    setSaving(true);
+  const addItem = async () => {
+    if (!newItem.name.trim()) { flash('Enter item name', 'err'); return; }
+    setAdding(true);
     try {
-      const valid = items.filter(x => x.name?.trim());
-      await api.put(`/shops/${shopId}/catalog`, { items: valid });
-      flash(`✅ Catalog saved — ${valid.length} items`);
-    } catch (err) { flash(err.response?.data?.message || 'Save failed', 'err'); }
-    setSaving(false);
+      const { data } = await api.post(`/shops/${shopId}/catalog`, newItem);
+      setItems(p => [...p, data]);
+      setNewItem({ name: '', price: '', description: '' });
+    } catch (err) { flash(err.response?.data?.message || 'Failed to add', 'err'); }
+    setAdding(false);
   };
 
-  const inp = { padding: '8px 10px', border: '1px solid #ddd', borderRadius: 7, fontSize: 13, width: '100%', boxSizing: 'border-box' };
+  const startEdit = (item) => {
+    setEditing(item.id);
+    setEditBuf({ name: item.name, price: item.price || '', description: item.description || '' });
+  };
+
+  const saveEdit = async (item) => {
+    if (!editBuf.name.trim()) { flash('Item name cannot be empty', 'err'); return; }
+    try {
+      await api.put(`/shops/${shopId}/catalog/${item.id}`, editBuf);
+      setItems(p => p.map(x => x.id === item.id ? { ...x, ...editBuf } : x));
+      setEditing(null);
+    } catch (err) { flash(err.response?.data?.message || 'Save failed', 'err'); }
+  };
+
+  const deleteItem = async (itemId) => {
+    if (!window.confirm('Remove this item?')) return;
+    try {
+      await api.delete(`/shops/${shopId}/catalog/${itemId}`);
+      setItems(p => p.filter(x => x.id !== itemId));
+    } catch { flash('Delete failed', 'err'); }
+  };
+
+  const inp = { padding: '7px 10px', border: '1px solid #ddd', borderRadius: 7, fontSize: 13, width: '100%', boxSizing: 'border-box' };
 
   return (
     <div>
-      <h2>📋 Services &amp; Catalog</h2>
-      <div style={{ marginBottom: 16 }}>
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16, flexWrap: 'wrap', gap: 10 }}>
+        <h2 style={{ margin: 0 }}>📋 Services &amp; Catalog</h2>
+        {shopId && <span style={{ fontSize: 13, color: '#888' }}>{items.length} items</span>}
+      </div>
+
+      <div style={{ marginBottom: 20 }}>
         <select value={shopId} onChange={e => loadCatalog(e.target.value)}
           style={{ padding: '9px 14px', borderRadius: 8, border: '1px solid #ddd', fontSize: 14, minWidth: 220 }}>
           <option value="">— Select a shop —</option>
@@ -68,44 +95,103 @@ function CatalogTab({ shops, flash }) {
         </select>
       </div>
 
+      {loading && <p style={{ color: '#aaa' }}>Loading…</p>}
+
       {shopId && !loading && (
         <>
-          <div style={{ display: 'grid', gridTemplateColumns: '1fr 110px 1fr 32px', gap: 8, marginBottom: 8, padding: '0 4px' }}>
-            <span style={{ fontSize: 12, fontWeight: 700, color: '#555' }}>Service / Item *</span>
-            <span style={{ fontSize: 12, fontWeight: 700, color: '#555' }}>Price (₹)</span>
-            <span style={{ fontSize: 12, fontWeight: 700, color: '#555' }}>Description</span>
-            <span />
+          {/* Existing items */}
+          {items.length === 0 && (
+            <p style={{ color: '#aaa', fontSize: 14, marginBottom: 20 }}>No items yet. Add your first service below.</p>
+          )}
+
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 8, marginBottom: 24 }}>
+            {items.map((item, i) => (
+              <div key={item.id} style={{ background: '#fff', borderRadius: 10, padding: '12px 14px', boxShadow: '0 1px 4px rgba(0,0,0,0.07)', border: '1px solid #eee' }}>
+                {editing === item.id ? (
+                  /* Edit mode */
+                  <div>
+                    <div style={{ display: 'grid', gridTemplateColumns: '1fr 110px 1fr', gap: 8, marginBottom: 10 }}>
+                      <div>
+                        <label style={{ fontSize: 11, fontWeight: 700, color: '#555', display: 'block', marginBottom: 3 }}>Item Name *</label>
+                        <input value={editBuf.name} onChange={e => setEditBuf(b => ({ ...b, name: e.target.value }))} style={inp} autoFocus />
+                      </div>
+                      <div>
+                        <label style={{ fontSize: 11, fontWeight: 700, color: '#555', display: 'block', marginBottom: 3 }}>Price (₹)</label>
+                        <input type="number" value={editBuf.price} onChange={e => setEditBuf(b => ({ ...b, price: e.target.value }))} style={inp} placeholder="0.00" />
+                      </div>
+                      <div>
+                        <label style={{ fontSize: 11, fontWeight: 700, color: '#555', display: 'block', marginBottom: 3 }}>Description</label>
+                        <input value={editBuf.description} onChange={e => setEditBuf(b => ({ ...b, description: e.target.value }))} style={inp} placeholder="Optional" />
+                      </div>
+                    </div>
+                    <div style={{ display: 'flex', gap: 8 }}>
+                      <button onClick={() => saveEdit(item)}
+                        style={{ padding: '7px 18px', background: '#2e7d32', color: '#fff', border: 'none', borderRadius: 7, cursor: 'pointer', fontWeight: 700, fontSize: 13 }}>
+                        ✅ Save
+                      </button>
+                      <button onClick={() => setEditing(null)}
+                        style={{ padding: '7px 14px', background: '#eee', border: 'none', borderRadius: 7, cursor: 'pointer', fontSize: 13 }}>
+                        Cancel
+                      </button>
+                    </div>
+                  </div>
+                ) : (
+                  /* View mode */
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 12, flexWrap: 'wrap' }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 14, flex: 1, minWidth: 0 }}>
+                      <span style={{ fontSize: 13, color: '#aaa', minWidth: 22, textAlign: 'right' }}>{i + 1}.</span>
+                      <div style={{ minWidth: 0 }}>
+                        <div style={{ fontWeight: 600, fontSize: 15 }}>{item.name}</div>
+                        {item.description && <div style={{ fontSize: 12, color: '#888', marginTop: 1 }}>{item.description}</div>}
+                      </div>
+                    </div>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+                      <span style={{ fontWeight: 700, color: item.price ? '#2e7d32' : '#bbb', fontSize: 15, whiteSpace: 'nowrap' }}>
+                        {item.price ? `₹${Number(item.price).toLocaleString('en-IN')}` : '—'}
+                      </span>
+                      <button onClick={() => startEdit(item)}
+                        style={{ padding: '5px 12px', background: '#e3f2fd', color: '#1565c0', border: 'none', borderRadius: 6, cursor: 'pointer', fontSize: 12, fontWeight: 600 }}>
+                        ✏️ Edit
+                      </button>
+                      <button onClick={() => deleteItem(item.id)}
+                        style={{ padding: '5px 10px', background: '#ffebee', color: '#c62828', border: 'none', borderRadius: 6, cursor: 'pointer', fontSize: 12, fontWeight: 600 }}>
+                        🗑
+                      </button>
+                    </div>
+                  </div>
+                )}
+              </div>
+            ))}
           </div>
 
-          {items.map((item, i) => (
-            <div key={i} style={{ display: 'grid', gridTemplateColumns: '1fr 110px 1fr 32px', gap: 8, marginBottom: 8, alignItems: 'center' }}>
-              <input value={item.name || ''} placeholder={`Item ${i + 1}`}
-                onChange={e => setItem(i, 'name', e.target.value)} style={inp} />
-              <input type="number" value={item.price || ''} placeholder="0.00"
-                onChange={e => setItem(i, 'price', e.target.value)} style={inp} />
-              <input value={item.description || ''} placeholder="Optional"
-                onChange={e => setItem(i, 'description', e.target.value)} style={inp} />
-              <button type="button" onClick={() => setItems(p => p.filter((_, j) => j !== i))}
-                style={{ width: 30, height: 30, background: '#ffebee', color: '#c62828', border: 'none', borderRadius: 6, cursor: 'pointer', fontSize: 16 }}>×</button>
+          {/* Add new item row */}
+          <div style={{ background: '#f3e5f5', borderRadius: 12, padding: 16, border: '2px dashed #ce93d8' }}>
+            <div style={{ fontWeight: 700, color: '#6a1b9a', marginBottom: 12, fontSize: 14 }}>➕ Add New Item</div>
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 110px 1fr', gap: 8, marginBottom: 12 }}>
+              <div>
+                <label style={{ fontSize: 11, fontWeight: 700, color: '#555', display: 'block', marginBottom: 3 }}>Item Name *</label>
+                <input value={newItem.name} onChange={e => setNewItem(n => ({ ...n, name: e.target.value }))}
+                  placeholder="e.g. Haircut, Oil Change, Biryani…" style={inp}
+                  onKeyDown={e => e.key === 'Enter' && addItem()} />
+              </div>
+              <div>
+                <label style={{ fontSize: 11, fontWeight: 700, color: '#555', display: 'block', marginBottom: 3 }}>Price (₹)</label>
+                <input type="number" value={newItem.price} onChange={e => setNewItem(n => ({ ...n, price: e.target.value }))}
+                  placeholder="0.00" style={inp} />
+              </div>
+              <div>
+                <label style={{ fontSize: 11, fontWeight: 700, color: '#555', display: 'block', marginBottom: 3 }}>Description</label>
+                <input value={newItem.description} onChange={e => setNewItem(n => ({ ...n, description: e.target.value }))}
+                  placeholder="Optional details" style={inp} />
+              </div>
             </div>
-          ))}
-
-          <div style={{ display: 'flex', gap: 12, marginTop: 14, alignItems: 'center', flexWrap: 'wrap' }}>
-            {items.length < 25 && (
-              <button type="button" onClick={() => setItems(p => [...p, { name: '', price: '', description: '' }])}
-                style={{ padding: '8px 18px', background: '#6a1b9a', color: '#fff', border: 'none', borderRadius: 8, cursor: 'pointer', fontWeight: 600, fontSize: 13 }}>
-                + Add Item
-              </button>
-            )}
-            <button type="button" onClick={save} disabled={saving}
-              style={{ padding: '8px 22px', background: saving ? '#aaa' : '#e65100', color: '#fff', border: 'none', borderRadius: 8, cursor: saving ? 'not-allowed' : 'pointer', fontWeight: 700, fontSize: 13 }}>
-              {saving ? 'Saving…' : '💾 Save Catalog'}
+            <button onClick={addItem} disabled={adding}
+              style={{ padding: '9px 24px', background: adding ? '#aaa' : '#6a1b9a', color: '#fff', border: 'none', borderRadius: 8, cursor: adding ? 'not-allowed' : 'pointer', fontWeight: 700, fontSize: 14 }}>
+              {adding ? 'Adding…' : '+ Add to Catalog'}
             </button>
-            <span style={{ fontSize: 12, color: '#aaa' }}>{items.filter(x => x.name?.trim()).length}/25 items</span>
           </div>
         </>
       )}
-      {loading && <p style={{ color: '#aaa' }}>Loading…</p>}
     </div>
   );
 }

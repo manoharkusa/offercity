@@ -191,28 +191,55 @@ router.get('/:id/catalog', async (req, res) => {
   } catch (err) { res.status(500).json({ message: err.message }); }
 });
 
-// PUT /api/shops/:id/catalog — replace entire catalog (owner or admin)
-router.put('/:id/catalog', protect, requireRole('shop_owner', 'admin'), async (req, res) => {
-  const { items } = req.body; // [{ name, price, description }]
-  if (!Array.isArray(items)) return res.status(400).json({ message: 'items array required' });
-  if (items.length > 25) return res.status(400).json({ message: 'Maximum 25 catalog items allowed' });
+// Helper: verify shop ownership
+async function ownsShop(pool, shopId, user) {
+  const [rows] = await pool.query('SELECT owner_id FROM shops WHERE id = ?', [shopId]);
+  if (!rows.length) return null;
+  if (user.role === 'admin' || rows[0].owner_id === user.id) return rows[0];
+  return null;
+}
+
+// POST /api/shops/:id/catalog — add a single item
+router.post('/:id/catalog', protect, requireRole('shop_owner', 'admin'), async (req, res) => {
+  const { name, price, description } = req.body;
+  if (!name?.trim()) return res.status(400).json({ message: 'Item name is required' });
   try {
     const pool = getPool();
-    const [rows] = await pool.query('SELECT owner_id FROM shops WHERE id = ?', [req.params.id]);
-    if (!rows.length) return res.status(404).json({ message: 'Shop not found' });
-    if (req.user.role !== 'admin' && rows[0].owner_id !== req.user.id)
+    if (!await ownsShop(pool, req.params.id, req.user))
       return res.status(403).json({ message: 'Not your shop' });
+    const [[{ n }]] = await pool.query('SELECT COUNT(*) AS n FROM shop_catalog WHERE shop_id = ?', [req.params.id]);
+    const [r] = await pool.query(
+      'INSERT INTO shop_catalog (shop_id, name, price, description, sort_order) VALUES (?, ?, ?, ?, ?)',
+      [req.params.id, name.trim(), price || null, description?.trim() || null, n]
+    );
+    res.status(201).json({ id: r.insertId, name: name.trim(), price: price || null, description: description?.trim() || null, sort_order: n });
+  } catch (err) { res.status(500).json({ message: err.message }); }
+});
 
-    await pool.query('DELETE FROM shop_catalog WHERE shop_id = ?', [req.params.id]);
-    for (let i = 0; i < items.length; i++) {
-      const { name, price, description } = items[i];
-      if (!name?.trim()) continue;
-      await pool.query(
-        'INSERT INTO shop_catalog (shop_id, name, price, description, sort_order) VALUES (?, ?, ?, ?, ?)',
-        [req.params.id, name.trim(), price || null, description?.trim() || null, i]
-      );
-    }
-    res.json({ ok: true, saved: items.length });
+// PUT /api/shops/:id/catalog/:itemId — update a single item in-place
+router.put('/:id/catalog/:itemId', protect, requireRole('shop_owner', 'admin'), async (req, res) => {
+  const { name, price, description } = req.body;
+  if (!name?.trim()) return res.status(400).json({ message: 'Item name is required' });
+  try {
+    const pool = getPool();
+    if (!await ownsShop(pool, req.params.id, req.user))
+      return res.status(403).json({ message: 'Not your shop' });
+    await pool.query(
+      'UPDATE shop_catalog SET name=?, price=?, description=? WHERE id=? AND shop_id=?',
+      [name.trim(), price || null, description?.trim() || null, req.params.itemId, req.params.id]
+    );
+    res.json({ ok: true });
+  } catch (err) { res.status(500).json({ message: err.message }); }
+});
+
+// DELETE /api/shops/:id/catalog/:itemId — remove a single item
+router.delete('/:id/catalog/:itemId', protect, requireRole('shop_owner', 'admin'), async (req, res) => {
+  try {
+    const pool = getPool();
+    if (!await ownsShop(pool, req.params.id, req.user))
+      return res.status(403).json({ message: 'Not your shop' });
+    await pool.query('DELETE FROM shop_catalog WHERE id=? AND shop_id=?', [req.params.itemId, req.params.id]);
+    res.json({ ok: true });
   } catch (err) { res.status(500).json({ message: err.message }); }
 });
 
