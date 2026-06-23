@@ -100,8 +100,14 @@ jobs:
 
               # 2. Kill any stuck node process and reset Passenger crash protection
               sh(f"pkill -u {USER} -f 'node.*server.js' && echo 'killed node server.js' || echo 'no node server.js found'", "kill stuck process")
-              # Touch restart.txt — tells Passenger to spawn a fresh worker (resets crash protection)
-              sh(f"mkdir -p {HOME}/public_html/tmp && touch {HOME}/public_html/tmp/restart.txt && echo 'Passenger restart.txt touched'", "passenger restart signal")
+              # Touch restart.txt AND always_restart.txt — forces Passenger to bypass crash protection
+              sh(
+                  f"mkdir -p {HOME}/public_html/tmp && "
+                  f"touch {HOME}/public_html/tmp/restart.txt && "
+                  f"touch {HOME}/public_html/tmp/always_restart.txt && "
+                  f"echo 'Passenger restart signals sent'",
+                  "passenger restart signal"
+              )
               time.sleep(6)
 
               # 3. Wait up to 90s for Passenger to spawn a fresh worker

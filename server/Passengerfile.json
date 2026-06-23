@@ -2,5 +2,5 @@
   "startup_file": "server.js",
   "environment": "production",
   "max_pool_size": 1,
-  "startup_timeout": 120
+  "startup_timeout": 180
 }
