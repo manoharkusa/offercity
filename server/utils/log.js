@@ -1,6 +1,8 @@
-const fs = require('fs');
+const fs   = require('fs');
+const path = require('path');
 
-const LOG_FILE = '/home1/a1751tyi/node.log';
+// Same file as flog() in server.js — next to server.js at public_html/server/node.log
+const LOG_FILE = path.join(__dirname, '..', 'node.log');
 const MAX_BYTES = 2 * 1024 * 1024; // rotate at 2 MB
 
 function write(level, ...args) {

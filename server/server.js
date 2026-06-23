@@ -35,17 +35,21 @@ try {
 
 flog('INFO', 'Loading express...');
 const express = require('express');
+flog('INFO', 'express OK');
 const cors    = require('cors');
+flog('INFO', 'cors OK');
 const path    = require('path');
+flog('INFO', 'path OK');
 
 // Write PID so start_node.sh can kill us cleanly next restart
 try { fs.writeFileSync('/home1/a1751tyi/node.pid', String(process.pid)); } catch (_) {}
 
-log.info('Loading DB module...');
+flog('INFO', 'Loading DB module...');
 const { connectDB } = require('./config/db');
-log.info('Loading seed module...');
+flog('INFO', 'DB module OK');
+flog('INFO', 'Loading seed module...');
 const seed = require('./seed');
-log.info('Core modules loaded.');
+flog('INFO', 'Core modules loaded.');
 
 const app = express();
 
@@ -135,7 +139,7 @@ app.post('/api/deploy-restart', (req, res) => {
 
 // ── Logs endpoint ─────────────────────────────────────────────────────────────
 app.get('/api/logs', (req, res) => {
-  const logFile = '/home1/a1751tyi/node.log';
+  const logFile = LOG_FILE;
   try {
     const data  = fs.readFileSync(logFile, 'utf8');
     const lines = data.split('\n').filter(Boolean).slice(-200);
