@@ -180,4 +180,21 @@ router.put('/:id', protect, requireRole('shop_owner', 'admin'), upload.single('i
   }
 });
 
+// PUT /api/shops/:id/location — shop owner saves their GPS coordinates
+router.put('/:id/location', protect, requireRole('shop_owner', 'admin'), async (req, res) => {
+  const { lat, lng } = req.body;
+  if (!lat || !lng) return res.status(400).json({ message: 'lat and lng required' });
+  try {
+    const pool = getPool();
+    const [rows] = await pool.query('SELECT owner_id FROM shops WHERE id = ?', [req.params.id]);
+    if (!rows.length) return res.status(404).json({ message: 'Shop not found' });
+    if (req.user.role !== 'admin' && rows[0].owner_id !== req.user.id)
+      return res.status(403).json({ message: 'Not your shop' });
+    await pool.query('UPDATE shops SET lat = ?, lng = ? WHERE id = ?', [lat, lng, req.params.id]);
+    res.json({ ok: true, lat, lng });
+  } catch (err) {
+    res.status(500).json({ message: err.message });
+  }
+});
+
 module.exports = router;

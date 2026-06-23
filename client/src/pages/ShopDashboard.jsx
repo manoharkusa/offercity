@@ -578,7 +578,35 @@ export default function ShopDashboard() {
                           🔗 View Page
                         </a>
                       </div>
-                      <div className="shop-share-row" style={{ background:'#fff8f0', border:'1px solid #ffe0b2', borderRadius:8, padding:'10px 14px', marginTop:14, display:'flex', alignItems:'center', gap:10, flexWrap:'wrap' }}>
+                      {/* Location pin row */}
+                      <div style={{ display:'flex', alignItems:'center', gap:10, marginTop:10, flexWrap:'wrap' }}>
+                        {s.lat && s.lng ? (
+                          <span style={{ fontSize:12, color:'#2e7d32', background:'#e8f5e9', borderRadius:8, padding:'4px 10px', fontWeight:600 }}>
+                            📍 Location set — customers will get proximity alerts
+                          </span>
+                        ) : (
+                          <span style={{ fontSize:12, color:'#e65100', background:'#fff3e0', borderRadius:8, padding:'4px 10px', fontWeight:600 }}>
+                            ⚠️ No location — customers won't get nearby alerts
+                          </span>
+                        )}
+                        <button onClick={async () => {
+                          if (!navigator.geolocation) { flash('Geolocation not supported', 'err'); return; }
+                          flash('📍 Detecting your location…');
+                          navigator.geolocation.getCurrentPosition(async ({ coords }) => {
+                            try {
+                              await api.put(`/shops/${s.id}/location`, { lat: coords.latitude, lng: coords.longitude });
+                              setShops(prev => prev.map(x => x.id === s.id ? { ...x, lat: coords.latitude, lng: coords.longitude } : x));
+                              flash('✅ Shop location saved! Proximity alerts are now active.');
+                            } catch { flash('Failed to save location', 'err'); }
+                          }, () => flash('Could not detect location. Allow location access and try again.', 'err'),
+                          { enableHighAccuracy: true, timeout: 10000 });
+                        }}
+                          style={{ padding:'6px 14px', background:'#1565c0', color:'#fff', border:'none', borderRadius:8, cursor:'pointer', fontSize:12, fontWeight:600 }}>
+                          {s.lat ? '🔄 Update Location' : '📍 Set My Shop Location'}
+                        </button>
+                      </div>
+
+                      <div className="shop-share-row" style={{ background:'#fff8f0', border:'1px solid #ffe0b2', borderRadius:8, padding:'10px 14px', marginTop:10, display:'flex', alignItems:'center', gap:10, flexWrap:'wrap' }}>
                         <span style={{ fontSize:13, color:'#555', flex:1, wordBreak:'break-all', minWidth:0 }}>📲 <span style={{ color:'#e65100' }}>{link}</span></span>
                         <button onClick={() => { navigator.clipboard.writeText(link); flash('Link copied!'); }}
                           style={{ padding:'8px 16px', background:'#e65100', color:'#fff', border:'none', borderRadius:6, cursor:'pointer', fontSize:13, fontWeight:600 }}>📋 Copy</button>
