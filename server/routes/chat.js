@@ -59,9 +59,18 @@ router.post('/ask', async (req, res) => {
 
     let reply = null;
     if (process.env.ANTHROPIC_API_KEY) {
-      reply = await callClaudeAI(systemPrompt, messages);
-    } else {
+      try {
+        reply = await callClaudeAI(systemPrompt, messages);
+      } catch (claudeErr) {
+        console.error('[CHAT] Claude failed, trying Groq:', claudeErr.message);
+        if (process.env.GROQ_API_KEY) {
+          reply = await callGroqAI(systemPrompt, messages);
+        }
+      }
+    } else if (process.env.GROQ_API_KEY) {
       reply = await callGroqAI(systemPrompt, messages);
+    } else {
+      return res.status(503).json({ message: 'AI service not configured on server.' });
     }
 
     if (!reply || reply.trim().toUpperCase() === 'SKIP') {
