@@ -352,11 +352,18 @@ function callClaudeAI_multi(systemPrompt, messages) {
       const chunks = [];
       res.on('data', c => chunks.push(c));
       res.on('end', () => {
-        try { resolve(JSON.parse(Buffer.concat(chunks).toString('utf8')).content?.[0]?.text?.trim() || ''); }
-        catch (e) { reject(e); }
+        try {
+          const parsed = JSON.parse(Buffer.concat(chunks).toString('utf8'));
+          if (res.statusCode >= 400) {
+            console.error(`[CHAT] Claude HTTP ${res.statusCode}:`, JSON.stringify(parsed));
+            return reject(new Error(`Claude API error ${res.statusCode}: ${parsed.error?.message || 'unknown'}`));
+          }
+          resolve(parsed.content?.[0]?.text?.trim() || '');
+        } catch (e) { reject(e); }
       });
     });
-    req.on('error', reject); req.write(body); req.end();
+    req.on('error', e => { console.error('[CHAT] Claude network error:', e.message); reject(e); });
+    req.write(body); req.end();
   });
 }
 
