@@ -6,8 +6,8 @@ const { protect } = require('../middleware/auth');
 
 const router = express.Router();
 
-const signToken = (id) =>
-  jwt.sign({ id }, process.env.JWT_SECRET, { expiresIn: '7d' });
+const signToken = (user) =>
+  jwt.sign({ id: user.id, name: user.name, email: user.email, role: user.role }, process.env.JWT_SECRET, { expiresIn: '7d' });
 
 router.post('/register', async (req, res) => {
   const { name, email, password, role } = req.body;
@@ -23,7 +23,7 @@ router.post('/register', async (req, res) => {
       'INSERT INTO users (name, email, password, role) VALUES (?, ?, ?, ?)',
       [name, email, hashed, userRole]
     );
-    const token = signToken(result.insertId);
+    const token = signToken({ id: result.insertId, name, email, role: userRole });
     res.status(201).json({ token, user: { id: result.insertId, name, email, role: userRole } });
   } catch (err) {
     res.status(500).json({ message: err.message });
@@ -47,7 +47,7 @@ router.post('/login', async (req, res) => {
         pool.query('UPDATE users SET password=? WHERE id=?', [h, user.id])
       ).catch(() => {});
     }
-    const token = signToken(user.id);
+    const token = signToken(user);
     res.json({ token, user: { id: user.id, name: user.name, email: user.email, role: user.role } });
   } catch (err) {
     res.status(500).json({ message: err.message });

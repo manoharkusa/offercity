@@ -1,7 +1,7 @@
 const jwt = require('jsonwebtoken');
 const { getPool } = require('../config/db');
 
-const protect = async (req, res, next) => {
+const protect = (req, res, next) => {
   const header = req.headers.authorization;
   if (!header || !header.startsWith('Bearer '))
     return res.status(401).json({ message: 'Not authorized' });
@@ -9,13 +9,8 @@ const protect = async (req, res, next) => {
   try {
     const token = header.split(' ')[1];
     const decoded = jwt.verify(token, process.env.JWT_SECRET);
-    const pool = getPool();
-    const [rows] = await pool.query(
-      'SELECT id, name, email, role FROM users WHERE id = ?',
-      [decoded.id]
-    );
-    if (rows.length === 0) return res.status(401).json({ message: 'User not found' });
-    req.user = rows[0];
+    // User data is embedded in the JWT — no DB round-trip needed per request
+    req.user = { id: decoded.id, name: decoded.name, email: decoded.email, role: decoded.role };
     next();
   } catch (err) {
     res.status(401).json({ message: 'Invalid token' });
