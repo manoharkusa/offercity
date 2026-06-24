@@ -2,6 +2,7 @@ const express = require('express');
 const bcrypt  = require('bcryptjs');
 const { getPool } = require('../config/db');
 const { protect, requireRole } = require('../middleware/auth');
+const log = require('../utils/log');
 
 const router = express.Router();
 
@@ -17,6 +18,7 @@ router.get('/stats', async (req, res) => {
     const [[{ reviews }]] = await pool.query('SELECT COUNT(*) AS reviews FROM reviews');
     res.json({ users, shops, offers, reviews });
   } catch (err) {
+    log.error('[admin] error:', err.message, err.stack);
     res.status(500).json({ message: err.message });
   }
 });
@@ -29,6 +31,7 @@ router.get('/users', async (req, res) => {
     );
     res.json(users);
   } catch (err) {
+    log.error('[admin] error:', err.message, err.stack);
     res.status(500).json({ message: err.message });
   }
 });
@@ -39,6 +42,7 @@ router.delete('/users/:id', async (req, res) => {
     await getPool().query('DELETE FROM users WHERE id = ?', [req.params.id]);
     res.json({ message: 'User deleted' });
   } catch (err) {
+    log.error('[admin] error:', err.message, err.stack);
     res.status(500).json({ message: err.message });
   }
 });
@@ -52,6 +56,7 @@ router.get('/shops', async (req, res) => {
     );
     res.json(shops);
   } catch (err) {
+    log.error('[admin] error:', err.message, err.stack);
     res.status(500).json({ message: err.message });
   }
 });
@@ -62,6 +67,7 @@ router.delete('/shops/:id', async (req, res) => {
     await getPool().query('DELETE FROM shops WHERE id = ?', [req.params.id]);
     res.json({ message: 'Shop deleted' });
   } catch (err) {
+    log.error('[admin] error:', err.message, err.stack);
     res.status(500).json({ message: err.message });
   }
 });
@@ -75,6 +81,7 @@ router.get('/offers', async (req, res) => {
     );
     res.json(offers);
   } catch (err) {
+    log.error('[admin] error:', err.message, err.stack);
     res.status(500).json({ message: err.message });
   }
 });
@@ -88,6 +95,7 @@ router.put('/users/:id/role', async (req, res) => {
     await getPool().query('UPDATE users SET role = ? WHERE id = ?', [role, req.params.id]);
     res.json({ message: 'Role updated' });
   } catch (err) {
+    log.error('[admin] error:', err.message, err.stack);
     res.status(500).json({ message: err.message });
   }
 });
@@ -141,6 +149,7 @@ router.get('/bdos', async (req, res) => {
     }
     res.json(bdos);
   } catch (err) {
+    log.error('[admin] error:', err.message, err.stack);
     res.status(500).json({ message: err.message });
   }
 });
@@ -159,6 +168,7 @@ router.put('/bdos/:id/areas', async (req, res) => {
     }
     res.json({ message: 'Areas updated' });
   } catch (err) {
+    log.error('[admin] error:', err.message, err.stack);
     res.status(500).json({ message: err.message });
   }
 });
@@ -169,6 +179,7 @@ router.delete('/bdos/:id', async (req, res) => {
     await getPool().query("DELETE FROM users WHERE id = ? AND role = 'bdo'", [req.params.id]);
     res.json({ message: 'BDO deleted' });
   } catch (err) {
+    log.error('[admin] error:', err.message, err.stack);
     res.status(500).json({ message: err.message });
   }
 });
@@ -191,6 +202,7 @@ router.get('/shops/pending', async (req, res) => {
     );
     res.json(shops);
   } catch (err) {
+    log.error('[admin] error:', err.message, err.stack);
     res.status(500).json({ message: err.message });
   }
 });
@@ -227,6 +239,7 @@ router.put('/shops/:id/approve', async (req, res) => {
       }
     });
   } catch (err) {
+    log.error('[admin] error:', err.message, err.stack);
     res.status(500).json({ message: err.message });
   }
 });
@@ -242,6 +255,7 @@ router.put('/shops/:id/reject', async (req, res) => {
     );
     res.json({ message: 'Shop rejected.' });
   } catch (err) {
+    log.error('[admin] error:', err.message, err.stack);
     res.status(500).json({ message: err.message });
   }
 });

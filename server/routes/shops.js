@@ -3,6 +3,7 @@ const multer = require('multer');
 const path = require('path');
 const { getPool } = require('../config/db');
 const { protect, requireRole } = require('../middleware/auth');
+const log = require('../utils/log');
 
 const router = express.Router();
 
@@ -58,6 +59,7 @@ router.get('/owner/mine', protect, requireRole('shop_owner', 'admin'), async (re
     );
     res.json(shops);
   } catch (err) {
+    log.error('[shops] error:', err.message, err.stack);
     res.status(500).json({ message: err.message });
   }
 });
@@ -71,6 +73,7 @@ router.get('/slug/:slug', async (req, res) => {
     const detail = await shopDetail(pool, rows[0].id);
     res.json(detail);
   } catch (err) {
+    log.error('[shops] error:', err.message, err.stack);
     res.status(500).json({ message: err.message });
   }
 });
@@ -106,6 +109,7 @@ router.get('/', async (req, res) => {
     const [shops] = await pool.query(query, params);
     res.json(shops);
   } catch (err) {
+    log.error('[shops] error:', err.message, err.stack);
     res.status(500).json({ message: err.message });
   }
 });
@@ -118,6 +122,7 @@ router.get('/:id', async (req, res) => {
     if (!detail) return res.status(404).json({ message: 'Shop not found' });
     res.json(detail);
   } catch (err) {
+    log.error('[shops] error:', err.message, err.stack);
     res.status(500).json({ message: err.message });
   }
 });
@@ -147,6 +152,7 @@ router.post('/', protect, requireRole('shop_owner', 'admin'), upload.single('ima
     const [rows] = await pool.query('SELECT * FROM shops WHERE id = ?', [result.insertId]);
     res.status(201).json(rows[0]);
   } catch (err) {
+    log.error('[shops] error:', err.message, err.stack);
     res.status(500).json({ message: err.message });
   }
 });
@@ -176,6 +182,7 @@ router.put('/:id', protect, requireRole('shop_owner', 'admin'), upload.single('i
     const [updated] = await pool.query('SELECT * FROM shops WHERE id = ?', [req.params.id]);
     res.json(updated[0]);
   } catch (err) {
+    log.error('[shops] error:', err.message, err.stack);
     res.status(500).json({ message: err.message });
   }
 });
@@ -188,7 +195,7 @@ router.get('/:id/catalog', async (req, res) => {
       [req.params.id]
     );
     res.json(rows);
-  } catch (err) { res.status(500).json({ message: err.message }); }
+  } catch (err) { log.error('[shops] error:', err.message); res.status(500).json({ message: err.message }); }
 });
 
 // Helper: verify shop ownership
@@ -213,7 +220,7 @@ router.post('/:id/catalog', protect, requireRole('shop_owner', 'admin'), async (
       [req.params.id, name.trim(), price || null, description?.trim() || null, n]
     );
     res.status(201).json({ id: r.insertId, name: name.trim(), price: price || null, description: description?.trim() || null, sort_order: n });
-  } catch (err) { res.status(500).json({ message: err.message }); }
+  } catch (err) { log.error('[shops] error:', err.message); res.status(500).json({ message: err.message }); }
 });
 
 // PUT /api/shops/:id/catalog/:itemId — update a single item in-place
@@ -229,7 +236,7 @@ router.put('/:id/catalog/:itemId', protect, requireRole('shop_owner', 'admin'), 
       [name.trim(), price || null, description?.trim() || null, req.params.itemId, req.params.id]
     );
     res.json({ ok: true });
-  } catch (err) { res.status(500).json({ message: err.message }); }
+  } catch (err) { log.error('[shops] error:', err.message); res.status(500).json({ message: err.message }); }
 });
 
 // DELETE /api/shops/:id/catalog/:itemId — remove a single item
@@ -240,7 +247,7 @@ router.delete('/:id/catalog/:itemId', protect, requireRole('shop_owner', 'admin'
       return res.status(403).json({ message: 'Not your shop' });
     await pool.query('DELETE FROM shop_catalog WHERE id=? AND shop_id=?', [req.params.itemId, req.params.id]);
     res.json({ ok: true });
-  } catch (err) { res.status(500).json({ message: err.message }); }
+  } catch (err) { log.error('[shops] error:', err.message); res.status(500).json({ message: err.message }); }
 });
 
 // PUT /api/shops/:id/location — shop owner saves their GPS coordinates
@@ -256,6 +263,7 @@ router.put('/:id/location', protect, requireRole('shop_owner', 'admin'), async (
     await pool.query('UPDATE shops SET lat = ?, lng = ? WHERE id = ?', [lat, lng, req.params.id]);
     res.json({ ok: true, lat, lng });
   } catch (err) {
+    log.error('[shops] error:', err.message, err.stack);
     res.status(500).json({ message: err.message });
   }
 });

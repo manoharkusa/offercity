@@ -2,6 +2,7 @@ const express = require('express');
 const { getPool } = require('../config/db');
 const { protect, requireRole } = require('../middleware/auth');
 const { sendNearby } = require('../services/push');
+const log = require('../utils/log');
 
 const router = express.Router();
 
@@ -28,7 +29,6 @@ router.post('/', protect, async (req, res) => {
       [offer_id, req.user.id, offer.shop_id, req.user.name, eta_minutes, expires_at, eta_minutes, expires_at]
     );
 
-    // Push notification targeting the shop's location (0.5 km) — reaches the shop owner's device
     try {
       await sendNearby(
         offer.lat, offer.lng, 0.5,
@@ -38,13 +38,15 @@ router.post('/', protect, async (req, res) => {
       );
     } catch (_) {}
 
+    log.info(`[coming] user=${req.user.id} offer=${offer_id} eta=${eta_minutes}min`);
     res.json({ message: 'Confirmed! Shop notified.', eta_minutes, expires_at });
   } catch (err) {
+    log.error('[coming] POST error:', err.message, err.stack);
     res.status(500).json({ message: err.message });
   }
 });
 
-// GET /api/coming/mine  — user sees their active reservations
+// GET /api/coming/mine
 router.get('/mine', protect, async (req, res) => {
   try {
     const [rows] = await getPool().query(
@@ -58,6 +60,7 @@ router.get('/mine', protect, async (req, res) => {
     );
     res.json(rows);
   } catch (err) {
+    log.error('[coming] GET /mine error:', err.message, err.stack);
     res.status(500).json({ message: err.message });
   }
 });
@@ -67,7 +70,7 @@ router.get('/shop', protect, requireRole('shop_owner', 'admin'), async (req, res
   const { shop_id } = req.query;
   try {
     const pool = getPool();
-    let query = `
+    const query = `
       SELECT ic.*, o.title AS offer_title, o.discount
       FROM im_coming ic
       JOIN offers o ON o.id = ic.offer_id
@@ -80,16 +83,19 @@ router.get('/shop', protect, requireRole('shop_owner', 'admin'), async (req, res
     const [rows] = await pool.query(query, params);
     res.json(rows);
   } catch (err) {
+    log.error('[coming] GET /shop error:', err.message, err.stack);
     res.status(500).json({ message: err.message });
   }
 });
 
-// PUT /api/coming/:id/arrived  — shop owner marks customer arrived
+// PUT /api/coming/:id/arrived
 router.put('/:id/arrived', protect, requireRole('shop_owner', 'admin'), async (req, res) => {
   try {
     await getPool().query("UPDATE im_coming SET status='arrived' WHERE id=?", [req.params.id]);
+    log.info(`[coming] arrived id=${req.params.id}`);
     res.json({ message: 'Marked as arrived' });
   } catch (err) {
+    log.error('[coming] PUT /arrived error:', err.message, err.stack);
     res.status(500).json({ message: err.message });
   }
 });
@@ -103,6 +109,7 @@ router.delete('/:id', protect, async (req, res) => {
     );
     res.json({ message: 'Cancelled' });
   } catch (err) {
+    log.error('[coming] DELETE error:', err.message, err.stack);
     res.status(500).json({ message: err.message });
   }
 });

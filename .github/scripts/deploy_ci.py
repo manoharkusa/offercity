@@ -198,6 +198,13 @@ else:
         "graceful restart"
     )
     time.sleep(2)
+
+    # Flush logs before restarting — clean slate so post-deploy logs only show new server
+    sh(
+        f"truncate -s 0 {HOME_REMOTE}/public_html/server/node.log 2>/dev/null && echo 'node.log flushed' || echo 'node.log not found (OK)'",
+        "flush logs"
+    )
+
     # Always touch always_restart.txt — bypasses Passenger crash protection
     sh(
         f"mkdir -p {HOME_REMOTE}/public_html/tmp && "

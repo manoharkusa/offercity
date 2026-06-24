@@ -5,6 +5,7 @@ const multer  = require('multer');
 const path    = require('path');
 const { getPool } = require('../config/db');
 const { protect, requireRole } = require('../middleware/auth');
+const log = require('../utils/log');
 
 const router = express.Router();
 const bdoOnly = [protect, requireRole('bdo')];
@@ -32,6 +33,7 @@ router.post('/login', async (req, res) => {
     const token = jwt.sign({ id: bdo.id }, process.env.JWT_SECRET, { expiresIn: '7d' });
     res.json({ token, user: { id: bdo.id, name: bdo.name, email: bdo.email, role: 'bdo' } });
   } catch (err) {
+    log.error('[bdo] error:', err.message, err.stack);
     res.status(500).json({ message: err.message });
   }
 });
@@ -46,6 +48,7 @@ router.get('/me', ...bdoOnly, async (req, res) => {
     );
     res.json({ ...req.user, areas });
   } catch (err) {
+    log.error('[bdo] error:', err.message, err.stack);
     res.status(500).json({ message: err.message });
   }
 });
@@ -65,6 +68,7 @@ router.get('/stats', ...bdoOnly, async (req, res) => {
     const [[{ rejected }]] = await pool.query(`SELECT COUNT(*) AS rejected FROM shops WHERE pin_code IN (${placeholders}) AND status='rejected'`, pins);
     res.json({ pending, approved, rejected, total: pending + approved + rejected });
   } catch (err) {
+    log.error('[bdo] error:', err.message, err.stack);
     res.status(500).json({ message: err.message });
   }
 });
@@ -90,6 +94,7 @@ router.get('/shops', ...bdoOnly, async (req, res) => {
     );
     res.json(shops);
   } catch (err) {
+    log.error('[bdo] error:', err.message, err.stack);
     res.status(500).json({ message: err.message });
   }
 });
@@ -113,6 +118,7 @@ router.put('/shops/:id/approve', ...bdoOnly, async (req, res) => {
     );
     res.json({ message: 'Shop approved and now live' });
   } catch (err) {
+    log.error('[bdo] error:', err.message, err.stack);
     res.status(500).json({ message: err.message });
   }
 });
@@ -137,6 +143,7 @@ router.put('/shops/:id/reject', ...bdoOnly, async (req, res) => {
     );
     res.json({ message: 'Shop rejected' });
   } catch (err) {
+    log.error('[bdo] error:', err.message, err.stack);
     res.status(500).json({ message: err.message });
   }
 });
@@ -229,6 +236,7 @@ router.post('/register-shop', ...bdoOnly, registerFields, async (req, res) => {
       owner_id: ownerId,
     });
   } catch (err) {
+    log.error('[bdo] error:', err.message, err.stack);
     res.status(500).json({ message: err.message });
   }
 });
@@ -246,6 +254,7 @@ router.get('/my-shops', ...bdoOnly, async (req, res) => {
     );
     res.json(shops);
   } catch (err) {
+    log.error('[bdo] error:', err.message, err.stack);
     res.status(500).json({ message: err.message });
   }
 });

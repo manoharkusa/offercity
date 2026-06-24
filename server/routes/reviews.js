@@ -1,6 +1,7 @@
 const express = require('express');
 const { getPool } = require('../config/db');
 const { protect } = require('../middleware/auth');
+const log = require('../utils/log');
 
 const router = express.Router();
 
@@ -26,8 +27,10 @@ router.post('/:shopId', protect, async (req, res) => {
        JOIN users u ON u.id = r.user_id WHERE r.id = ?`,
       [result.insertId]
     );
+    log.info(`[reviews] new review shop=${req.params.shopId} user=${req.user.id} rating=${rating}`);
     res.status(201).json(rows[0]);
   } catch (err) {
+    log.error('[reviews] POST error:', err.message, err.stack);
     res.status(500).json({ message: err.message });
   }
 });
@@ -43,6 +46,7 @@ router.get('/:shopId', async (req, res) => {
     );
     res.json(reviews);
   } catch (err) {
+    log.error('[reviews] GET error:', err.message, err.stack);
     res.status(500).json({ message: err.message });
   }
 });

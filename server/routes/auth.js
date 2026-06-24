@@ -3,6 +3,7 @@ const bcrypt = require('bcryptjs');
 const jwt = require('jsonwebtoken');
 const { getPool } = require('../config/db');
 const { protect } = require('../middleware/auth');
+const log = require('../utils/log');
 
 const router = express.Router();
 
@@ -23,9 +24,11 @@ router.post('/register', async (req, res) => {
       'INSERT INTO users (name, email, password, role) VALUES (?, ?, ?, ?)',
       [name, email, hashed, userRole]
     );
+    log.info(`[auth] register OK: ${email} role=${userRole} id=${result.insertId}`);
     const token = signToken({ id: result.insertId, name, email, role: userRole });
     res.status(201).json({ token, user: { id: result.insertId, name, email, role: userRole } });
   } catch (err) {
+    log.error('[auth] register error:', err.message, err.stack);
     res.status(500).json({ message: err.message });
   }
 });
@@ -36,10 +39,16 @@ router.post('/login', async (req, res) => {
   try {
     const pool = getPool();
     const [rows] = await pool.query('SELECT * FROM users WHERE email = ?', [email]);
-    if (rows.length === 0) return res.status(401).json({ message: 'Invalid credentials' });
+    if (rows.length === 0) {
+      log.warn(`[auth] login failed — no user: ${email}`);
+      return res.status(401).json({ message: 'Invalid credentials' });
+    }
     const user = rows[0];
     const match = await bcrypt.compare(password, user.password);
-    if (!match) return res.status(401).json({ message: 'Invalid credentials' });
+    if (!match) {
+      log.warn(`[auth] login failed — wrong password: ${email}`);
+      return res.status(401).json({ message: 'Invalid credentials' });
+    }
     // Re-hash with lower cost factor if stored hash uses cost > 8 (speeds up future logins)
     const costMatch = user.password.match(/^\$2[ab]?\$(\d+)\$/);
     if (costMatch && parseInt(costMatch[1]) > 8) {
@@ -47,9 +56,11 @@ router.post('/login', async (req, res) => {
         pool.query('UPDATE users SET password=? WHERE id=?', [h, user.id])
       ).catch(() => {});
     }
+    log.info(`[auth] login OK: ${email} role=${user.role} id=${user.id}`);
     const token = signToken(user);
     res.json({ token, user: { id: user.id, name: user.name, email: user.email, role: user.role } });
   } catch (err) {
+    log.error('[auth] login error:', err.message, err.stack);
     res.status(500).json({ message: err.message });
   }
 });
@@ -72,6 +83,7 @@ router.get('/me', protect, async (req, res) => {
     );
     res.json({ ...rows[0], savedOffers: saved });
   } catch (err) {
+    log.error('[auth] GET /me error:', err.message, err.stack);
     res.status(500).json({ message: err.message });
   }
 });
@@ -82,6 +94,7 @@ router.put('/location', protect, async (req, res) => {
     await getPool().query('UPDATE users SET lat = ?, lng = ? WHERE id = ?', [lat, lng, req.user.id]);
     res.json({ message: 'Location updated' });
   } catch (err) {
+    log.error('[auth] PUT /location error:', err.message, err.stack);
     res.status(500).json({ message: err.message });
   }
 });
@@ -102,6 +115,7 @@ router.post('/save-offer/:offerId', protect, async (req, res) => {
       [req.user.id, req.params.offerId]);
     res.json({ saved: true });
   } catch (err) {
+    log.error('[auth] save-offer error:', err.message, err.stack);
     res.status(500).json({ message: err.message });
   }
 });

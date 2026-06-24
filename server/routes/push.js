@@ -1,6 +1,7 @@
 const express = require('express');
 const router  = express.Router();
 const { getPool } = require('../config/db');
+const log = require('../utils/log');
 
 // GET /api/push/vapid-key
 router.get('/vapid-key', (req, res) => {
@@ -9,7 +10,7 @@ router.get('/vapid-key', (req, res) => {
   res.json({ publicKey: key });
 });
 
-// POST /api/push/subscribe  — save browser push subscription + user location
+// POST /api/push/subscribe
 router.post('/subscribe', async (req, res) => {
   const { endpoint, p256dh, auth, lat, lng } = req.body;
   if (!endpoint || !p256dh || !auth)
@@ -24,15 +25,15 @@ router.post('/subscribe', async (req, res) => {
                                lat = VALUES(lat), lng = VALUES(lng)`,
       [endpoint, p256dh, auth, lat || null, lng || null]
     );
+    log.info(`[push] subscribe OK lat=${lat} lng=${lng}`);
     res.json({ ok: true });
   } catch (err) {
-    console.error('[PUSH] subscribe error:', err.message);
+    log.error('[push] subscribe error:', err.message, err.stack);
     res.status(500).json({ error: 'DB error' });
   }
 });
 
 // GET /api/push/nearby-shops?lat=X&lng=Y&km=5
-// Returns shops with active offers within radius — used by client for proximity alerts
 router.get('/nearby-shops', async (req, res) => {
   const lat = parseFloat(req.query.lat);
   const lng = parseFloat(req.query.lng);
@@ -41,7 +42,6 @@ router.get('/nearby-shops', async (req, res) => {
 
   try {
     const pool = getPool();
-    // Haversine bounding box rough filter, then exact calc in JS
     const [shops] = await pool.query(
       `SELECT s.id, s.name, s.slug, s.category, s.address, s.city, s.lat, s.lng,
               COUNT(o.id) AS offer_count,
@@ -68,7 +68,7 @@ router.get('/nearby-shops', async (req, res) => {
 
     res.json(nearby);
   } catch (err) {
-    console.error('[PUSH] nearby-shops error:', err.message);
+    log.error('[push] nearby-shops error:', err.message, err.stack);
     res.status(500).json({ error: 'DB error' });
   }
 });
@@ -77,8 +77,13 @@ router.get('/nearby-shops', async (req, res) => {
 router.post('/unsubscribe', async (req, res) => {
   const { endpoint } = req.body;
   if (!endpoint) return res.status(400).json({ error: 'Missing endpoint' });
-  await getPool().query('DELETE FROM push_subscriptions WHERE endpoint = ?', [endpoint]);
-  res.json({ ok: true });
+  try {
+    await getPool().query('DELETE FROM push_subscriptions WHERE endpoint = ?', [endpoint]);
+    res.json({ ok: true });
+  } catch (err) {
+    log.error('[push] unsubscribe error:', err.message, err.stack);
+    res.status(500).json({ error: 'DB error' });
+  }
 });
 
 module.exports = router;

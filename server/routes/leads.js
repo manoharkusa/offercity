@@ -1,10 +1,10 @@
 const express = require('express');
 const https = require('https');
 const { getPool } = require('../config/db');
+const log = require('../utils/log');
 
 const router = express.Router();
 
-// Fire data to Google Sheets via Apps Script GET URL (fire-and-forget, one redirect allowed)
 function pushToSheets(params) {
   const url = process.env.GOOGLE_SHEET_URL;
   if (!url) return;
@@ -27,7 +27,7 @@ function pushToSheets(params) {
   } catch (_) {}
 }
 
-// POST /api/leads  (name and email are both optional for guest captures)
+// POST /api/leads
 router.post('/', async (req, res) => {
   const { name, phone, email } = req.body;
   if (!name && !email) return res.status(400).json({ message: 'Name or email required' });
@@ -42,27 +42,26 @@ router.post('/', async (req, res) => {
       'INSERT INTO leads (name, phone, email) VALUES (?,?,?)',
       [safeName, safePhone, safeEmail]
     );
+    log.info(`[leads] new lead: ${safeName} ${safeEmail || safePhone}`);
   } catch (err) {
-    console.error('Lead DB error:', err.message);
+    log.error('[leads] DB error:', err.message, err.stack);
   }
 
   pushToSheets({
-    name: safeName,
-    phone: safePhone,
-    email: safeEmail || '',
-    source: 'OfferCity',
-    time: new Date().toLocaleString('en-IN')
+    name: safeName, phone: safePhone, email: safeEmail || '',
+    source: 'OfferCity', time: new Date().toLocaleString('en-IN')
   });
 
   res.json({ ok: true });
 });
 
-// GET /api/leads/count  (admin use)
+// GET /api/leads/count
 router.get('/count', async (req, res) => {
   try {
     const [[row]] = await getPool().query('SELECT COUNT(*) AS total FROM leads');
     res.json({ total: row.total });
   } catch (err) {
+    log.error('[leads] GET /count error:', err.message, err.stack);
     res.status(500).json({ message: err.message });
   }
 });

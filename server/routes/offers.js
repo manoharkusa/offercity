@@ -3,6 +3,7 @@ const multer = require('multer');
 const path = require('path');
 const { getPool } = require('../config/db');
 const { protect, requireRole } = require('../middleware/auth');
+const log = require('../utils/log');
 
 const router = express.Router();
 
@@ -62,6 +63,7 @@ router.get('/', async (req, res) => {
     const [offers] = await pool.query(query, params);
     res.json(offers);
   } catch (err) {
+    log.error('[offers] error:', err.message, err.stack);
     res.status(500).json({ message: err.message });
   }
 });
@@ -78,7 +80,7 @@ router.get('/mine', protect, requireRole('shop_owner', 'admin'), async (req, res
       [req.user.id]
     );
     res.json(rows);
-  } catch (err) { res.status(500).json({ message: err.message }); }
+  } catch (err) { log.error('[offers] error:', err.message); res.status(500).json({ message: err.message }); }
 });
 
 // GET /api/offers/shop/:shopId  — must be BEFORE /:id
@@ -89,6 +91,7 @@ router.get('/shop/:shopId', async (req, res) => {
     );
     res.json(offers);
   } catch (err) {
+    log.error('[offers] error:', err.message, err.stack);
     res.status(500).json({ message: err.message });
   }
 });
@@ -106,6 +109,7 @@ router.get('/:id', async (req, res) => {
     if (rows.length === 0) return res.status(404).json({ message: 'Offer not found' });
     res.json(rows[0]);
   } catch (err) {
+    log.error('[offers] error:', err.message, err.stack);
     res.status(500).json({ message: err.message });
   }
 });
@@ -141,6 +145,7 @@ router.post('/', protect, requireRole('shop_owner', 'admin'), upload.single('ima
       require('../services/push').notifyNearbyUsers(pushOffer, shopFull[0]).catch(() => {});
     }
   } catch (err) {
+    log.error('[offers] error:', err.message, err.stack);
     res.status(500).json({ message: err.message });
   }
 });
@@ -168,6 +173,7 @@ router.put('/:id', protect, requireRole('shop_owner', 'admin'), upload.single('i
     const [updated] = await pool.query('SELECT * FROM offers WHERE id = ?', [req.params.id]);
     res.json(updated[0]);
   } catch (err) {
+    log.error('[offers] error:', err.message, err.stack);
     res.status(500).json({ message: err.message });
   }
 });
@@ -186,6 +192,7 @@ router.delete('/:id', protect, requireRole('shop_owner', 'admin'), async (req, r
     await pool.query('DELETE FROM offers WHERE id = ?', [req.params.id]);
     res.json({ message: 'Offer deleted' });
   } catch (err) {
+    log.error('[offers] error:', err.message, err.stack);
     res.status(500).json({ message: err.message });
   }
 });

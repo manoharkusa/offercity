@@ -1,10 +1,10 @@
 const express = require('express');
 const { getPool } = require('../config/db');
 const { protect, requireRole } = require('../middleware/auth');
+const log = require('../utils/log');
 
 const router = express.Router();
 
-// User's stamp code = zero-padded user ID (e.g. user 7 → "000007")
 const toCode = (id) => String(id).padStart(6, '0');
 const fromCode = (code) => parseInt(code, 10);
 
@@ -22,13 +22,15 @@ router.post('/cards', protect, requireRole('shop_owner', 'admin'), async (req, r
       [shop_id, title, required_stamps, reward]
     );
     const [rows] = await pool.query('SELECT * FROM stamp_cards WHERE id=?', [result.insertId]);
+    log.info(`[stamps] card created id=${result.insertId} shop=${shop_id}`);
     res.status(201).json(rows[0]);
   } catch (err) {
+    log.error('[stamps] POST /cards error:', err.message, err.stack);
     res.status(500).json({ message: err.message });
   }
 });
 
-// GET /api/stamps/cards/shop/:shopId  — public, get active cards for a shop
+// GET /api/stamps/cards/shop/:shopId  — public
 router.get('/cards/shop/:shopId', async (req, res) => {
   try {
     const [rows] = await getPool().query(
@@ -37,6 +39,7 @@ router.get('/cards/shop/:shopId', async (req, res) => {
     );
     res.json(rows);
   } catch (err) {
+    log.error('[stamps] GET /cards/shop error:', err.message, err.stack);
     res.status(500).json({ message: err.message });
   }
 });
@@ -55,6 +58,7 @@ router.get('/cards/mine', protect, requireRole('shop_owner', 'admin'), async (re
     );
     res.json(rows);
   } catch (err) {
+    log.error('[stamps] GET /cards/mine error:', err.message, err.stack);
     res.status(500).json({ message: err.message });
   }
 });
@@ -74,11 +78,12 @@ router.get('/mine', protect, async (req, res) => {
     );
     res.json(rows);
   } catch (err) {
+    log.error('[stamps] GET /mine error:', err.message, err.stack);
     res.status(500).json({ message: err.message });
   }
 });
 
-// GET /api/stamps/mycode  — user gets their stamp QR code value
+// GET /api/stamps/mycode
 router.get('/mycode', protect, (req, res) => {
   res.json({ code: toCode(req.user.id), user_id: req.user.id });
 });
@@ -91,7 +96,6 @@ router.post('/add', protect, requireRole('shop_owner', 'admin'), async (req, res
   if (!user_id) return res.status(400).json({ message: 'Invalid customer code' });
   try {
     const pool = getPool();
-    // Verify card belongs to owner
     const [cardRows] = await pool.query(
       `SELECT sc.*, s.owner_id FROM stamp_cards sc JOIN shops s ON s.id=sc.shop_id WHERE sc.id=?`,
       [card_id]
@@ -99,7 +103,6 @@ router.post('/add', protect, requireRole('shop_owner', 'admin'), async (req, res
     if (cardRows.length === 0) return res.status(404).json({ message: 'Card not found' });
     if (cardRows[0].owner_id !== req.user.id && req.user.role !== 'admin')
       return res.status(403).json({ message: 'Not your stamp card' });
-    // Verify customer exists
     const [userRows] = await pool.query('SELECT id, name FROM users WHERE id=?', [user_id]);
     if (userRows.length === 0) return res.status(404).json({ message: 'Customer not found' });
 
@@ -113,6 +116,7 @@ router.post('/add', protect, requireRole('shop_owner', 'admin'), async (req, res
     const [[cs]] = await pool.query('SELECT * FROM customer_stamps WHERE card_id=? AND user_id=?', [card_id, user_id]);
     const completed = Math.floor(cs.stamps / card.required_stamps);
     const newlyCompleted = completed > cs.redeemed;
+    log.info(`[stamps] stamp added card=${card_id} user=${user_id} stamps=${cs.stamps} completed=${newlyCompleted}`);
     res.json({
       stamps: cs.stamps,
       required: card.required_stamps,
@@ -124,11 +128,12 @@ router.post('/add', protect, requireRole('shop_owner', 'admin'), async (req, res
         : `✅ Stamp added! ${userRows[0].name} has ${cs.stamps}/${card.required_stamps} stamps.`
     });
   } catch (err) {
+    log.error('[stamps] POST /add error:', err.message, err.stack);
     res.status(500).json({ message: err.message });
   }
 });
 
-// POST /api/stamps/redeem/:id  — customer redeems their reward
+// POST /api/stamps/redeem/:id
 router.post('/redeem/:id', protect, async (req, res) => {
   try {
     const pool = getPool();
@@ -140,8 +145,10 @@ router.post('/redeem/:id', protect, async (req, res) => {
     const earned = Math.floor(cs.stamps / cs.required_stamps);
     if (earned <= cs.redeemed) return res.status(400).json({ message: 'No reward to redeem yet' });
     await pool.query('UPDATE customer_stamps SET redeemed=redeemed+1 WHERE id=?', [req.params.id]);
+    log.info(`[stamps] reward redeemed id=${req.params.id} user=${req.user.id}`);
     res.json({ message: `Reward redeemed: ${cs.reward}` });
   } catch (err) {
+    log.error('[stamps] POST /redeem error:', err.message, err.stack);
     res.status(500).json({ message: err.message });
   }
 });

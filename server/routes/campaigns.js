@@ -3,6 +3,7 @@ const { protect, requireRole } = require('../middleware/auth');
 const wa = require('../services/whatsapp');
 const ai = require('../services/aichatbot');
 const { getPool } = require('../config/db');
+const log = require('../utils/log');
 
 const router = express.Router();
 
@@ -48,6 +49,7 @@ router.post('/whatsapp/connect-pairing', protect, requireRole('shop_owner', 'adm
     const code = await wa.connectWithPairingCode(req.user.id, phone);
     res.json({ code });
   } catch (err) {
+    log.error('[campaigns] pairing error:', err.message, err.stack);
     res.status(500).json({ message: err.message });
   }
 });
