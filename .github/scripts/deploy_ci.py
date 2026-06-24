@@ -190,10 +190,11 @@ else:
         "restart"
     )
 
-    # Wait up to 75s for Passenger to spawn a fresh worker
+    # Wait up to 200s for Passenger to spawn a fresh worker
+    # (Passengerfile.json startup_timeout = 180s, so we need at least that)
     print("Waiting for server to come back up…")
     up = False
-    for i in range(15):
+    for i in range(40):
         time.sleep(5)
         r = sh(f"curl -sf https://offerscity.co.in/api/health || echo 'not yet'")
         if 'running' in r or 'OfferCity' in r:
