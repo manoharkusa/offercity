@@ -148,6 +148,15 @@ sftp.close()
 print()
 print(f"Server files changed: {server_changed}")
 
+# ── 3b. Always clean up always_restart.txt if it exists ──────────────────────
+# Leaving always_restart.txt causes Passenger to restart on every request (dev mode).
+sh(
+    f"if [ -f {HOME_REMOTE}/public_html/tmp/always_restart.txt ]; then "
+    f"rm -f {HOME_REMOTE}/public_html/tmp/always_restart.txt && echo 'always_restart.txt cleaned up'; "
+    f"else echo 'always_restart.txt not present'; fi",
+    "cleanup always_restart.txt"
+)
+
 # ── 4. Inject secrets into production .env ────────────────────────────────────
 env_path = f"{HOME_REMOTE}/.env"
 
