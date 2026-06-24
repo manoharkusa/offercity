@@ -139,12 +139,16 @@ app.post('/api/deploy-restart', (req, res) => {
 
 // ── Logs endpoint ─────────────────────────────────────────────────────────────
 app.get('/api/logs', (req, res) => {
-  const logFile = LOG_FILE;
   try {
-    const data  = fs.readFileSync(logFile, 'utf8');
-    const lines = data.split('\n').filter(Boolean).slice(-200);
-    res.json({ lines });
-  } catch (e) { res.json({ lines: [], error: e.message }); }
+    const data  = fs.readFileSync(LOG_FILE, 'utf8');
+    const all   = data.split('\n').filter(Boolean);
+    const n     = parseInt(req.query.n) || 500;
+    const search = req.query.search || '';
+    const filtered = search
+      ? all.filter(l => l.toLowerCase().includes(search.toLowerCase()))
+      : all;
+    res.json({ lines: filtered.slice(-n), total: all.length });
+  } catch (e) { res.json({ lines: [], total: 0, error: e.message }); }
 });
 
 // ── Global error handler ──────────────────────────────────────────────────────

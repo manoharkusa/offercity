@@ -198,23 +198,32 @@ function CatalogTab({ shops, flash }) {
 
 // ── Chat Logs sub-component ─────────────────────────────────────────────────
 function ChatLogsTab({ shops, flash }) {
-  const [shopId,  setShopId]  = useState('');
+  const firstId = shops.length ? String(shops[0].id) : '';
+  const [shopId,  setShopId]  = useState(firstId);
   const [channel, setChannel] = useState('all');
   const [logs,    setLogs]    = useState([]);
   const [total,   setTotal]   = useState(0);
   const [loading, setLoading] = useState(false);
   const [page,    setPage]    = useState(1);
+  const [loadErr, setLoadErr] = useState(false);
 
   const load = async (sid, ch, pg) => {
     if (!sid) return;
     setLoading(true);
+    setLoadErr(false);
     try {
       const { data } = await api.get('/chat/logs', { params: { shop_id: sid, channel: ch, page: pg } });
       setLogs(data.rows);
       setTotal(data.total);
-    } catch { flash('Could not load chat logs', 'err'); }
+    } catch {
+      setLoadErr(true);
+      flash('Could not load chat logs — server may be starting up. Retry in a moment.', 'err');
+    }
     setLoading(false);
   };
+
+  // Auto-load when tab opens
+  useEffect(() => { if (firstId) load(firstId, 'all', 1); }, []); // eslint-disable-line
 
   const onShop = (id) => { setShopId(id); setPage(1); load(id, channel, 1); };
   const onChannel = (ch) => { setChannel(ch); setPage(1); load(shopId, ch, 1); };
@@ -278,7 +287,17 @@ function ChatLogsTab({ shops, flash }) {
       {!shopId && <p style={{ color: '#aaa', fontSize: 14 }}>Select a shop to view its chat history.</p>}
       {loading && <p style={{ color: '#aaa' }}>Loading…</p>}
 
-      {shopId && !loading && logs.length === 0 && (
+      {loadErr && !loading && (
+        <div style={{ textAlign: 'center', padding: '30px 0' }}>
+          <p style={{ color: '#c62828', marginBottom: 12, fontSize: 14 }}>Could not load — server may be starting up.</p>
+          <button onClick={() => load(shopId, channel, page)}
+            style={{ padding: '8px 24px', background: '#e65100', color: '#fff', border: 'none', borderRadius: 8, cursor: 'pointer', fontWeight: 700 }}>
+            Retry
+          </button>
+        </div>
+      )}
+
+      {shopId && !loading && !loadErr && logs.length === 0 && (
         <p style={{ color: '#aaa', fontSize: 14 }}>No chat conversations yet for this shop.</p>
       )}
 
