@@ -326,7 +326,9 @@ async function handleIncoming(ownerId, jid, messageText, senderName) {
     }
     if (reply) {
       lastReply[rateKey] = now;
-      console.log(`[AI] Owner ${ownerId} → replied to ${jid.replace('@s.whatsapp.net', '')}`);
+      const phone = jid.replace('@s.whatsapp.net', '');
+      console.log(`[AI] Owner ${ownerId} → replied to ${phone}`);
+      logChat({ shop_id: campaign.shop_id, channel: 'whatsapp', customer_name: senderName || null, customer_phone: phone, message: messageText, reply });
     }
     return reply || null;
   } catch (err) {
@@ -387,9 +389,23 @@ function callGroqAI_multi(systemPrompt, messages) {
   });
 }
 
+async function logChat({ shop_id, channel, customer_name, customer_phone, message, reply }) {
+  try {
+    const { getPool } = require('../config/db');
+    await getPool().query(
+      `INSERT INTO chat_logs (shop_id, channel, customer_name, customer_phone, message, reply)
+       VALUES (?, ?, ?, ?, ?, ?)`,
+      [shop_id, channel, customer_name || null, customer_phone || null, message, reply || null]
+    );
+  } catch (err) {
+    console.error('[CHAT LOG] Failed to save:', err.message);
+  }
+}
+
 module.exports = {
   handleIncoming, setEnabled, loadEnabled, isEnabled, invalidateCache, setLang, getLang,
   callClaudeAI: callClaudeAI_multi,
   callGroqAI: callGroqAI_multi,
   buildSystemPromptForShop: buildSystemPrompt,
+  logChat,
 };

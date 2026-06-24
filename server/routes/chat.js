@@ -1,13 +1,14 @@
 const express = require('express');
 const { getPool } = require('../config/db');
-const { callClaudeAI, callGroqAI, buildSystemPromptForShop } = require('../services/aichatbot');
+const { callClaudeAI, callGroqAI, buildSystemPromptForShop, logChat } = require('../services/aichatbot');
+const { protect, requireRole } = require('../middleware/auth');
 
 const router = express.Router();
 
 // IP-based rate limit: ip → { count, resetAt }
 const ipLimits = {};
-const LIMIT = 30;         // max 30 messages per window
-const WINDOW_MS = 60000;  // per 1 minute
+const LIMIT = 30;
+const WINDOW_MS = 60000;
 
 function checkRateLimit(ip) {
   const now = Date.now();
@@ -51,7 +52,6 @@ router.post('/ask', async (req, res) => {
       : null;
     const systemPrompt = buildSystemPromptForShop({ shops: [shop], offers, mapsUrl }, 'auto');
 
-    // Include last 6 turns of conversation history for context
     const messages = [
       ...history.slice(-6).map(h => ({ role: h.role, content: h.content })),
       { role: 'user', content: message.trim() }
@@ -74,13 +74,60 @@ router.post('/ask', async (req, res) => {
     }
 
     if (!reply || reply.trim().toUpperCase() === 'SKIP') {
-      return res.json({ reply: `I can only help with questions about ${shop.name}. What would you like to know about our offers or services?` });
+      reply = `I can only help with questions about ${shop.name}. What would you like to know about our offers or services?`;
     }
+
+    // Log this conversation
+    logChat({ shop_id, channel: 'web', customer_name: null, customer_phone: null, message: message.trim(), reply });
 
     res.json({ reply });
   } catch (err) {
     console.error('[CHAT] Error:', err.message);
     res.status(500).json({ message: 'Could not get a reply. Please try again.' });
+  }
+});
+
+// GET /api/chat/logs?shop_id=X&channel=all&page=1
+// Shop owner / admin only — returns paginated conversation history
+router.get('/logs', protect, requireRole('shop_owner', 'admin'), async (req, res) => {
+  const { shop_id, channel = 'all', page = 1 } = req.query;
+  const perPage = 100;
+  const offset  = (parseInt(page) - 1) * perPage;
+
+  try {
+    const pool = getPool();
+
+    // Verify ownership unless admin
+    if (req.user.role !== 'admin') {
+      if (!shop_id) return res.status(400).json({ message: 'shop_id required' });
+      const [own] = await pool.query('SELECT id FROM shops WHERE id = ? AND owner_id = ?', [shop_id, req.user.id]);
+      if (!own.length) return res.status(403).json({ message: 'Not your shop' });
+    }
+
+    let where = shop_id ? 'cl.shop_id = ?' : '1=1';
+    const params = shop_id ? [shop_id] : [];
+
+    if (channel !== 'all') {
+      where += ' AND cl.channel = ?';
+      params.push(channel);
+    }
+
+    const [[{ total }]] = await pool.query(`SELECT COUNT(*) AS total FROM chat_logs cl WHERE ${where}`, params);
+
+    const [rows] = await pool.query(
+      `SELECT cl.id, cl.shop_id, s.name AS shop_name, cl.channel,
+              cl.customer_name, cl.customer_phone, cl.message, cl.reply, cl.created_at
+       FROM chat_logs cl
+       JOIN shops s ON s.id = cl.shop_id
+       WHERE ${where}
+       ORDER BY cl.created_at DESC
+       LIMIT ? OFFSET ?`,
+      [...params, perPage, offset]
+    );
+
+    res.json({ total, page: parseInt(page), perPage, rows });
+  } catch (err) {
+    res.status(500).json({ message: err.message });
   }
 });
 

@@ -196,6 +196,156 @@ function CatalogTab({ shops, flash }) {
   );
 }
 
+// ── Chat Logs sub-component ─────────────────────────────────────────────────
+function ChatLogsTab({ shops, flash }) {
+  const [shopId,  setShopId]  = useState('');
+  const [channel, setChannel] = useState('all');
+  const [logs,    setLogs]    = useState([]);
+  const [total,   setTotal]   = useState(0);
+  const [loading, setLoading] = useState(false);
+  const [page,    setPage]    = useState(1);
+
+  const load = async (sid, ch, pg) => {
+    if (!sid) return;
+    setLoading(true);
+    try {
+      const { data } = await api.get('/chat/logs', { params: { shop_id: sid, channel: ch, page: pg } });
+      setLogs(data.rows);
+      setTotal(data.total);
+    } catch { flash('Could not load chat logs', 'err'); }
+    setLoading(false);
+  };
+
+  const onShop = (id) => { setShopId(id); setPage(1); load(id, channel, 1); };
+  const onChannel = (ch) => { setChannel(ch); setPage(1); load(shopId, ch, 1); };
+  const onPage = (pg) => { setPage(pg); load(shopId, channel, pg); };
+
+  const exportCSV = () => {
+    if (!logs.length) return;
+    const header = ['Date', 'Time', 'Channel', 'Customer Name', 'Phone', 'Message', 'AI Reply'];
+    const rows = logs.map(l => {
+      const d = new Date(l.created_at);
+      return [
+        d.toLocaleDateString('en-IN'),
+        d.toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit' }),
+        l.channel === 'whatsapp' ? 'WhatsApp' : 'Web Chat',
+        l.customer_name || '-',
+        l.customer_phone || '-',
+        `"${(l.message || '').replace(/"/g, '""')}"`,
+        `"${(l.reply   || '').replace(/"/g, '""')}"`,
+      ];
+    });
+    const csv = [header, ...rows].map(r => r.join(',')).join('\n');
+    const blob = new Blob([csv], { type: 'text/csv' });
+    const url  = URL.createObjectURL(blob);
+    const a    = document.createElement('a');
+    a.href = url; a.download = `chat-logs-${shopId}.csv`; a.click();
+    URL.revokeObjectURL(url);
+  };
+
+  const perPage = 100;
+  const totalPages = Math.ceil(total / perPage);
+
+  const th = { padding: '10px 12px', textAlign: 'left', fontSize: 12, fontWeight: 700, color: '#888', borderBottom: '2px solid #f0ebe4', whiteSpace: 'nowrap' };
+  const td = { padding: '10px 12px', fontSize: 13, borderBottom: '1px solid #f5f5f5', verticalAlign: 'top' };
+
+  return (
+    <div>
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 18, flexWrap: 'wrap', gap: 10 }}>
+        <h2 style={{ margin: 0 }}>💬 AI Chat Conversations</h2>
+        <button onClick={exportCSV} disabled={!logs.length}
+          style={{ padding: '8px 18px', background: logs.length ? '#2e7d32' : '#ccc', color: '#fff', border: 'none', borderRadius: 8, cursor: logs.length ? 'pointer' : 'default', fontWeight: 700, fontSize: 13 }}>
+          ⬇ Export CSV
+        </button>
+      </div>
+
+      {/* Filters */}
+      <div style={{ display: 'flex', gap: 12, marginBottom: 18, flexWrap: 'wrap' }}>
+        <select value={shopId} onChange={e => onShop(e.target.value)}
+          style={{ padding: '9px 14px', borderRadius: 8, border: '1px solid #ddd', fontSize: 14, minWidth: 200 }}>
+          <option value="">— Select a shop —</option>
+          {shops.map(s => <option key={s.id} value={s.id}>{s.name}</option>)}
+        </select>
+        <select value={channel} onChange={e => onChannel(e.target.value)}
+          style={{ padding: '9px 14px', borderRadius: 8, border: '1px solid #ddd', fontSize: 14 }}>
+          <option value="all">All Channels</option>
+          <option value="web">🌐 Web Chat</option>
+          <option value="whatsapp">📱 WhatsApp</option>
+        </select>
+        {shopId && !loading && <span style={{ alignSelf: 'center', fontSize: 13, color: '#888' }}>{total} conversation{total !== 1 ? 's' : ''}</span>}
+      </div>
+
+      {!shopId && <p style={{ color: '#aaa', fontSize: 14 }}>Select a shop to view its chat history.</p>}
+      {loading && <p style={{ color: '#aaa' }}>Loading…</p>}
+
+      {shopId && !loading && logs.length === 0 && (
+        <p style={{ color: '#aaa', fontSize: 14 }}>No chat conversations yet for this shop.</p>
+      )}
+
+      {logs.length > 0 && (
+        <>
+          <div style={{ overflowX: 'auto', borderRadius: 12, border: '1px solid #f0ebe4', background: '#fff' }}>
+            <table style={{ width: '100%', borderCollapse: 'collapse', minWidth: 700 }}>
+              <thead style={{ background: '#faf7f3' }}>
+                <tr>
+                  <th style={th}>Date & Time</th>
+                  <th style={th}>Channel</th>
+                  <th style={th}>Customer</th>
+                  <th style={th}>Phone</th>
+                  <th style={th}>Question</th>
+                  <th style={th}>AI Reply</th>
+                </tr>
+              </thead>
+              <tbody>
+                {logs.map(l => (
+                  <tr key={l.id} style={{ transition: 'background .1s' }}
+                    onMouseEnter={e => e.currentTarget.style.background = '#fdf9f5'}
+                    onMouseLeave={e => e.currentTarget.style.background = ''}>
+                    <td style={{ ...td, whiteSpace: 'nowrap', color: '#888', fontSize: 12 }}>
+                      {new Date(l.created_at).toLocaleDateString('en-IN', { day: 'numeric', month: 'short' })}<br />
+                      {new Date(l.created_at).toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit' })}
+                    </td>
+                    <td style={td}>
+                      <span style={{ display: 'inline-block', padding: '3px 10px', borderRadius: 20, fontSize: 11, fontWeight: 700,
+                        background: l.channel === 'whatsapp' ? '#e8f5e9' : '#e3f2fd',
+                        color: l.channel === 'whatsapp' ? '#2e7d32' : '#1565c0' }}>
+                        {l.channel === 'whatsapp' ? '📱 WhatsApp' : '🌐 Web'}
+                      </span>
+                    </td>
+                    <td style={{ ...td, fontWeight: 600 }}>{l.customer_name || <span style={{ color: '#bbb' }}>Anonymous</span>}</td>
+                    <td style={{ ...td, color: '#555', fontSize: 12 }}>{l.customer_phone || <span style={{ color: '#bbb' }}>—</span>}</td>
+                    <td style={{ ...td, maxWidth: 260 }}>
+                      <div style={{ display: '-webkit-box', WebkitLineClamp: 3, WebkitBoxOrient: 'vertical', overflow: 'hidden' }}>
+                        {l.message}
+                      </div>
+                    </td>
+                    <td style={{ ...td, maxWidth: 260, color: '#444' }}>
+                      <div style={{ display: '-webkit-box', WebkitLineClamp: 3, WebkitBoxOrient: 'vertical', overflow: 'hidden' }}>
+                        {l.reply || <span style={{ color: '#bbb' }}>No reply</span>}
+                      </div>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+
+          {/* Pagination */}
+          {totalPages > 1 && (
+            <div style={{ display: 'flex', gap: 8, justifyContent: 'center', marginTop: 16 }}>
+              <button onClick={() => onPage(page - 1)} disabled={page <= 1}
+                style={{ padding: '6px 14px', borderRadius: 7, border: '1px solid #ddd', background: page <= 1 ? '#f5f5f5' : '#fff', cursor: page <= 1 ? 'default' : 'pointer' }}>← Prev</button>
+              <span style={{ alignSelf: 'center', fontSize: 13, color: '#888' }}>Page {page} of {totalPages}</span>
+              <button onClick={() => onPage(page + 1)} disabled={page >= totalPages}
+                style={{ padding: '6px 14px', borderRadius: 7, border: '1px solid #ddd', background: page >= totalPages ? '#f5f5f5' : '#fff', cursor: page >= totalPages ? 'default' : 'pointer' }}>Next →</button>
+            </div>
+          )}
+        </>
+      )}
+    </div>
+  );
+}
+
 export default function ShopDashboard() {
   const [tab, setTab]             = useState('shops');
   const [shops, setShops]         = useState([]);
@@ -687,7 +837,8 @@ export default function ShopDashboard() {
             ['add-offer', editingOffer ? '✏️ Edit Offer' : '➕ Add Offer'],
             ['campaign', '📣 Campaign'],
             ['incoming', incoming.length > 0 ? `🚶 Incoming (${incoming.length})` : '🚶 Incoming'],
-            ['stamps',   '🎟 Stamp Cards']
+            ['stamps',   '🎟 Stamp Cards'],
+            ['chat-logs','💬 Chat Logs']
           ].map(([t, label]) => (
             <button key={t} className={tab === t ? 'active' : ''}
               onClick={() => { if (t !== 'add-offer') resetOffer(); setTab(t); }}>
@@ -1971,6 +2122,11 @@ export default function ShopDashboard() {
           )}
         </div>
       </div>
+
+          {/* ── Chat Logs Tab ── */}
+          {tab === 'chat-logs' && (
+            <ChatLogsTab shops={shops} flash={flash} />
+          )}
 
       {/* ── Mobile Bottom Navigation ── */}
       <nav className="sd-bottom-nav">

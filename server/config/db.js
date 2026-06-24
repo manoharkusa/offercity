@@ -242,6 +242,20 @@ const createTables = async () => {
     if (r.affectedRows > 0) log.info(`Migration: auto-approved ${r.affectedRows} unassigned shop(s)`);
   } catch (e) { log.error('Migration auto-approve shops:', e.message); }
 
+  // chat_logs — stores all AI chatbot conversations (web + WhatsApp) per shop
+  await pool.query(`CREATE TABLE IF NOT EXISTS chat_logs (
+    id             INT AUTO_INCREMENT PRIMARY KEY,
+    shop_id        INT NOT NULL,
+    channel        ENUM('web','whatsapp') NOT NULL DEFAULT 'web',
+    customer_name  VARCHAR(255) DEFAULT NULL,
+    customer_phone VARCHAR(30)  DEFAULT NULL,
+    message        TEXT NOT NULL,
+    reply          TEXT,
+    created_at     TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    INDEX idx_shop_channel (shop_id, channel),
+    INDEX idx_created (created_at)
+  ) ENGINE=InnoDB`);
+
   // push_subscriptions — location-based, no shop dependency
   await pool.query(`CREATE TABLE IF NOT EXISTS push_subscriptions (
     id INT AUTO_INCREMENT PRIMARY KEY,
