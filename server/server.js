@@ -172,3 +172,11 @@ server.on('error', (err) => {
     process.exit(1);
   }
 });
+
+// Self-ping every 90s so Passenger doesn't kill the process for inactivity
+// (shared hosting kills idle Node.js processes; this keeps the process warm)
+setInterval(() => {
+  require('http').get(`http://localhost:${PORT}/api/health`, (res) => {
+    res.resume(); // drain response body
+  }).on('error', () => {}); // ignore errors silently
+}, 90 * 1000);
