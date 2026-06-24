@@ -20,7 +20,7 @@ function checkRateLimit(ip) {
   return true;
 }
 
-// POST /api/chat/ask  — public web chat (no auth needed)
+// POST /api/chat/ask  — public web chat (no auth needed, Claude primary / Groq fallback)
 // Body: { shop_id, message, history: [{role,content}] }
 router.post('/ask', async (req, res) => {
   const ip = req.headers['x-forwarded-for']?.split(',')[0] || req.socket.remoteAddress || 'unknown';
