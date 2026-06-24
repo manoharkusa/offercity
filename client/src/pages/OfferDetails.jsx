@@ -9,6 +9,7 @@ export default function OfferDetails() {
   const { id } = useParams();
   const { user } = useAuth();
   const [offer, setOffer] = useState(null);
+  const [loadError, setLoadError] = useState(null);
   const [reviews, setReviews] = useState([]);
   const [route, setRoute] = useState(null);
   const [userCoords, setUserCoords] = useState(null);
@@ -18,12 +19,19 @@ export default function OfferDetails() {
   const [coming,      setComing]      = useState(false);
   const [comingMsg,   setComingMsg]   = useState('');
 
-  useEffect(() => {
+  const loadOffer = () => {
+    setLoadError(null);
     api.get(`/offers/${id}`).then(r => {
       setOffer(r.data);
-      api.get(`/reviews/${r.data.shop_id}`).then(rv => setReviews(rv.data));
-    }).catch(err => console.error('load offer:', err.response?.data || err.message));
+      api.get(`/reviews/${r.data.shop_id}`).then(rv => setReviews(rv.data)).catch(() => {});
+    }).catch(err => {
+      console.error('load offer:', err.response?.data || err.message);
+      setLoadError(err.code === 'ECONNABORTED' ? 'Server is starting up, please retry.' : 'Could not load offer details.');
+    });
+  };
 
+  useEffect(() => {
+    loadOffer();
     navigator.geolocation?.getCurrentPosition(({ coords: c }) =>
       setUserCoords({ lng: c.longitude, lat: c.latitude })
     );
@@ -74,6 +82,14 @@ export default function OfferDetails() {
     }
   };
 
+  if (loadError) return (
+    <div style={{ textAlign: 'center', padding: '60px 20px' }}>
+      <p style={{ color: '#c62828', marginBottom: 16 }}>{loadError}</p>
+      <button className="btn-primary" style={{ width: 'auto', padding: '10px 28px' }} onClick={loadOffer}>
+        Retry
+      </button>
+    </div>
+  );
   if (!offer) return <p className="loading">Loading offer...</p>;
 
   const sLng = parseFloat(offer.lng);

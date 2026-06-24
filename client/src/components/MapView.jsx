@@ -35,7 +35,10 @@ function Recenter({ center }) {
 }
 
 export default function MapView({ center, markers = [], route = null, onMarkerClick }) {
-  const latlng = center ? [center[1], center[0]] : [17.3850, 78.4867]; // [lat, lng] for Leaflet
+  const isValid = (v) => typeof v === 'number' && isFinite(v) && v !== 0;
+  const latlng = (center && isValid(center[0]) && isValid(center[1]))
+    ? [center[1], center[0]]
+    : [17.3850, 78.4867]; // fallback: Hyderabad
 
   return (
     <MapContainer
@@ -51,7 +54,7 @@ export default function MapView({ center, markers = [], route = null, onMarkerCl
 
       <Recenter center={latlng} />
 
-      {markers.map((m, i) => (
+      {markers.filter(m => isValid(m.lat) && isValid(m.lng)).map((m, i) => (
         <Marker
           key={i}
           position={[m.lat, m.lng]}
