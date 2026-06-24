@@ -226,8 +226,15 @@ else:
     except Exception as e:
         print(f"Could not download node.log: {e}")
 
-    if not up:
-        print("❌ ERROR: Server did not come up within 75s after deploy!")
+    if up:
+        # Remove always_restart.txt — it's only needed during the restart window.
+        # Leaving it causes Passenger to restart on every request (dev-mode behaviour).
+        sh(
+            f"rm -f {HOME_REMOTE}/public_html/tmp/always_restart.txt && echo 'always_restart.txt removed'",
+            "remove always_restart.txt"
+        )
+    else:
+        print("❌ ERROR: Server did not come up within 200s after deploy!")
         import sys; sys.exit(1)
 
 sh(f"curl -s https://offerscity.co.in/api/health", "final health check")
