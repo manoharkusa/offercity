@@ -176,9 +176,7 @@ else:
     print("=== Server files changed — restarting Node process ===")
     time.sleep(3)
 
-    # Graceful HTTP restart — tells the running process to exit cleanly so Passenger
-    # spawns a fresh worker with the new files. If the server is already down,
-    # the curl fails silently and Passenger will auto-spawn on the next request.
+    # Graceful HTTP restart first; if that fails, kill by PID
     sh(
         f"PORT=$(cat {PORT_FILE} 2>/dev/null || echo 5008); "
         f"curl -sf -X POST http://localhost:$PORT/api/deploy-restart "
@@ -186,8 +184,18 @@ else:
         f"&& echo 'graceful HTTP restart OK' "
         f"|| (PID=$(cat {HOME_REMOTE}/node.pid 2>/dev/null); "
         f"   [ -n \"$PID\" ] && kill $PID 2>/dev/null && echo \"killed PID $PID\" "
-        f"   || echo 'server was already down — Passenger will spawn on next request')",
-        "restart"
+        f"   || pkill -u $(whoami) -f 'node.*server.js' && echo 'pkilled node' "
+        f"   || echo 'server was already down')",
+        "graceful restart"
+    )
+    time.sleep(2)
+    # Always touch always_restart.txt — bypasses Passenger crash protection
+    sh(
+        f"mkdir -p {HOME_REMOTE}/public_html/tmp && "
+        f"touch {HOME_REMOTE}/public_html/tmp/restart.txt && "
+        f"touch {HOME_REMOTE}/public_html/tmp/always_restart.txt && "
+        f"echo 'Passenger restart signals sent'",
+        "passenger restart signal"
     )
 
     # Wait up to 200s for Passenger to spawn a fresh worker
