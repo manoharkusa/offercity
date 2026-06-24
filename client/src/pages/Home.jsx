@@ -24,13 +24,14 @@ export default function Home() {
   const navigate = useNavigate();
   const [offers, setOffers]           = useState([]);
   const [loading, setLoading]         = useState(true);
-  const [coords, setCoords]           = useState(null);
+  // Start with Hyderabad default so offers load immediately — GPS updates it later
+  const [coords, setCoords]           = useState({ lng: 78.4867, lat: 17.3850 });
   const [search, setSearch]           = useState('');
   const [category, setCategory]       = useState('All');
   const [radius, setRadius]           = useState(10);
   const [view, setView]               = useState('scroll');
   const [newOffersCount, setNewOffersCount] = useState(0);
-  const [locationLabel, setLocationLabel]   = useState('Detecting location…');
+  const [locationLabel, setLocationLabel]   = useState('Hyderabad');
 
   useEffect(() => {
     navigator.geolocation?.getCurrentPosition(
@@ -40,10 +41,8 @@ export default function Home() {
         setLocationLabel('Near You');
         if (user) updateLocation(pos.lng, pos.lat);
       },
-      () => {
-        setCoords({ lng: 78.4867, lat: 17.3850 });
-        setLocationLabel('Hyderabad');
-      }
+      () => { /* keep Hyderabad default */ },
+      { timeout: 6000, maximumAge: 60000 }
     );
   }, []);
 

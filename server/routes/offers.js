@@ -25,18 +25,26 @@ router.get('/', async (req, res) => {
         AND s.status != 'rejected'`;
 
     if (lat && lng) {
+      const r = parseFloat(radius);
+      const latDelta = r / 111.0;
+      const lngDelta = r / (111.0 * Math.cos(parseFloat(lat) * Math.PI / 180));
       query = `
         SELECT o.*, s.name AS shop_name, s.slug, s.city, s.area, s.address, s.category, s.lat, s.lng,
-          (6371 * ACOS(COS(RADIANS(?)) * COS(RADIANS(s.lat)) *
+          (6371 * ACOS(LEAST(1, COS(RADIANS(?)) * COS(RADIANS(s.lat)) *
             COS(RADIANS(s.lng) - RADIANS(?)) +
-            SIN(RADIANS(?)) * SIN(RADIANS(s.lat)))) AS distance
+            SIN(RADIANS(?)) * SIN(RADIANS(s.lat))))) AS distance
         FROM offers o JOIN shops s ON s.id = o.shop_id
         WHERE ${activeClause}
+          AND s.lat BETWEEN ? AND ?
+          AND s.lng BETWEEN ? AND ?
         HAVING distance <= ?
         ORDER BY o.flash_expires_at IS NULL ASC, distance ASC
         LIMIT 50
       `;
-      params = [lat, lng, lat, parseFloat(radius)];
+      params = [lat, lng, lat,
+        parseFloat(lat) - latDelta, parseFloat(lat) + latDelta,
+        parseFloat(lng) - lngDelta, parseFloat(lng) + lngDelta,
+        r];
     } else {
       query = `
         SELECT o.*, s.name AS shop_name, s.slug, s.city, s.area, s.address, s.category, s.lat, s.lng
