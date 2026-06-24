@@ -6,24 +6,32 @@ let pool;
 const connectDB = async () => {
   log.info('connectDB: creating pool...');
   pool = mysql.createPool({
-    host: process.env.DB_HOST || 'localhost',
-    user: process.env.DB_USER || 'a1751tyi_offeruser',
+    host:     process.env.DB_HOST || 'localhost',
+    user:     process.env.DB_USER || 'a1751tyi_offeruser',
     password: process.env.DB_PASS ?? '',
     database: process.env.DB_NAME || 'a1751tyi_offerscity',
     waitForConnections: true,
-    connectionLimit: 10,
-    queueLimit: 0
+    connectionLimit: 3,      // keep low — shared hosting has strict per-user limits
+    queueLimit: 10,
+    connectTimeout: 10000,   // 10s per connection attempt
+    enableKeepAlive: true,
+    keepAliveInitialDelay: 30000,
   });
 
   try {
     log.info('connectDB: testing connection...');
-    const conn = await pool.getConnection();
+    // Race against a 12s timeout so the server never hangs here
+    const conn = await Promise.race([
+      pool.getConnection(),
+      new Promise((_, reject) => setTimeout(() => reject(new Error('DB connection timed out after 12s')), 12000))
+    ]);
     log.info('MySQL connected');
     conn.release();
     await createTables();
   } catch (err) {
-    log.error('MySQL connection error:', err.message, err.stack);
-    setTimeout(connectDB, 10000);
+    log.error('MySQL connection error:', err.message);
+    log.info('Retrying DB connection in 15s...');
+    setTimeout(connectDB, 15000);
   }
 };
 
