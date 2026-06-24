@@ -126,27 +126,22 @@ export default function Home() {
         </div>
       </section>
 
-      {/* ── CATEGORY CARDS (Swiggy-style) ── */}
+      {/* ── CATEGORY PILL STRIP (sticky, horizontal scroll) ── */}
       <section className="home-cats-section">
         <div className="home-cats-inner">
-          <div className="home-cats-grid">
+          <div className="home-cats-strip">
             {CATEGORIES.map(cat => {
               const count = cat.key === 'All' ? offers.length : offers.filter(o => o.category === cat.key).length;
               return (
-                <div
+                <button
                   key={cat.key}
-                  className={`cat-card${category === cat.key ? ' active' : ''}`}
-                  style={{ '--cat-color': cat.color }}
+                  className={`cat-pill${category === cat.key ? ' active' : ''}`}
                   onClick={() => setCategory(cat.key)}
                 >
-                  <div className="cat-card-icon">{cat.icon}</div>
-                  <div className="cat-card-body">
-                    <div className="cat-card-name">{cat.label}</div>
-                    <div className="cat-card-sub">{cat.sub}</div>
-                    {count > 0 && <div className="cat-card-badge">Upto {Math.max(...(offers.filter(o => cat.key === 'All' || o.category === cat.key).map(o => o.discount || 0)), 0)}% OFF</div>}
-                  </div>
-                  <div className="cat-card-arrow">→</div>
-                </div>
+                  <span className="cat-pill-icon">{cat.icon}</span>
+                  <span className="cat-pill-name">{cat.label}</span>
+                  {count > 0 && <span className="cat-pill-count">{count}</span>}
+                </button>
               );
             })}
           </div>
