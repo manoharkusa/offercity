@@ -386,6 +386,8 @@ export default function ShopDashboard() {
   const [photoStep, setPhotoStep]       = useState('pick');  // pick | optimizing | details | success
   const [imageFile, setImageFile]       = useState(null);
   const [imagePreview, setImagePreview] = useState(null);
+  const [aiImagePath, setAiImagePath]   = useState(null);
+  const [aiGenerating, setAiGenerating] = useState(false);
   const [compressStats, setCompressStats] = useState(null);
   const [uploading, setUploading]       = useState(false);
   const [postedOffer, setPostedOffer]   = useState(null);
@@ -578,6 +580,7 @@ export default function ShopDashboard() {
     setEditingOffer(null);
     setImageFile(null);
     setImagePreview(null);
+    setAiImagePath(null);
     setCompressStats(null);
     setPhotoStep('pick');
     setPostedOffer(null);
@@ -637,11 +640,123 @@ export default function ShopDashboard() {
     setPhotoStep('details');
   }, []);
 
+  const generateAiImage = async () => {
+    const shopId = offerForm.shop_id || (shops.length > 0 ? String(shops[0].id) : '');
+    const shop = shops.find(s => String(s.id) === shopId);
+    setAiGenerating(true);
+    try {
+      const { data } = await api.post('/offers/generate-image', {
+        category: shop?.category || 'Other',
+        title: offerForm.title || 'Special Offer',
+        discount: offerForm.discount || '20',
+        shop_name: shop?.name || ''
+      });
+
+      // Fetch image as blob to avoid canvas CORS taint
+      const resp = await fetch(data.image);
+      const blob = await resp.blob();
+      const objUrl = URL.createObjectURL(blob);
+
+      await new Promise((resolve) => {
+        const img = new Image();
+        img.onload = () => {
+          const W = img.width, H = img.height;
+          const canvas = document.createElement('canvas');
+          canvas.width = W; canvas.height = H;
+          const ctx = canvas.getContext('2d');
+
+          // Base image
+          ctx.drawImage(img, 0, 0);
+
+          // Bottom gradient for text readability
+          const grad = ctx.createLinearGradient(0, H * 0.5, 0, H);
+          grad.addColorStop(0, 'rgba(0,0,0,0)');
+          grad.addColorStop(1, 'rgba(0,0,0,0.78)');
+          ctx.fillStyle = grad;
+          ctx.fillRect(0, 0, W, H);
+
+          // Discount badge (top-left)
+          const disc = offerForm.discount || shop?.discount;
+          if (disc) {
+            ctx.fillStyle = '#FF3D00';
+            const bx = 24, by = 24, bw = 148, bh = 64, br = 14;
+            ctx.beginPath();
+            ctx.moveTo(bx + br, by);
+            ctx.lineTo(bx + bw - br, by); ctx.quadraticCurveTo(bx+bw, by, bx+bw, by+br);
+            ctx.lineTo(bx + bw, by + bh - br); ctx.quadraticCurveTo(bx+bw, by+bh, bx+bw-br, by+bh);
+            ctx.lineTo(bx + br, by + bh); ctx.quadraticCurveTo(bx, by+bh, bx, by+bh-br);
+            ctx.lineTo(bx, by + br); ctx.quadraticCurveTo(bx, by, bx+br, by);
+            ctx.closePath(); ctx.fill();
+            ctx.fillStyle = '#fff';
+            ctx.font = `bold ${Math.round(W * 0.048)}px Arial`;
+            ctx.textAlign = 'center';
+            ctx.fillText(`${disc}% OFF`, bx + bw / 2, by + bh * 0.68);
+          }
+
+          // Helper: wrap text
+          const wrapText = (text, maxW) => {
+            const words = text.split(' ');
+            const lines = [];
+            let line = '';
+            for (const w of words) {
+              const test = line ? line + ' ' + w : w;
+              if (ctx.measureText(test).width > maxW && line) { lines.push(line); line = w; }
+              else line = test;
+            }
+            if (line) lines.push(line);
+            return lines;
+          };
+
+          const pad = Math.round(W * 0.05);
+
+          // Shop name
+          ctx.font = `${Math.round(W * 0.032)}px Arial`;
+          ctx.fillStyle = 'rgba(255,255,255,0.82)';
+          ctx.textAlign = 'center';
+          ctx.fillText(shop?.name || '', W / 2, H - Math.round(H * 0.085));
+
+          // Offer title (bold, wrapped)
+          ctx.font = `bold ${Math.round(W * 0.052)}px Arial`;
+          ctx.fillStyle = '#ffffff';
+          ctx.textAlign = 'center';
+          const titleLines = wrapText(offerForm.title || 'Special Offer', W - pad * 2);
+          const lineH = Math.round(W * 0.062);
+          const titleY = H - Math.round(H * 0.135) - (titleLines.length - 1) * lineH;
+          titleLines.forEach((ln, i) => ctx.fillText(ln, W / 2, titleY + i * lineH));
+
+          URL.revokeObjectURL(objUrl);
+          canvas.toBlob(composited => {
+            setImageFile(composited);
+            setAiImagePath(null);
+            setCompressStats(null);
+            setImagePreview(URL.createObjectURL(composited));
+            setPhotoStep('details');
+            resolve();
+          }, 'image/jpeg', 0.88);
+        };
+        img.onerror = () => {
+          setAiImagePath(data.image);
+          setImageFile(null);
+          setCompressStats(null);
+          setImagePreview(data.image);
+          setPhotoStep('details');
+          resolve();
+        };
+        img.src = objUrl;
+      });
+    } catch {
+      flash('Could not generate image — please try again', 'err');
+    } finally {
+      setAiGenerating(false);
+    }
+  };
+
   const buildFD = (extra = {}) => {
     const fd = new FormData();
     const payload = { ...offerForm, ...extra };
     Object.entries(payload).forEach(([k, v]) => { if (v !== undefined && v !== null) fd.append(k, v); });
     if (imageFile) fd.append('image', imageFile, 'offer.jpg');
+    else if (aiImagePath) fd.append('ai_image_path', aiImagePath);
     return fd;
   };
 
@@ -1186,6 +1301,12 @@ export default function ShopDashboard() {
                     <button className="photo-btn gallery" onClick={() => { setCameraMsg(''); galleryRef.current?.click(); }}>
                       <span>🖼</span><strong>Gallery</strong><small>Choose existing</small>
                     </button>
+                    <button className="photo-btn" onClick={generateAiImage} disabled={aiGenerating}
+                      style={{ background: aiGenerating ? '#f3e8ff' : 'linear-gradient(135deg,#7c3aed,#a855f7)', color:'#fff', border:'none', opacity: aiGenerating ? 0.8 : 1 }}>
+                      <span>{aiGenerating ? '⏳' : '✨'}</span>
+                      <strong>{aiGenerating ? 'Generating…' : 'AI Generate'}</strong>
+                      <small>{aiGenerating ? 'Please wait' : 'Free · Instant'}</small>
+                    </button>
                   </div>
                   {cameraMsg && (
                     <div style={{ margin:'10px auto', padding:'10px 16px', background:'#fff3cd', border:'1px solid #ffc107', borderRadius:8, color:'#7a5700', fontSize:13, maxWidth:340, textAlign:'center' }}>
@@ -1193,7 +1314,7 @@ export default function ShopDashboard() {
                     </div>
                   )}
                   <input ref={cameraRef}  type="file" accept="image/*" capture="environment" style={{ display:'none' }} onChange={e => handleImage(e.target.files[0])} />
-                  <input ref={galleryRef} type="file" accept="image/*"                        style={{ display:'none' }} onChange={e => handleImage(e.target.files[0])} />
+                  <input ref={galleryRef} type="file" accept="image/*"                        style={{ display:'none' }} onChange={e => { setAiImagePath(null); handleImage(e.target.files[0]); }} />
                   <button className="photo-skip-btn" onClick={() => setPhotoStep('details')}>Skip photo, just add details →</button>
                 </div>
               )}
@@ -1227,7 +1348,7 @@ export default function ShopDashboard() {
                             : <span className="compress-badge">📸 Current photo</span>
                           }
                         </div>
-                        <button className="photo-bar-change" onClick={() => { setImageFile(null); setImagePreview(null); setCompressStats(null); setPhotoStep('pick'); }}>🔄 Change</button>
+                        <button className="photo-bar-change" onClick={() => { setImageFile(null); setImagePreview(null); setAiImagePath(null); setCompressStats(null); setPhotoStep('pick'); }}>🔄 Change</button>
                       </div>
                     )}
 

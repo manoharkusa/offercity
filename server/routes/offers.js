@@ -1,11 +1,45 @@
 const express = require('express');
 const multer = require('multer');
 const path = require('path');
+const fs = require('fs');
+const https = require('https');
+const http = require('http');
 const { getPool } = require('../config/db');
 const { protect, requireRole } = require('../middleware/auth');
 const log = require('../utils/log');
 
 const router = express.Router();
+
+function buildImagePrompt({ category, title, discount, shop_name }) {
+  const styles = {
+    'Fashion':     'luxury Indian fashion boutique, elegant ethnic wear and sarees on display, silk embroidery, vibrant jewel tones, golden warm lighting, premium store atmosphere',
+    'Food':        'appetizing Indian restaurant food photography, fresh ingredients, steam rising, warm candlelight, rustic wooden table, Michelin star plating quality',
+    'Electronics': 'modern electronics product photography, futuristic neon blue lighting, dark background, clean minimalist tech aesthetic, cinematic composition',
+    'Beauty':      'luxury beauty cosmetics flat lay, flower petals, marble surface, rose gold accents, soft studio lighting, glamour editorial style',
+    'Grocery':     'fresh colorful vegetables and fruits arranged artfully, vibrant farmers market style, natural sunlight, wholesome organic feel',
+    'Health':      'clean wellness health products, white minimalist background, green accents, fresh herbs, calm spa atmosphere',
+    'Travel':      'breathtaking scenic Indian destination, golden hour landscape, vibrant colors, professional travel photography, wanderlust',
+    'Other':       'professional product photography, clean background, vibrant colors, commercial advertisement style'
+  };
+  const style = styles[category] || styles['Other'];
+  const discountText = discount ? `${discount}% discount special sale offer` : 'special promotional offer';
+  return `${style}, ${discountText}, Indian market, high quality commercial photography, ultra realistic, 8K detail, no text, no watermark, no price tags`;
+}
+
+function downloadImage(url) {
+  return new Promise((resolve, reject) => {
+    const client = url.startsWith('https') ? https : http;
+    client.get(url, { timeout: 45000 }, (res) => {
+      if (res.statusCode >= 300 && res.statusCode < 400 && res.headers.location) {
+        return resolve(downloadImage(res.headers.location));
+      }
+      const chunks = [];
+      res.on('data', c => chunks.push(c));
+      res.on('end', () => resolve(Buffer.concat(chunks)));
+      res.on('error', reject);
+    }).on('error', reject);
+  });
+}
 
 const storage = multer.diskStorage({
   destination: (req, file, cb) => cb(null, path.join(__dirname, '../uploads')),
@@ -114,6 +148,26 @@ router.get('/:id', async (req, res) => {
   }
 });
 
+// POST /api/offers/generate-image  — free AI image via Pollinations.ai (no API key needed)
+router.post('/generate-image', protect, requireRole('shop_owner', 'admin'), async (req, res) => {
+  const { category, title, discount, shop_name } = req.body;
+  try {
+    const prompt = buildImagePrompt({ category: category || 'Other', title, discount, shop_name });
+    const seed = Math.floor(Math.random() * 99999);
+    const url = `https://image.pollinations.ai/prompt/${encodeURIComponent(prompt)}?width=1024&height=1024&model=flux&nologo=true&seed=${seed}`;
+
+    log.info(`[offers] AI image: category=${category} title=${title} discount=${discount}`);
+    const buffer = await downloadImage(url);
+    const filename = `ai_${Date.now()}.jpg`;
+    fs.writeFileSync(path.join(__dirname, '../uploads', filename), buffer);
+
+    res.json({ image: `/uploads/${filename}` });
+  } catch (err) {
+    log.error('[offers] generate-image error:', err.message, err.stack);
+    res.status(500).json({ message: 'Could not generate image — please try again' });
+  }
+});
+
 // POST /api/offers  (shop_owner)
 router.post('/', protect, requireRole('shop_owner', 'admin'), upload.single('image'), async (req, res) => {
   const { shop_id, title, description, discount, original_price, offer_price, valid_until, flash_hours } = req.body;
@@ -124,7 +178,7 @@ router.post('/', protect, requireRole('shop_owner', 'admin'), upload.single('ima
     if (shopRows.length === 0 && req.user.role !== 'admin')
       return res.status(403).json({ message: 'Not your shop' });
 
-    const image = req.file ? `/uploads/${req.file.filename}` : null;
+    const image = req.file ? `/uploads/${req.file.filename}` : (req.body.ai_image_path || null);
     const flash_expires_at = flash_hours
       ? new Date(Date.now() + parseFloat(flash_hours) * 3600 * 1000).toISOString().slice(0, 19).replace('T', ' ')
       : null;
