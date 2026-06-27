@@ -726,6 +726,7 @@ export default function ShopDashboard() {
 
           URL.revokeObjectURL(objUrl);
           canvas.toBlob(composited => {
+            if (!composited) { resolve(); return; }
             setImageFile(composited);
             setAiImagePath(null);
             setCompressStats(null);

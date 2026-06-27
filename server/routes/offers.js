@@ -26,19 +26,32 @@ function buildImagePrompt({ category, title, discount, shop_name }) {
   return `${style}, ${discountText}, Indian market, high quality commercial photography, ultra realistic, 8K detail, no text, no watermark, no price tags`;
 }
 
-function downloadImage(url) {
+function downloadImage(url, depth = 0) {
+  if (depth > 5) return Promise.reject(new Error('Too many redirects'));
   return new Promise((resolve, reject) => {
     const client = url.startsWith('https') ? https : http;
-    client.get(url, { timeout: 45000 }, (res) => {
+    const req = client.get(url, (res) => {
       if (res.statusCode >= 300 && res.statusCode < 400 && res.headers.location) {
-        return resolve(downloadImage(res.headers.location));
+        res.resume();
+        return resolve(downloadImage(res.headers.location, depth + 1));
       }
       const chunks = [];
       res.on('data', c => chunks.push(c));
       res.on('end', () => resolve(Buffer.concat(chunks)));
       res.on('error', reject);
-    }).on('error', reject);
+    });
+    req.setTimeout(45000, () => { req.destroy(new Error('Image download timed out')); });
+    req.on('error', reject);
   });
+}
+
+// Per-user cooldown for AI image generation (max 1 per 10s)
+const _aiGenLastCall = {};
+function aiRateLimit(userId) {
+  const now = Date.now();
+  if (_aiGenLastCall[userId] && now - _aiGenLastCall[userId] < 10000) return false;
+  _aiGenLastCall[userId] = now;
+  return true;
 }
 
 const storage = multer.diskStorage({
@@ -150,6 +163,9 @@ router.get('/:id', async (req, res) => {
 
 // POST /api/offers/generate-image  — free AI image via Pollinations.ai (no API key needed)
 router.post('/generate-image', protect, requireRole('shop_owner', 'admin'), async (req, res) => {
+  if (!aiRateLimit(req.user.id))
+    return res.status(429).json({ message: 'Please wait 10 seconds before generating another image' });
+
   const { category, title, discount, shop_name } = req.body;
   try {
     const prompt = buildImagePrompt({ category: category || 'Other', title, discount, shop_name });
@@ -159,7 +175,7 @@ router.post('/generate-image', protect, requireRole('shop_owner', 'admin'), asyn
     log.info(`[offers] AI image: category=${category} title=${title} discount=${discount}`);
     const buffer = await downloadImage(url);
     const filename = `ai_${Date.now()}.jpg`;
-    fs.writeFileSync(path.join(__dirname, '../uploads', filename), buffer);
+    await fs.promises.writeFile(path.join(__dirname, '../uploads', filename), buffer);
 
     res.json({ image: `/uploads/${filename}` });
   } catch (err) {
@@ -178,7 +194,10 @@ router.post('/', protect, requireRole('shop_owner', 'admin'), upload.single('ima
     if (shopRows.length === 0 && req.user.role !== 'admin')
       return res.status(403).json({ message: 'Not your shop' });
 
-    const image = req.file ? `/uploads/${req.file.filename}` : (req.body.ai_image_path || null);
+    const aiPath = req.body.ai_image_path;
+    const image = req.file
+      ? `/uploads/${req.file.filename}`
+      : (typeof aiPath === 'string' && /^\/uploads\/ai_\d+\.jpg$/.test(aiPath) ? aiPath : null);
     const flash_expires_at = flash_hours
       ? new Date(Date.now() + parseFloat(flash_hours) * 3600 * 1000).toISOString().slice(0, 19).replace('T', ' ')
       : null;

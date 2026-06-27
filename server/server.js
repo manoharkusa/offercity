@@ -137,8 +137,9 @@ app.post('/api/deploy-restart', (req, res) => {
   }, 500);
 });
 
-// ── Logs endpoint ─────────────────────────────────────────────────────────────
-app.get('/api/logs', (req, res) => {
+// ── Logs endpoint (admin-only) ────────────────────────────────────────────────
+const { protect: _protect, requireRole: _requireRole } = require('./middleware/auth');
+app.get('/api/logs', _protect, _requireRole('admin'), (req, res) => {
   try {
     const data  = fs.readFileSync(LOG_FILE, 'utf8');
     const all   = data.split('\n').filter(Boolean);

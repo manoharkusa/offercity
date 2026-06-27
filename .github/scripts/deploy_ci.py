@@ -199,12 +199,6 @@ else:
     )
     time.sleep(2)
 
-    # Flush logs before restarting — clean slate so post-deploy logs only show new server
-    sh(
-        f"truncate -s 0 {HOME_REMOTE}/public_html/server/node.log 2>/dev/null && echo 'node.log flushed' || echo 'node.log not found (OK)'",
-        "flush logs"
-    )
-
     # Always touch always_restart.txt — bypasses Passenger crash protection
     sh(
         f"mkdir -p {HOME_REMOTE}/public_html/tmp && "
@@ -243,6 +237,12 @@ else:
         print(f"Could not download node.log: {e}")
 
     if up:
+        # Flush logs NOW (after confirmed up) — preserves any crash output from the
+        # old process, while still giving a clean slate for the new server's logs.
+        sh(
+            f"truncate -s 0 {HOME_REMOTE}/public_html/server/node.log 2>/dev/null && echo 'node.log flushed' || echo 'node.log not found (OK)'",
+            "flush logs"
+        )
         # Remove always_restart.txt — it's only needed during the restart window.
         # Leaving it causes Passenger to restart on every request (dev-mode behaviour).
         sh(
