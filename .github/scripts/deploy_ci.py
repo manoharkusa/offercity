@@ -93,6 +93,7 @@ if new_css:
 print("=== Uploading server files ===")
 server_files = [
     ("server/Passengerfile.json",    f"{APP}/Passengerfile.json"),
+    ("server/package.json",          f"{APP}/package.json"),
     ("server/server.js",             f"{APP}/server.js"),
     ("server/utils/log.js",          f"{APP}/utils/log.js"),
     ("server/utils/cache.js",        f"{APP}/utils/cache.js"),
@@ -148,6 +149,14 @@ for local, remote in server_files:
 sftp.close()
 print()
 print(f"Server files changed: {server_changed}")
+
+# ── 3c. Run npm install if package.json changed or node_modules missing ───────
+r = sh(f"[ -d {APP}/node_modules ] && echo exists || echo missing", "check node_modules")
+if server_changed or "missing" in r:
+    print("=== Running npm install ===")
+    sh(f"cd {APP} && npm install --production 2>&1 | tail -5", "npm install", timeout=120)
+else:
+    print("=== node_modules up to date — skipping npm install ===")
 
 # ── 3b. Always clean up always_restart.txt if it exists ──────────────────────
 # Leaving always_restart.txt causes Passenger to restart on every request (dev mode).
