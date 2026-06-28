@@ -22,38 +22,35 @@ jobs:
       - name: Install and build React
         run: cd client && npm ci && npm run build
 
-      # 1. Pull latest server code on EC2
+      - name: Setup SSH key
+        run: |
+          mkdir -p ~/.ssh
+          echo "${{ secrets.EC2_SSH_KEY }}" > ~/.ssh/deploy_key
+          chmod 600 ~/.ssh/deploy_key
+          ssh-keyscan -H ${{ secrets.EC2_HOST }} >> ~/.ssh/known_hosts 2>/dev/null
+
       - name: Pull server code on EC2
-        uses: appleboy/ssh-action@v1
-        with:
-          host: ${{ secrets.EC2_HOST }}
-          username: ${{ secrets.EC2_USER }}
-          key: ${{ secrets.EC2_SSH_KEY }}
-          script: |
-            cd /home/ubuntu/offercity
-            git pull origin main
-            cd server && npm ci --omit=dev
+        run: |
+          ssh -i ~/.ssh/deploy_key -o StrictHostKeyChecking=no \
+            ${{ secrets.EC2_USER }}@${{ secrets.EC2_HOST }} \
+            "cd /home/ubuntu/offercity && git pull origin main && cd server && npm ci --omit=dev"
 
-      # 2. Upload built React dist to EC2
       - name: Upload React dist to EC2
-        uses: appleboy/scp-action@v0.1.7
-        with:
-          host: ${{ secrets.EC2_HOST }}
-          username: ${{ secrets.EC2_USER }}
-          key: ${{ secrets.EC2_SSH_KEY }}
-          source: "client/dist/"
-          target: "/home/ubuntu/offercity/client/dist/"
-          strip_components: 2
+        run: |
+          rsync -az --delete -e "ssh -i ~/.ssh/deploy_key -o StrictHostKeyChecking=no" \
+            client/dist/ \
+            ${{ secrets.EC2_USER }}@${{ secrets.EC2_HOST }}:/home/ubuntu/offercity/client/dist/
 
-      # 3. Inject secrets into .env and restart
       - name: Inject secrets and restart
-        uses: appleboy/ssh-action@v1
-        with:
-          host: ${{ secrets.EC2_HOST }}
-          username: ${{ secrets.EC2_USER }}
-          key: ${{ secrets.EC2_SSH_KEY }}
-          envs: GROQ_API_KEY,ANTHROPIC_API_KEY,VAPID_PUBLIC_KEY,VAPID_PRIVATE_KEY
-          script: |
+        env:
+          GROQ_API_KEY:      ${{ secrets.GROQ_API_KEY }}
+          ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+          VAPID_PUBLIC_KEY:  ${{ secrets.VAPID_PUBLIC_KEY }}
+          VAPID_PRIVATE_KEY: ${{ secrets.VAPID_PRIVATE_KEY }}
+        run: |
+          ssh -i ~/.ssh/deploy_key -o StrictHostKeyChecking=no \
+            ${{ secrets.EC2_USER }}@${{ secrets.EC2_HOST }} \
+            "bash -s" << 'REMOTE'
             ENV_FILE=/home/ubuntu/offercity/server/.env
 
             update_env() {
@@ -74,8 +71,4 @@ jobs:
             pm2 restart offercity --update-env
             sleep 5
             curl -sf http://localhost:5008/api/health && echo "Deploy OK" || echo "WARNING: health check failed"
-        env:
-          GROQ_API_KEY:      ${{ secrets.GROQ_API_KEY }}
-          ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
-          VAPID_PUBLIC_KEY:  ${{ secrets.VAPID_PUBLIC_KEY }}
-          VAPID_PRIVATE_KEY: ${{ secrets.VAPID_PRIVATE_KEY }}
+          REMOTE
