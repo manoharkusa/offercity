@@ -4,6 +4,9 @@ on:
   push:
     branches: [main]
 
+env:
+  EC2_IP: 3.110.190.182
+
 jobs:
   deploy:
     runs-on: ubuntu-latest
@@ -25,44 +28,36 @@ jobs:
       - name: Upload dist to EC2
         env:
           DEPLOY_SECRET: ${{ secrets.DEPLOY_SECRET }}
-          EC2_HOST: ${{ secrets.EC2_HOST }}
         run: |
-          echo "EC2_HOST length: ${#EC2_HOST} | DEPLOY_SECRET length: ${#DEPLOY_SECRET}"
-          echo "Packaging dist..."
           tar -czf /tmp/dist.tar.gz -C client/dist .
-          echo "Uploading dist ($(du -sh /tmp/dist.tar.gz | cut -f1)) to http://${EC2_HOST}/api/deploy-dist ..."
-          HTTP_CODE=$(curl -v -o /tmp/upload_resp.txt -w "%{http_code}" \
+          echo "Uploading $(du -sh /tmp/dist.tar.gz | cut -f1) to http://${{ env.EC2_IP }}/api/deploy-dist"
+          HTTP_CODE=$(curl -s -o /tmp/resp.txt -w "%{http_code}" \
             -X POST \
             -H "x-deploy-secret: ${DEPLOY_SECRET}" \
             -H "Content-Type: application/octet-stream" \
             --data-binary @/tmp/dist.tar.gz \
-            "http://${EC2_HOST}/api/deploy-dist" \
-            --max-time 60 2>/tmp/curl_debug.txt)
-          echo "HTTP: $HTTP_CODE"
-          echo "Response: $(cat /tmp/upload_resp.txt)"
-          echo "Curl debug: $(grep -E 'Connected|HTTP|error' /tmp/curl_debug.txt | head -10)"
+            "http://${{ env.EC2_IP }}/api/deploy-dist" \
+            --max-time 60)
+          echo "HTTP: $HTTP_CODE — $(cat /tmp/resp.txt)"
           [ "$HTTP_CODE" = "200" ] || exit 1
 
       - name: Restart server via webhook
         env:
           DEPLOY_SECRET: ${{ secrets.DEPLOY_SECRET }}
-          EC2_HOST: ${{ secrets.EC2_HOST }}
         run: |
           HTTP_CODE=$(curl -s -o /tmp/resp.txt -w "%{http_code}" -X POST \
             -H "x-deploy-secret: ${DEPLOY_SECRET}" \
             -H "Content-Type: application/json" \
-            "http://${EC2_HOST}/api/deploy-restart" \
+            "http://${{ env.EC2_IP }}/api/deploy-restart" \
             --max-time 15)
           echo "HTTP: $HTTP_CODE — $(cat /tmp/resp.txt)"
           [ "$HTTP_CODE" = "200" ] || exit 1
 
       - name: Wait for health check
-        env:
-          EC2_HOST: ${{ secrets.EC2_HOST }}
         run: |
           sleep 30
           for i in $(seq 1 6); do
-            STATUS=$(curl -sf "http://${EC2_HOST}/api/health" --max-time 10 2>/dev/null || echo "")
+            STATUS=$(curl -sf "http://${{ env.EC2_IP }}/api/health" --max-time 10 2>/dev/null || echo "")
             if [ -n "$STATUS" ]; then
               echo "EC2 healthy: $STATUS"
               exit 0
