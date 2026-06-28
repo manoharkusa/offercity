@@ -2,6 +2,8 @@ name: Migrate BigRock MySQL → EC2
 
 on:
   workflow_dispatch:
+  push:
+    branches: [migrate-db]
 
 jobs:
   migrate:
