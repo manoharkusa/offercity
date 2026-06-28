@@ -118,8 +118,9 @@ for (const [prefix, mod] of routes) {
 }
 
 // ── Health ────────────────────────────────────────────────────────────────────
+const cache = require('./utils/cache');
 app.get('/api/health', (req, res) => {
-  res.json({ status: 'OfferCity API running', port: process.env.PORT || 5000, pid: process.pid, v: '2.1' });
+  res.json({ status: 'OfferCity API running', port: process.env.PORT || 5000, pid: process.pid, v: '2.1', cache_keys: cache.size() });
 });
 
 // ── Deploy restart ────────────────────────────────────────────────────────────
