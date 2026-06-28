@@ -95,6 +95,7 @@ server_files = [
     ("server/Passengerfile.json",    f"{APP}/Passengerfile.json"),
     ("server/server.js",             f"{APP}/server.js"),
     ("server/utils/log.js",          f"{APP}/utils/log.js"),
+    ("server/utils/cache.js",        f"{APP}/utils/cache.js"),
     ("server/config/db.js",          f"{APP}/config/db.js"),
     ("server/middleware/auth.js",    f"{APP}/middleware/auth.js"),
     ("server/routes/auth.js",        f"{APP}/routes/auth.js"),
