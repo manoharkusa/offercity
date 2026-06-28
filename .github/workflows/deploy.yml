@@ -1,73 +1,18 @@
-name: Deploy to BigRock (Staging)
+name: Staging → Test → Production
 
 on:
   push:
     branches: [staging]
 
 env:
-  STAGING_URL: http://staging.offerscity.co.in
-  STAGING_IP: 192.185.129.210
   EC2_IP: 3.110.190.182
 
 jobs:
-  deploy:
-    runs-on: ubuntu-latest
-    outputs:
-      deploy_ok: ${{ steps.deploy.outcome == 'success' }}
-
-    steps:
-      - name: Checkout code
-        uses: actions/checkout@v4
-
-      - name: Setup Node.js
-        uses: actions/setup-node@v4
-        with:
-          node-version: '18'
-          cache: 'npm'
-          cache-dependency-path: client/package-lock.json
-
-      - name: Install client dependencies
-        run: cd client && npm ci
-
-      - name: Build React app
-        run: cd client && npm run build
-
-      - name: Write SSH key
-        run: |
-          printf '%s\n' "$SSH_CI_KEY" > /tmp/ci_key
-          chmod 600 /tmp/ci_key
-        env:
-          SSH_CI_KEY: ${{ secrets.SSH_CI_KEY }}
-
-      - name: Install paramiko
-        run: pip install paramiko
-
-      - name: Deploy to cPanel via SSH/SFTP
-        id: deploy
-        env:
-          SSH_HOST:          ${{ secrets.SSH_HOST }}
-          SSH_USER:          ${{ secrets.SSH_USER }}
-          SSH_KEY_PATH:      /tmp/ci_key
-          GROQ_API_KEY:       ${{ secrets.GROQ_API_KEY }}
-          ANTHROPIC_API_KEY:  ${{ secrets.ANTHROPIC_API_KEY }}
-          VAPID_PUBLIC_KEY:   ${{ secrets.VAPID_PUBLIC_KEY }}
-          VAPID_PRIVATE_KEY:  ${{ secrets.VAPID_PRIVATE_KEY }}
-        run: python .github/scripts/deploy_ci.py
-
-      - name: Upload node.log artifact
-        if: always()
-        uses: actions/upload-artifact@v4
-        with:
-          name: node-log
-          path: /tmp/node.log
-          if-no-files-found: ignore
-
   smoke-test:
     runs-on: ubuntu-latest
-    needs: deploy
 
     steps:
-      - name: Health check (EC2 production API)
+      - name: Health check
         run: |
           HTTP=$(curl -sf -o /tmp/health.json -w "%{http_code}" \
             "http://${{ env.EC2_IP }}/api/health" --max-time 15 || echo "000")
@@ -101,7 +46,7 @@ jobs:
           [ "$HTTP" = "200" ] || (echo "FAIL: homepage returned $HTTP"; exit 1)
 
       - name: All smoke tests passed
-        run: echo "EC2 API smoke tests passed — promoting staging to production"
+        run: echo "All checks passed — promoting to production"
 
   promote-to-production:
     runs-on: ubuntu-latest
@@ -124,4 +69,4 @@ jobs:
           git checkout main
           git merge origin/staging --no-edit -m "chore: promote staging to production [auto]"
           git push origin main
-          echo "Promoted staging → main. EC2 deploy will trigger automatically."
+          echo "Promoted staging → main. EC2 deploy triggered automatically."
