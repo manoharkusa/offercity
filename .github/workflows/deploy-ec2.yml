@@ -22,24 +22,25 @@ jobs:
       - name: Build React app
         run: cd client && npm ci && npm run build
 
-      - name: Setup SSH key
-        run: |
-          mkdir -p ~/.ssh
-          echo "${{ secrets.EC2_SSH_KEY }}" | base64 -d > ~/.ssh/deploy_key
-          chmod 600 ~/.ssh/deploy_key
-          ssh-keyscan -H "${{ secrets.EC2_HOST }}" >> ~/.ssh/known_hosts 2>/dev/null || true
-
-      - name: Upload React dist to EC2
+      - name: Upload dist to EC2
         env:
+          DEPLOY_SECRET: ${{ secrets.DEPLOY_SECRET }}
           EC2_HOST: ${{ secrets.EC2_HOST }}
         run: |
-          echo "Uploading dist to EC2..."
-          scp -i ~/.ssh/deploy_key -o StrictHostKeyChecking=no \
-            -r client/dist/. \
-            "ubuntu@${EC2_HOST}:/home/ubuntu/offercity/client/dist/"
-          echo "Upload complete"
+          echo "Packaging dist..."
+          tar -czf /tmp/dist.tar.gz -C client/dist .
+          echo "Uploading dist ($(du -sh /tmp/dist.tar.gz | cut -f1))..."
+          HTTP_CODE=$(curl -s -o /tmp/upload_resp.txt -w "%{http_code}" \
+            -X POST \
+            -H "x-deploy-secret: ${DEPLOY_SECRET}" \
+            -H "Content-Type: application/octet-stream" \
+            --data-binary @/tmp/dist.tar.gz \
+            "http://${EC2_HOST}/api/deploy-dist" \
+            --max-time 60)
+          echo "HTTP: $HTTP_CODE — $(cat /tmp/upload_resp.txt)"
+          [ "$HTTP_CODE" = "200" ] || exit 1
 
-      - name: Trigger server restart via webhook
+      - name: Restart server via webhook
         env:
           DEPLOY_SECRET: ${{ secrets.DEPLOY_SECRET }}
           EC2_HOST: ${{ secrets.EC2_HOST }}
@@ -52,7 +53,7 @@ jobs:
           echo "HTTP: $HTTP_CODE — $(cat /tmp/resp.txt)"
           [ "$HTTP_CODE" = "200" ] || exit 1
 
-      - name: Wait for EC2 health check
+      - name: Wait for health check
         env:
           EC2_HOST: ${{ secrets.EC2_HOST }}
         run: |

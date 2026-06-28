@@ -123,6 +123,31 @@ app.get('/api/health', (req, res) => {
   res.json({ status: 'OfferCity API running', port: process.env.PORT || 5000, pid: process.pid, v: '2.1', cache_keys: cache.size() });
 });
 
+// ── Deploy: upload client dist as tar.gz, extract to client/dist ─────────────
+app.post('/api/deploy-dist', (req, res) => {
+  const secret = process.env.DEPLOY_SECRET || 'offerscity-deploy-2025';
+  if (req.headers['x-deploy-secret'] !== secret) return res.status(403).json({ error: 'forbidden' });
+
+  const { execSync } = require('child_process');
+  const distDir = path0.join(__dirname, '..', 'client', 'dist');
+  const tmpFile = '/tmp/dist_upload.tar.gz';
+  const chunks  = [];
+
+  req.on('data', c => chunks.push(c));
+  req.on('end', () => {
+    try {
+      fs.writeFileSync(tmpFile, Buffer.concat(chunks));
+      execSync(`rm -rf "${distDir}" && mkdir -p "${distDir}" && tar -xzf "${tmpFile}" -C "${distDir}"`, { stdio: 'pipe' });
+      fs.unlinkSync(tmpFile);
+      log.info('[DEPLOY] dist uploaded and extracted OK');
+      res.json({ ok: true });
+    } catch (e) {
+      log.error('[DEPLOY] dist upload error:', e.message);
+      res.status(500).json({ error: e.message });
+    }
+  });
+});
+
 // ── Deploy webhook — git pull + npm ci server only, client dist uploaded by CI ─
 app.post('/api/deploy-restart', (req, res) => {
   const secret = process.env.DEPLOY_SECRET || 'offerscity-deploy-2025';
