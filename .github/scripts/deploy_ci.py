@@ -168,6 +168,7 @@ def inject_env(key, value, label=""):
     print(f"=== Injecting {label or key} into .env ===")
     sh(f"""if grep -q '^{key}=' {env_path} 2>/dev/null; then sed -i 's|^{key}=.*|{key}={value}|' {env_path} && echo "Updated"; else echo "{key}={value}" >> {env_path} && echo "Added"; fi""", f"update .env ({key})")
 
+inject_env("CLIENT_URL",          "http://staging.offerscity.co.in",               "CLIENT_URL")
 inject_env("GROQ_API_KEY",        os.environ.get("GROQ_API_KEY","").strip(),        "GROQ_API_KEY")
 inject_env("ANTHROPIC_API_KEY",   os.environ.get("ANTHROPIC_API_KEY","").strip(),   "ANTHROPIC_API_KEY")
 inject_env("VAPID_PUBLIC_KEY",    os.environ.get("VAPID_PUBLIC_KEY","").strip(),    "VAPID_PUBLIC_KEY")
@@ -215,7 +216,7 @@ else:
     up = False
     for i in range(40):
         time.sleep(5)
-        r = sh(f"curl -sf https://offerscity.co.in/api/health || echo 'not yet'")
+        r = sh(f"curl -sf http://staging.offerscity.co.in/api/health || echo 'not yet'")
         if 'running' in r or 'OfferCity' in r:
             print(f"✅ Server up after {(i+1)*5}s")
             up = True
@@ -254,7 +255,7 @@ else:
         print("❌ ERROR: Server did not come up within 200s after deploy!")
         import sys; sys.exit(1)
 
-sh(f"curl -s https://offerscity.co.in/api/health", "final health check")
+sh(f"curl -s http://staging.offerscity.co.in/api/health", "final health check")
 
 c.close()
 print("=== Deploy complete ===")
