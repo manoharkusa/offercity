@@ -186,6 +186,38 @@ app.get('/api/logs', _protect, _requireRole('admin'), (req, res) => {
   } catch (e) { res.json({ lines: [], total: 0, error: e.message }); }
 });
 
+// ── DB import webhook (one-shot migration, deploy-secret protected) ───────────
+app.post('/api/deploy-db-import', (req, res) => {
+  const secret = process.env.DEPLOY_SECRET || 'offerscity-deploy-2025';
+  if (req.headers['x-deploy-secret'] !== secret) return res.status(403).json({ error: 'forbidden' });
+
+  const chunks = [];
+  req.on('data', c => chunks.push(c));
+  req.on('end', () => {
+    const sql = Buffer.concat(chunks).toString('utf8');
+    if (!sql.includes('CREATE TABLE') && !sql.includes('INSERT INTO')) {
+      return res.status(400).json({ error: 'Does not look like a valid SQL dump' });
+    }
+    const { execSync } = require('child_process');
+    const tmpFile = '/tmp/import_dump.sql';
+    try {
+      fs.writeFileSync(tmpFile, sql);
+      const dbHost = process.env.DB_HOST || 'localhost';
+      const dbUser = process.env.DB_USER || 'offercity';
+      const dbPass = process.env.DB_PASS || process.env.DB_PASSWORD || '';
+      const dbName = process.env.DB_NAME || 'offercity';
+      const passArg = dbPass ? `-p'${dbPass}'` : '';
+      execSync(`mysql -h${dbHost} -u${dbUser} ${passArg} ${dbName} < ${tmpFile}`, { stdio: 'pipe' });
+      fs.unlinkSync(tmpFile);
+      log.info('[DB-IMPORT] Migration import completed OK');
+      res.json({ ok: true, msg: 'Database imported successfully' });
+    } catch (e) {
+      log.error('[DB-IMPORT] error:', e.message);
+      res.status(500).json({ error: e.message });
+    }
+  });
+});
+
 // ── Global error handler ──────────────────────────────────────────────────────
 app.use((err, req, res, next) => {
   log.error('Unhandled route error:', err.message, err.stack);

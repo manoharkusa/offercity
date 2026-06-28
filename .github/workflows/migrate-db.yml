@@ -34,9 +34,22 @@ jobs:
           wc -l /tmp/bigrock_dump.sql
           grep "^INSERT INTO" /tmp/bigrock_dump.sql | sed "s/INSERT INTO \`\([^']*\)\`.*/\1/" | sort | uniq -c | sort -rn
 
-      - name: Upload dump as artifact
+      - name: Import dump into EC2
+        env:
+          DEPLOY_SECRET: ${{ secrets.DEPLOY_SECRET }}
+        run: |
+          echo "Sending dump to EC2..."
+          HTTP=$(curl -s -o /tmp/import_resp.txt -w "%{http_code}" \
+            -X POST -H "x-deploy-secret: ${DEPLOY_SECRET}" \
+            -H "Content-Type: text/plain" \
+            --data-binary @/tmp/bigrock_dump.sql \
+            "http://3.110.190.182/api/deploy-db-import" --max-time 60)
+          echo "HTTP: $HTTP — $(cat /tmp/import_resp.txt)"
+          [ "$HTTP" = "200" ] || (echo "FAIL: import returned $HTTP"; exit 1)
+
+      - name: Upload dump as artifact (backup)
         uses: actions/upload-artifact@v4
         with:
           name: bigrock-mysql-dump
           path: /tmp/bigrock_dump.sql
-          retention-days: 1
+          retention-days: 7
