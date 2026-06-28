@@ -12,63 +12,29 @@ jobs:
       - name: Checkout code
         uses: actions/checkout@v4
 
-      - name: Setup Node.js
-        uses: actions/setup-node@v4
-        with:
-          node-version: '20'
-          cache: 'npm'
-          cache-dependency-path: client/package-lock.json
-
-      - name: Install and build React
-        run: cd client && npm ci && npm run build
-
-      - name: Setup SSH key
+      - name: Trigger deploy on EC2
         run: |
-          mkdir -p ~/.ssh
-          echo "${{ secrets.EC2_SSH_KEY }}" | base64 -d > ~/.ssh/deploy_key
-          chmod 600 ~/.ssh/deploy_key
-          ssh-keyscan -H "${{ secrets.EC2_HOST }}" >> ~/.ssh/known_hosts 2>/dev/null || true
+          echo "Calling EC2 deploy webhook..."
+          RESPONSE=$(curl -sf -X POST \
+            -H "x-deploy-secret: ${{ secrets.DEPLOY_SECRET }}" \
+            -H "Content-Type: application/json" \
+            http://${{ secrets.EC2_HOST }}/api/deploy-restart \
+            --max-time 15 2>&1)
+          echo "Response: $RESPONSE"
+          echo "Deploy triggered — EC2 is pulling code and restarting (takes ~60s)"
 
-      - name: Pull server code on EC2
+      - name: Wait for EC2 to come back
         run: |
-          ssh -i ~/.ssh/deploy_key -o StrictHostKeyChecking=no \
-            ${{ secrets.EC2_USER }}@${{ secrets.EC2_HOST }} \
-            "cd /home/ubuntu/offercity && git pull origin main && cd server && npm ci --omit=dev"
-
-      - name: Upload React dist to EC2
-        run: |
-          rsync -az --delete -e "ssh -i ~/.ssh/deploy_key -o StrictHostKeyChecking=no" \
-            client/dist/ \
-            ${{ secrets.EC2_USER }}@${{ secrets.EC2_HOST }}:/home/ubuntu/offercity/client/dist/
-
-      - name: Inject secrets and restart
-        env:
-          GROQ_API_KEY:      ${{ secrets.GROQ_API_KEY }}
-          ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
-          VAPID_PUBLIC_KEY:  ${{ secrets.VAPID_PUBLIC_KEY }}
-          VAPID_PRIVATE_KEY: ${{ secrets.VAPID_PRIVATE_KEY }}
-        run: |
-          ssh -i ~/.ssh/deploy_key -o StrictHostKeyChecking=no \
-            ${{ secrets.EC2_USER }}@${{ secrets.EC2_HOST }} \
-            "bash -s" << 'REMOTE'
-            ENV_FILE=/home/ubuntu/offercity/server/.env
-
-            update_env() {
-              local key=$1 val=$2
-              [ -z "$val" ] && return
-              if grep -q "^${key}=" "$ENV_FILE" 2>/dev/null; then
-                sed -i "s|^${key}=.*|${key}=${val}|" "$ENV_FILE"
-              else
-                echo "${key}=${val}" >> "$ENV_FILE"
-              fi
-            }
-
-            update_env GROQ_API_KEY      "$GROQ_API_KEY"
-            update_env ANTHROPIC_API_KEY "$ANTHROPIC_API_KEY"
-            update_env VAPID_PUBLIC_KEY  "$VAPID_PUBLIC_KEY"
-            update_env VAPID_PRIVATE_KEY "$VAPID_PRIVATE_KEY"
-
-            pm2 restart offercity --update-env
-            sleep 5
-            curl -sf http://localhost:5008/api/health && echo "Deploy OK" || echo "WARNING: health check failed"
-          REMOTE
+          echo "Waiting 75s for EC2 to restart..."
+          sleep 75
+          for i in $(seq 1 6); do
+            STATUS=$(curl -sf http://${{ secrets.EC2_HOST }}/api/health --max-time 10 2>/dev/null || echo "")
+            if [ -n "$STATUS" ]; then
+              echo "EC2 is up: $STATUS"
+              exit 0
+            fi
+            echo "  attempt $i — not ready yet, waiting 10s..."
+            sleep 10
+          done
+          echo "WARNING: EC2 health check timed out — check PM2 logs"
+          exit 1
