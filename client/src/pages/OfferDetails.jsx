@@ -1,9 +1,10 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, lazy, Suspense } from 'react';
 import { useParams } from 'react-router-dom';
 import api from '../services/api';
 import { useAuth } from '../context/AuthContext';
-import MapView from '../components/MapView';
 import ChatWidget from '../components/ChatWidget';
+
+const MapView = lazy(() => import('../components/MapView'));
 
 export default function OfferDetails() {
   const { id } = useParams();
@@ -152,14 +153,16 @@ export default function OfferDetails() {
           <h3 style={{ marginBottom: 8 }}>📍 {offer.shop_name}</h3>
           <p style={{ color: '#666', marginBottom: 4 }}>{offer.address}</p>
           <p style={{ color: '#888', marginBottom: 12 }}>🏙 {offer.city}</p>
-          <MapView
-            center={[sLng, sLat]}
-            markers={[
-              { lng: sLng, lat: sLat, label: offer.shop_name },
-              ...(userCoords ? [{ lng: userCoords.lng, lat: userCoords.lat, label: 'You', color: '#1565c0' }] : [])
-            ]}
-            route={route}
-          />
+          <Suspense fallback={<div style={{ height: 380, display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#888' }}>Loading map…</div>}>
+            <MapView
+              center={[sLng, sLat]}
+              markers={[
+                { lng: sLng, lat: sLat, label: offer.shop_name },
+                ...(userCoords ? [{ lng: userCoords.lng, lat: userCoords.lat, label: 'You', color: '#1565c0' }] : [])
+              ]}
+              route={route}
+            />
+          </Suspense>
         </div>
       </div>
 

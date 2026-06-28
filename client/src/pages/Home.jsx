@@ -1,9 +1,10 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, lazy, Suspense } from 'react';
 import { useNavigate } from 'react-router-dom';
 import api from '../services/api';
 import { useAuth } from '../context/AuthContext';
-import MapView from '../components/MapView';
 import OffersScroll from '../components/OffersScroll';
+
+const MapView = lazy(() => import('../components/MapView'));
 
 const CATEGORIES = [
   { key: 'All',         label: 'All Offers',   icon: '🔥', sub: 'Everything near you',    color: '#e65100' },
@@ -179,6 +180,7 @@ export default function Home() {
         {view === 'map' && coords && (
           <>
             <p style={{ color: '#888', fontSize: 13, marginBottom: 8 }}>📍 {shopMarkers.length} nearby shops on map. Click a pin to view.</p>
+            <Suspense fallback={<div style={{ height: 380, display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#888' }}>Loading map…</div>}>
             <MapView
               center={[coords.lng, coords.lat]}
               markers={[
@@ -187,6 +189,7 @@ export default function Home() {
               ]}
               onMarkerClick={(m) => m.link && navigate(m.link)}
             />
+            </Suspense>
             {shopMarkers.length > 0 && (
               <div style={{ marginTop: 16, display: 'flex', flexWrap: 'wrap', gap: 10 }}>
                 {shopMarkers.map(m => (
