@@ -4,6 +4,7 @@ const path = require('path');
 const { getPool } = require('../config/db');
 const { protect, requireRole } = require('../middleware/auth');
 const log = require('../utils/log');
+const cache = require('../utils/cache');
 
 const router = express.Router();
 
@@ -66,11 +67,15 @@ router.get('/owner/mine', protect, requireRole('shop_owner', 'admin'), async (re
 
 // GET /api/shops/slug/:slug  — public shop profile page data
 router.get('/slug/:slug', async (req, res) => {
+  const cacheKey = `shops:slug:${req.params.slug}`;
+  const cached = cache.get(cacheKey);
+  if (cached) return res.json(cached);
   try {
     const pool = getPool();
     const [rows] = await pool.query('SELECT id FROM shops WHERE slug = ?', [req.params.slug]);
     if (rows.length === 0) return res.status(404).json({ message: 'Shop not found' });
     const detail = await shopDetail(pool, rows[0].id);
+    cache.set(cacheKey, detail);
     res.json(detail);
   } catch (err) {
     log.error('[shops] error:', err.message, err.stack);
@@ -81,6 +86,9 @@ router.get('/slug/:slug', async (req, res) => {
 // GET /api/shops?lat=&lng=&radius=&category=&city=
 router.get('/', async (req, res) => {
   const { lat, lng, radius = 10, category, city } = req.query;
+  const cacheKey = `shops:list:${city||''}:${category||''}:${lat||''}:${lng||''}:${radius}`;
+  const cached = cache.get(cacheKey);
+  if (cached) return res.json(cached);
   try {
     const pool = getPool();
     let query, params;
@@ -107,6 +115,7 @@ router.get('/', async (req, res) => {
       if (city) params.push(`%${city}%`);
     }
     const [shops] = await pool.query(query, params);
+    cache.set(cacheKey, shops);
     res.json(shops);
   } catch (err) {
     log.error('[shops] error:', err.message, err.stack);
@@ -116,10 +125,14 @@ router.get('/', async (req, res) => {
 
 // GET /api/shops/:id
 router.get('/:id', async (req, res) => {
+  const cacheKey = `shops:id:${req.params.id}`;
+  const cached = cache.get(cacheKey);
+  if (cached) return res.json(cached);
   try {
     const pool = getPool();
     const detail = await shopDetail(pool, req.params.id);
     if (!detail) return res.status(404).json({ message: 'Shop not found' });
+    cache.set(cacheKey, detail);
     res.json(detail);
   } catch (err) {
     log.error('[shops] error:', err.message, err.stack);
@@ -180,6 +193,11 @@ router.put('/:id', protect, requireRole('shop_owner', 'admin'), upload.single('i
        lat || rows[0].lat, lng || rows[0].lng, image, req.params.id]
     );
     const [updated] = await pool.query('SELECT * FROM shops WHERE id = ?', [req.params.id]);
+    // Bust cache for this shop (slug may have changed too)
+    cache.del(`shops:id:${req.params.id}`);
+    cache.del(`shops:slug:${rows[0].slug}`);
+    cache.del(`shops:slug:${updated[0].slug}`);
+    cache.del('shops:list:');
     res.json(updated[0]);
   } catch (err) {
     log.error('[shops] error:', err.message, err.stack);

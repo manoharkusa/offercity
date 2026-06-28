@@ -8,6 +8,7 @@ const { getPool } = require('../config/db');
 const { protect, requireRole } = require('../middleware/auth');
 const log = require('../utils/log');
 
+const cache = require('../utils/cache');
 const router = express.Router();
 
 function buildImagePrompt({ category, title, discount, shop_name }) {
@@ -63,6 +64,9 @@ const upload = multer({ storage, limits: { fileSize: 5 * 1024 * 1024 } });
 // GET /api/offers?lat=&lng=&radius=&category=&city=
 router.get('/', async (req, res) => {
   const { lat, lng, radius = 10, category, city } = req.query;
+  const cacheKey = `offers:list:${city||''}:${category||''}:${lat||''}:${lng||''}:${radius}`;
+  const cached = cache.get(cacheKey);
+  if (cached) return res.json(cached);
   try {
     const pool = getPool();
     let query, params;
@@ -108,6 +112,7 @@ router.get('/', async (req, res) => {
     }
 
     const [offers] = await pool.query(query, params);
+    cache.set(cacheKey, offers);
     res.json(offers);
   } catch (err) {
     log.error('[offers] error:', err.message, err.stack);
@@ -207,6 +212,10 @@ router.post('/', protect, requireRole('shop_owner', 'admin'), upload.single('ima
       [shop_id, title, description, discount || 0, original_price, offer_price, valid_until || null, image, flash_expires_at]
     );
     const [rows] = await pool.query('SELECT * FROM offers WHERE id = ?', [result.insertId]);
+    cache.del('offers:list:');
+    cache.del(`offers:shop:${shop_id}`);
+    cache.del(`shops:id:${shop_id}`);
+    cache.del(`shops:slug:${shopRows[0].slug}`);
     res.status(201).json(rows[0]);
 
     // Fire-and-forget push — flash sales get urgent title
@@ -244,6 +253,9 @@ router.put('/:id', protect, requireRole('shop_owner', 'admin'), upload.single('i
        is_active !== undefined ? is_active : rows[0].is_active, image, req.params.id]
     );
     const [updated] = await pool.query('SELECT * FROM offers WHERE id = ?', [req.params.id]);
+    cache.del('offers:list:');
+    cache.del(`offers:shop:${rows[0].shop_id}`);
+    cache.del(`shops:id:${rows[0].shop_id}`);
     res.json(updated[0]);
   } catch (err) {
     log.error('[offers] error:', err.message, err.stack);
@@ -263,6 +275,9 @@ router.delete('/:id', protect, requireRole('shop_owner', 'admin'), async (req, r
     if (rows[0].owner_id !== req.user.id && req.user.role !== 'admin')
       return res.status(403).json({ message: 'Not authorized' });
     await pool.query('DELETE FROM offers WHERE id = ?', [req.params.id]);
+    cache.del('offers:list:');
+    cache.del(`offers:shop:${rows[0].shop_id}`);
+    cache.del(`shops:id:${rows[0].shop_id}`);
     res.json({ message: 'Offer deleted' });
   } catch (err) {
     log.error('[offers] error:', err.message, err.stack);

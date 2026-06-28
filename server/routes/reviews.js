@@ -2,6 +2,7 @@ const express = require('express');
 const { getPool } = require('../config/db');
 const { protect } = require('../middleware/auth');
 const log = require('../utils/log');
+const cache = require('../utils/cache');
 
 const router = express.Router();
 
@@ -27,6 +28,8 @@ router.post('/:shopId', protect, async (req, res) => {
        JOIN users u ON u.id = r.user_id WHERE r.id = ?`,
       [result.insertId]
     );
+    cache.del(`shops:id:${req.params.shopId}`);
+    cache.del('shops:slug:'); // slug unknown here, bust all slug entries
     log.info(`[reviews] new review shop=${req.params.shopId} user=${req.user.id} rating=${rating}`);
     res.status(201).json(rows[0]);
   } catch (err) {
