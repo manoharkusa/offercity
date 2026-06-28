@@ -56,15 +56,15 @@ if db_pass:
 else:
     pass_arg = ""
 
-cmd = f"mysqldump -u{db_user} {pass_arg} --single-transaction {db_name} 2>&1"
+cmd = f"mysqldump -u{db_user} {pass_arg} --single-transaction {db_name}"
 print("Running dump...")
 out, err = sh(cmd, timeout=180)
-print(f"Dump output: {len(out)} bytes, stderr: {err[:300] if err else 'none'}")
+print(f"Dump stdout: {len(out)} bytes, stderr: {err[:300] if err else 'none'}")
 
 # Check if dump looks valid
 if "CREATE TABLE" not in out and "INSERT INTO" not in out:
     # Try without --single-transaction
-    cmd2 = f"mysqldump -u{db_user} {pass_arg} {db_name} 2>&1"
+    cmd2 = f"mysqldump -u{db_user} {pass_arg} {db_name}"
     print("Retrying without --single-transaction...")
     out, err = sh(cmd2, timeout=180)
     print(f"Retry dump: {len(out)} bytes")
