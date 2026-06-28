@@ -184,16 +184,11 @@ inject_env("ANTHROPIC_API_KEY",   os.environ.get("ANTHROPIC_API_KEY","").strip()
 inject_env("VAPID_PUBLIC_KEY",    os.environ.get("VAPID_PUBLIC_KEY","").strip(),    "VAPID_PUBLIC_KEY")
 inject_env("VAPID_PRIVATE_KEY",   os.environ.get("VAPID_PRIVATE_KEY","").strip(),   "VAPID_PRIVATE_KEY")
 
-# ── 5. Restart only if server files changed ───────────────────────────────────
-# Skipping restart for client-only deploys prevents unnecessary Passenger exits
-# which can trigger crash protection when multiple deploys happen quickly.
+# ── 5. Always restart — .env may have changed even if server files didn't ────
 DEPLOY_SECRET = os.environ.get("DEPLOY_SECRET", "offerscity-deploy-2025")
 PORT_FILE = f"{HOME_REMOTE}/node_port.txt"
 
-if not server_changed:
-    print("=== Client-only deploy — skipping server restart ===")
-    time.sleep(5)
-else:
+if True:  # always restart on staging so new .env takes effect
     print("=== Server files changed — restarting Node process ===")
     time.sleep(3)
 
