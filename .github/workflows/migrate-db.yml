@@ -1,0 +1,66 @@
+name: Migrate BigRock MySQL → EC2
+
+on:
+  workflow_dispatch:
+
+jobs:
+  migrate:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Write BigRock SSH key
+        run: |
+          printf '%s\n' "${{ secrets.SSH_CI_KEY }}" > /tmp/br_key
+          chmod 600 /tmp/br_key
+
+      - name: Dump BigRock MySQL
+        env:
+          SSH_HOST: ${{ secrets.SSH_HOST }}
+          SSH_USER: ${{ secrets.SSH_USER }}
+        run: |
+          pip install -q paramiko
+          python3 - <<'EOF'
+          import paramiko, os, base64
+
+          key  = paramiko.Ed25519Key.from_private_key_file("/tmp/br_key")
+          c    = paramiko.SSHClient()
+          c.set_missing_host_key_policy(paramiko.AutoAddPolicy())
+          c.connect(os.environ["SSH_HOST"], username=os.environ["SSH_USER"], pkey=key, timeout=30)
+
+          # Read DB credentials from .env on BigRock
+          _, o, _ = c.exec_command("cat /home1/a1751tyi/public_html/server/.env 2>/dev/null || cat /home1/a1751tyi/.env 2>/dev/null || echo ''")
+          env_content = o.read().decode()
+          print("BigRock .env found:", len(env_content), "bytes")
+
+          db_user = "a1751tyi_offeruser"
+          db_pass = ""
+          db_name = "a1751tyi_offerscity"
+          for line in env_content.splitlines():
+              if line.startswith("DB_USER="): db_user = line.split("=",1)[1].strip().strip('"\'')
+              if line.startswith("DB_PASS=") or line.startswith("DB_PASSWORD="): db_pass = line.split("=",1)[1].strip().strip('"\'')
+              if line.startswith("DB_NAME="): db_name = line.split("=",1)[1].strip().strip('"\'')
+
+          print(f"Dumping {db_name} as {db_user}...")
+          cmd = f"mysqldump -u{db_user} -p'{db_pass}' {db_name} 2>/dev/null"
+          _, o, e = c.exec_command(cmd, timeout=120)
+          sql = o.read().decode(errors="replace")
+          err = e.read().decode(errors="replace")
+          if err: print("STDERR:", err[:500])
+          print(f"Dump size: {len(sql)} bytes")
+
+          with open("/tmp/bigrock_dump.sql", "w") as f:
+              f.write(sql)
+          c.close()
+          EOF
+
+      - name: Show dump stats
+        run: |
+          wc -l /tmp/bigrock_dump.sql
+          grep "^INSERT INTO" /tmp/bigrock_dump.sql | awk -F'`' '{print $2}' | sort | uniq -c | sort -rn
+
+      - name: Upload dump as artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: bigrock-mysql-dump
+          path: /tmp/bigrock_dump.sql
+          retention-days: 1
