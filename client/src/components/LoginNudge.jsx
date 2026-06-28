@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useLocation } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import api from '../services/api';
 
@@ -63,22 +63,30 @@ async function requestPushPermission() {
   }
 }
 
+const AUTH_PAGES = ['/login', '/register'];
+
 export default function LoginNudge() {
-  const { user }  = useAuth();
-  const navigate  = useNavigate();
+  const { user }    = useAuth();
+  const navigate    = useNavigate();
+  const { pathname} = useLocation();
   const [show, setShow]   = useState(false);
   const [email, setEmail] = useState('');
 
   useEffect(() => {
     if (user) { acceptCookies(); return; }
     if (localStorage.getItem(COOKIE_KEY) === 'true') return;
+    if (AUTH_PAGES.includes(pathname)) return;
     const t = setTimeout(() => setShow(true), NUDGE_DELAY);
     return () => clearTimeout(t);
-  }, [user]);
+  }, [user, pathname]);
 
   useEffect(() => {
     if (user) { acceptCookies(); setShow(false); }
   }, [user]);
+
+  useEffect(() => {
+    if (AUTH_PAGES.includes(pathname)) setShow(false);
+  }, [pathname]);
 
   const dismiss = async (goLogin = false) => {
     setShow(false);

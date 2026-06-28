@@ -11,6 +11,10 @@ export default function Register() {
   const handleSubmit = async (e) => {
     e.preventDefault();
     setError('');
+    if (!form.name.trim()) return setError('Full name is required');
+    if (!form.email.trim()) return setError('Email is required');
+    if (!form.password.trim()) return setError('Password is required');
+    if (form.password.length < 6) return setError('Password must be at least 6 characters');
     try {
       const user = await register(form);
       if (user.role === 'shop_owner') navigate('/shop-dashboard');
