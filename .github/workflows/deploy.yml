@@ -7,6 +7,7 @@ on:
 env:
   STAGING_URL: http://staging.offerscity.co.in
   STAGING_IP: 192.185.129.210
+  EC2_IP: 3.110.190.182
 
 jobs:
   deploy:
@@ -66,58 +67,41 @@ jobs:
     needs: deploy
 
     steps:
-      - name: Wait for staging to settle
-        run: sleep 15
-
-      - name: Resolve staging host
+      - name: Health check (EC2 production API)
         run: |
-          # Use domain if DNS is propagated, fallback to direct IP with Host header
-          if curl -sf --max-time 5 "${{ env.STAGING_URL }}/api/health" > /dev/null 2>&1; then
-            echo "CURL_OPTS=" >> $GITHUB_ENV
-            echo "BASE_URL=${{ env.STAGING_URL }}" >> $GITHUB_ENV
-            echo "Using domain: ${{ env.STAGING_URL }}"
-          else
-            echo "CURL_OPTS=--resolve staging.offerscity.co.in:80:${{ env.STAGING_IP }}" >> $GITHUB_ENV
-            echo "BASE_URL=${{ env.STAGING_URL }}" >> $GITHUB_ENV
-            echo "DNS not propagated — using IP ${{ env.STAGING_IP }} with Host header"
-          fi
-
-      - name: Health check
-        run: |
-          HTTP=$(curl -sf $CURL_OPTS -o /tmp/health.json -w "%{http_code}" \
-            "$BASE_URL/api/health" --max-time 15 || echo "000")
+          HTTP=$(curl -sf -o /tmp/health.json -w "%{http_code}" \
+            "http://${{ env.EC2_IP }}/api/health" --max-time 15 || echo "000")
           echo "HTTP: $HTTP — $(cat /tmp/health.json 2>/dev/null)"
           [ "$HTTP" = "200" ] || (echo "FAIL: health check returned $HTTP"; exit 1)
 
       - name: API — offers endpoint
         run: |
-          HTTP=$(curl -sf $CURL_OPTS -o /tmp/offers.json -w "%{http_code}" \
-            "$BASE_URL/api/offers" --max-time 15 || echo "000")
+          HTTP=$(curl -sf -o /tmp/offers.json -w "%{http_code}" \
+            "http://${{ env.EC2_IP }}/api/offers" --max-time 15 || echo "000")
           COUNT=$(cat /tmp/offers.json 2>/dev/null | python3 -c "import sys,json; print(len(json.load(sys.stdin)))" 2>/dev/null || echo 0)
           echo "HTTP: $HTTP — $COUNT offers"
           [ "$HTTP" = "200" ] || (echo "FAIL: offers endpoint returned $HTTP"; exit 1)
 
       - name: API — auth endpoint responds
         run: |
-          HTTP=$(curl -s $CURL_OPTS -o /tmp/auth.json -w "%{http_code}" \
-            -X POST "$BASE_URL/api/auth/login" \
+          HTTP=$(curl -s -o /tmp/auth.json -w "%{http_code}" \
+            -X POST "http://${{ env.EC2_IP }}/api/auth/login" \
             -H "Content-Type: application/json" \
             -d '{"email":"smoke@test.com","password":"wrongpass"}' \
             --max-time 15 || echo "000")
           echo "HTTP: $HTTP — $(cat /tmp/auth.json 2>/dev/null)"
-          # 401 is correct (wrong password) — proves the endpoint is reachable
           [ "$HTTP" = "401" ] || [ "$HTTP" = "400" ] || (echo "FAIL: auth returned $HTTP"; exit 1)
 
-      - name: Frontend — page loads
+      - name: Frontend — React app loads
         run: |
-          HTTP=$(curl -sf $CURL_OPTS -o /tmp/index.html -w "%{http_code}" \
-            "$BASE_URL" --max-time 15 || echo "000")
+          HTTP=$(curl -sf -o /tmp/index.html -w "%{http_code}" \
+            "http://${{ env.EC2_IP }}/" --max-time 15 || echo "000")
           TITLE=$(grep -o '<title>[^<]*</title>' /tmp/index.html 2>/dev/null | head -1 || echo "")
           echo "HTTP: $HTTP — $TITLE"
           [ "$HTTP" = "200" ] || (echo "FAIL: homepage returned $HTTP"; exit 1)
 
       - name: All smoke tests passed
-        run: echo "Staging smoke tests passed — ready for production"
+        run: echo "EC2 API smoke tests passed — promoting staging to production"
 
   promote-to-production:
     runs-on: ubuntu-latest
