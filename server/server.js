@@ -123,12 +123,12 @@ app.get('/api/health', (req, res) => {
   res.json({ status: 'OfferCity API running', port: process.env.PORT || 5000, pid: process.pid, v: '2.1', cache_keys: cache.size() });
 });
 
-// ── Deploy webhook — git pull + npm ci + build + pm2 restart (no SSH from CI) ─
+// ── Deploy webhook — git pull + npm ci server only, client dist uploaded by CI ─
 app.post('/api/deploy-restart', (req, res) => {
   const secret = process.env.DEPLOY_SECRET || 'offerscity-deploy-2025';
   if (req.headers['x-deploy-secret'] !== secret) return res.status(403).json({ error: 'forbidden' });
-  log.info('[DEPLOY] webhook triggered — pull + build + restart');
-  res.json({ ok: true, msg: 'Deploy started — server restarts in ~60s' });
+  log.info('[DEPLOY] webhook triggered — git pull + npm ci + restart');
+  res.json({ ok: true, msg: 'Deploy started — server restarts in ~20s' });
 
   const { execSync } = require('child_process');
   const root = path0.join(__dirname, '..');
@@ -138,8 +138,6 @@ app.post('/api/deploy-restart', (req, res) => {
       execSync('git pull origin main', { cwd: root, stdio: 'pipe' });
       log.info('[DEPLOY] npm ci server...');
       execSync('npm ci --omit=dev', { cwd: __dirname, stdio: 'pipe' });
-      log.info('[DEPLOY] npm ci + build client...');
-      execSync('npm ci && npm run build', { cwd: path0.join(root, 'client'), stdio: 'pipe', shell: true });
       log.info('[DEPLOY] done — exiting for PM2 restart');
     } catch (e) {
       log.error('[DEPLOY] error:', e.message);

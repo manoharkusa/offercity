@@ -12,39 +12,56 @@ jobs:
       - name: Checkout code
         uses: actions/checkout@v4
 
-      - name: Trigger deploy on EC2
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+          cache-dependency-path: client/package-lock.json
+
+      - name: Build React app
+        run: cd client && npm ci && npm run build
+
+      - name: Setup SSH key
+        run: |
+          mkdir -p ~/.ssh
+          echo "${{ secrets.EC2_SSH_KEY }}" | base64 -d > ~/.ssh/deploy_key
+          chmod 600 ~/.ssh/deploy_key
+          ssh-keyscan -H "${{ secrets.EC2_HOST }}" >> ~/.ssh/known_hosts 2>/dev/null || true
+
+      - name: Upload React dist to EC2
+        run: |
+          rsync -az --delete \
+            -e "ssh -i ~/.ssh/deploy_key -o StrictHostKeyChecking=no" \
+            client/dist/ \
+            ${{ secrets.EC2_USER }}@${{ secrets.EC2_HOST }}:/home/ubuntu/offercity/client/dist/
+
+      - name: Trigger server restart via webhook
         env:
           DEPLOY_SECRET: ${{ secrets.DEPLOY_SECRET }}
           EC2_HOST: ${{ secrets.EC2_HOST }}
         run: |
-          echo "Calling EC2 deploy webhook..."
-          HTTP_CODE=$(curl -s -o /tmp/deploy_resp.txt -w "%{http_code}" -X POST \
+          HTTP_CODE=$(curl -s -o /tmp/resp.txt -w "%{http_code}" -X POST \
             -H "x-deploy-secret: ${DEPLOY_SECRET}" \
             -H "Content-Type: application/json" \
             "http://${EC2_HOST}/api/deploy-restart" \
             --max-time 15)
-          echo "HTTP status: $HTTP_CODE"
-          echo "Response: $(cat /tmp/deploy_resp.txt)"
-          if [ "$HTTP_CODE" != "200" ]; then
-            echo "ERROR: Deploy webhook returned HTTP $HTTP_CODE"
-            exit 1
-          fi
-          echo "Deploy triggered successfully!"
+          echo "HTTP: $HTTP_CODE — $(cat /tmp/resp.txt)"
+          [ "$HTTP_CODE" = "200" ] || exit 1
 
-      - name: Wait for EC2 to come back
+      - name: Wait for EC2 health check
         env:
           EC2_HOST: ${{ secrets.EC2_HOST }}
         run: |
-          echo "Waiting 75s for EC2 to pull code and restart..."
-          sleep 75
-          for i in $(seq 1 8); do
+          sleep 30
+          for i in $(seq 1 6); do
             STATUS=$(curl -sf "http://${EC2_HOST}/api/health" --max-time 10 2>/dev/null || echo "")
             if [ -n "$STATUS" ]; then
-              echo "EC2 is up: $STATUS"
+              echo "EC2 healthy: $STATUS"
               exit 0
             fi
-            echo "  attempt $i — not ready yet, waiting 10s..."
+            echo "  attempt $i — waiting 10s..."
             sleep 10
           done
-          echo "WARNING: EC2 health check timed out"
+          echo "WARNING: health check timed out"
           exit 1
