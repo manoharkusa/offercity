@@ -30,12 +30,12 @@ export default function Register() {
       <form onSubmit={handleSubmit}>
         <div className="form-group">
           <label>Full Name</label>
-          <input required placeholder="Your name"
+          <input placeholder="Your name"
             value={form.name} onChange={e => setForm({ ...form, name: e.target.value })} />
         </div>
         <div className="form-group">
           <label>Email</label>
-          <input type="email" required placeholder="you@email.com"
+          <input type="email" placeholder="you@email.com"
             value={form.email} onChange={e => setForm({ ...form, email: e.target.value })} />
         </div>
         <div className="form-group">
@@ -45,7 +45,7 @@ export default function Register() {
         </div>
         <div className="form-group">
           <label>Password</label>
-          <input type="password" required placeholder="Min 6 characters"
+          <input type="password" placeholder="Min 6 characters"
             value={form.password} onChange={e => setForm({ ...form, password: e.target.value })} />
         </div>
         <div className="form-group">
