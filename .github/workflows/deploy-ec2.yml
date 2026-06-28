@@ -13,22 +13,32 @@ jobs:
         uses: actions/checkout@v4
 
       - name: Trigger deploy on EC2
+        env:
+          DEPLOY_SECRET: ${{ secrets.DEPLOY_SECRET }}
+          EC2_HOST: ${{ secrets.EC2_HOST }}
         run: |
           echo "Calling EC2 deploy webhook..."
-          RESPONSE=$(curl -sf -X POST \
-            -H "x-deploy-secret: ${{ secrets.DEPLOY_SECRET }}" \
+          HTTP_CODE=$(curl -s -o /tmp/deploy_resp.txt -w "%{http_code}" -X POST \
+            -H "x-deploy-secret: ${DEPLOY_SECRET}" \
             -H "Content-Type: application/json" \
-            http://${{ secrets.EC2_HOST }}/api/deploy-restart \
-            --max-time 15 2>&1)
-          echo "Response: $RESPONSE"
-          echo "Deploy triggered — EC2 is pulling code and restarting (takes ~60s)"
+            "http://${EC2_HOST}/api/deploy-restart" \
+            --max-time 15)
+          echo "HTTP status: $HTTP_CODE"
+          echo "Response: $(cat /tmp/deploy_resp.txt)"
+          if [ "$HTTP_CODE" != "200" ]; then
+            echo "ERROR: Deploy webhook returned HTTP $HTTP_CODE"
+            exit 1
+          fi
+          echo "Deploy triggered successfully!"
 
       - name: Wait for EC2 to come back
+        env:
+          EC2_HOST: ${{ secrets.EC2_HOST }}
         run: |
-          echo "Waiting 75s for EC2 to restart..."
+          echo "Waiting 75s for EC2 to pull code and restart..."
           sleep 75
-          for i in $(seq 1 6); do
-            STATUS=$(curl -sf http://${{ secrets.EC2_HOST }}/api/health --max-time 10 2>/dev/null || echo "")
+          for i in $(seq 1 8); do
+            STATUS=$(curl -sf "http://${EC2_HOST}/api/health" --max-time 10 2>/dev/null || echo "")
             if [ -n "$STATUS" ]; then
               echo "EC2 is up: $STATUS"
               exit 0
@@ -36,5 +46,5 @@ jobs:
             echo "  attempt $i — not ready yet, waiting 10s..."
             sleep 10
           done
-          echo "WARNING: EC2 health check timed out — check PM2 logs"
+          echo "WARNING: EC2 health check timed out"
           exit 1
