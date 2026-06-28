@@ -41,7 +41,7 @@ function OfferCard({ offer, navigate }) {
           </div>
       }
       {/* Discount badge on image */}
-      <div className="ofs-card-badge">{offer.discount}% OFF</div>
+      <div className="ofs-card-badge">{parseFloat(offer.discount)}% OFF</div>
 
       <div className="ofs-card-body">
         <div className="ofs-card-title">{offer.title}</div>
@@ -85,7 +85,7 @@ function OfferSlide({ offer, index, navigate }) {
       </div>
       <div className="ofs-overlay" />
       <div className="ofs-content">
-        <div className="ofs-badge">{offer.discount}% OFF</div>
+        <div className="ofs-badge">{parseFloat(offer.discount)}% OFF</div>
         <div className="ofs-title">{offer.title}</div>
         {(offer.offer_price || offer.original_price) && (
           <div className="ofs-price-row">

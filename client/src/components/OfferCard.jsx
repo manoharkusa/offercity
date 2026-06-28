@@ -59,7 +59,7 @@ export default function OfferCard({ offer }) {
         <p className="shop-name">📍 {offer.shop_name}</p>
         {offer.city && <p className="shop-name" style={{ fontSize: 12, color: '#888' }}>🏙 {offer.area || offer.city}</p>}
         <div className="price-row">
-          <span className="discount">{offer.discount}% OFF</span>
+          <span className="discount">{parseFloat(offer.discount)}% OFF</span>
           {offer.original_price && <span className="original">₹{Number(offer.original_price).toLocaleString('en-IN')}</span>}
           {offer.offer_price && <span className="discounted">₹{Number(offer.offer_price).toLocaleString('en-IN')}</span>}
         </div>

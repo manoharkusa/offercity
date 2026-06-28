@@ -108,7 +108,7 @@ export default function OfferDetails() {
           <p style={{ color: '#555', marginBottom: 12 }}>{offer.description}</p>
 
           <div className="price-row" style={{ marginBottom: 12 }}>
-            <span className="discount" style={{ fontSize: 28 }}>{offer.discount}% OFF</span>
+            <span className="discount" style={{ fontSize: 28 }}>{parseFloat(offer.discount)}% OFF</span>
             {offer.original_price && <span className="original">₹{Number(offer.original_price).toLocaleString('en-IN')}</span>}
             {offer.offer_price && <span className="discounted" style={{ fontSize: 22 }}>₹{Number(offer.offer_price).toLocaleString('en-IN')}</span>}
           </div>

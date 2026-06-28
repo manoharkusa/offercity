@@ -24,6 +24,7 @@ export default function ShopPage() {
   const { user } = useAuth();
   const [shop, setShop] = useState(null);
   const [loading, setLoading] = useState(true);
+  const [loadError, setLoadError] = useState(false);
   const [copied, setCopied] = useState(false);
   const [reviewForm, setReviewForm] = useState({ rating: 5, comment: '' });
   const [reviewMsg, setReviewMsg] = useState('');
@@ -31,13 +32,21 @@ export default function ShopPage() {
   const [catalog, setCatalog] = useState([]);
 
   useEffect(() => {
+    setLoading(true);
+    setLoadError(false);
+    const timeout = setTimeout(() => {
+      setLoading(false);
+      setLoadError(true);
+    }, 12000);
     api.get(`/shops/slug/${slug}`)
       .then(r => {
+        clearTimeout(timeout);
         setShop(r.data);
         setLoading(false);
         api.get(`/shops/${r.data.id}/catalog`).then(c => setCatalog(c.data)).catch(() => {});
       })
-      .catch(() => { setLoading(false); });
+      .catch(() => { clearTimeout(timeout); setLoading(false); setLoadError(true); });
+    return () => clearTimeout(timeout);
   }, [slug]);
 
   const doSubscribe = async (reg) => {
@@ -150,10 +159,18 @@ export default function ShopPage() {
   };
 
   if (loading) return <p className="loading">Loading shop...</p>;
-  if (!shop) return (
+  if (loadError || !shop) return (
     <div className="page" style={{ textAlign: 'center', padding: 60 }}>
-      <h2>Shop not found</h2>
-      <button className="btn-primary" style={{ width: 'auto', marginTop: 16 }} onClick={() => navigate('/')}>
+      <h2>{loadError ? 'Taking too long...' : 'Shop not found'}</h2>
+      <p style={{ color: '#888', marginBottom: 24 }}>
+        {loadError ? 'Slow connection — please try again.' : 'This shop may have moved or been removed.'}
+      </p>
+      {loadError && (
+        <button className="btn-primary" style={{ width: 'auto', marginBottom: 12 }} onClick={() => window.location.reload()}>
+          Retry
+        </button>
+      )}
+      <button className="btn-primary" style={{ width: 'auto', marginTop: loadError ? 0 : 16, background: '#888' }} onClick={() => navigate('/')}>
         Browse Nearby Offers
       </button>
     </div>
