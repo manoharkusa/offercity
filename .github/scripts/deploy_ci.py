@@ -167,8 +167,8 @@ sh(
     "cleanup always_restart.txt"
 )
 
-# ── 4. Inject secrets into production .env ────────────────────────────────────
-env_path = f"{HOME_REMOTE}/.env"
+# ── 4. Inject secrets into staging .env (dotenv loads from server working dir) ──
+env_path = f"{APP}/.env"
 
 def inject_env(key, value, label=""):
     if not value:
@@ -178,6 +178,7 @@ def inject_env(key, value, label=""):
     sh(f"""if grep -q '^{key}=' {env_path} 2>/dev/null; then sed -i 's|^{key}=.*|{key}={value}|' {env_path} && echo "Updated"; else echo "{key}={value}" >> {env_path} && echo "Added"; fi""", f"update .env ({key})")
 
 inject_env("CLIENT_URL",          "http://staging.offerscity.co.in",               "CLIENT_URL")
+inject_env("JWT_SECRET",          os.environ.get("JWT_SECRET","offercity-staging-secret-2025").strip(), "JWT_SECRET")
 inject_env("GROQ_API_KEY",        os.environ.get("GROQ_API_KEY","").strip(),        "GROQ_API_KEY")
 inject_env("ANTHROPIC_API_KEY",   os.environ.get("ANTHROPIC_API_KEY","").strip(),   "ANTHROPIC_API_KEY")
 inject_env("VAPID_PUBLIC_KEY",    os.environ.get("VAPID_PUBLIC_KEY","").strip(),    "VAPID_PUBLIC_KEY")
