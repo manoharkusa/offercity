@@ -1,0 +1,28 @@
+name: BigRock DNS Cutover to EC2
+
+on:
+  workflow_dispatch:
+  push:
+    branches: [dns-cutover]
+
+jobs:
+  dns:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Write BigRock SSH key
+        env:
+          SSH_CI_KEY: ${{ secrets.SSH_CI_KEY }}
+        run: |
+          printf '%s\n' "$SSH_CI_KEY" > /tmp/br_key
+          chmod 600 /tmp/br_key
+
+      - name: Install paramiko
+        run: pip install -q paramiko
+
+      - name: Inspect BigRock DNS
+        env:
+          SSH_HOST: ${{ secrets.SSH_HOST }}
+          SSH_USER: ${{ secrets.SSH_USER }}
+        run: python .github/scripts/bigrock_dns_cutover.py
