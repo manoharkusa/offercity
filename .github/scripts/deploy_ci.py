@@ -10,7 +10,7 @@ USER     = os.environ["SSH_USER"].strip()
 KEY_PATH = os.environ.get("SSH_KEY_PATH", "/tmp/ci_key").strip()
 
 HOME_REMOTE  = "/home1/a1751tyi"
-WEB          = f"{HOME_REMOTE}/public_html"
+WEB          = f"{HOME_REMOTE}/staging.offerscity.co.in"
 DIST_REMOTE  = f"{WEB}/client/dist"
 APP          = f"{WEB}/server"
 
