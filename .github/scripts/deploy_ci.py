@@ -152,8 +152,8 @@ print(f"Server files changed: {server_changed}")
 # ── 3b. Always clean up always_restart.txt if it exists ──────────────────────
 # Leaving always_restart.txt causes Passenger to restart on every request (dev mode).
 sh(
-    f"if [ -f {HOME_REMOTE}/public_html/tmp/always_restart.txt ]; then "
-    f"rm -f {HOME_REMOTE}/public_html/tmp/always_restart.txt && echo 'always_restart.txt cleaned up'; "
+    f"if [ -f {WEB}/tmp/always_restart.txt ]; then "
+    f"rm -f {WEB}/tmp/always_restart.txt && echo 'always_restart.txt cleaned up'; "
     f"else echo 'always_restart.txt not present'; fi",
     "cleanup always_restart.txt"
 )
@@ -203,20 +203,20 @@ else:
 
     # Always touch always_restart.txt — bypasses Passenger crash protection
     sh(
-        f"mkdir -p {HOME_REMOTE}/public_html/tmp && "
-        f"touch {HOME_REMOTE}/public_html/tmp/restart.txt && "
-        f"touch {HOME_REMOTE}/public_html/tmp/always_restart.txt && "
+        f"mkdir -p {WEB}/tmp && "
+        f"touch {WEB}/tmp/restart.txt && "
+        f"touch {WEB}/tmp/always_restart.txt && "
         f"echo 'Passenger restart signals sent'",
         "passenger restart signal"
     )
 
     # Wait up to 200s for Passenger to spawn a fresh worker
-    # (Passengerfile.json startup_timeout = 180s, so we need at least that)
+    # Check via localhost to avoid DNS dependency
     print("Waiting for server to come back up…")
     up = False
     for i in range(40):
         time.sleep(5)
-        r = sh(f"curl -sf http://staging.offerscity.co.in/api/health || echo 'not yet'")
+        r = sh(f"PORT=$(cat {PORT_FILE} 2>/dev/null || echo 5008); curl -sf http://localhost:$PORT/api/health || echo 'not yet'")
         if 'running' in r or 'OfferCity' in r:
             print(f"✅ Server up after {(i+1)*5}s")
             up = True
@@ -227,7 +227,6 @@ else:
     print("=== Downloading node.log ===")
     try:
         sftp2 = c.open_sftp()
-        # node.log now lives next to server.js at public_html/server/node.log
         sftp2.get(f"{APP}/node.log", "/tmp/node.log")
         sftp2.close()
         with open("/tmp/node.log", "r", errors="replace") as f:
@@ -239,23 +238,19 @@ else:
         print(f"Could not download node.log: {e}")
 
     if up:
-        # Flush logs NOW (after confirmed up) — preserves any crash output from the
-        # old process, while still giving a clean slate for the new server's logs.
         sh(
-            f"truncate -s 0 {HOME_REMOTE}/public_html/server/node.log 2>/dev/null && echo 'node.log flushed' || echo 'node.log not found (OK)'",
+            f"truncate -s 0 {APP}/node.log 2>/dev/null && echo 'node.log flushed' || echo 'node.log not found (OK)'",
             "flush logs"
         )
-        # Remove always_restart.txt — it's only needed during the restart window.
-        # Leaving it causes Passenger to restart on every request (dev-mode behaviour).
         sh(
-            f"rm -f {HOME_REMOTE}/public_html/tmp/always_restart.txt && echo 'always_restart.txt removed'",
+            f"rm -f {WEB}/tmp/always_restart.txt && echo 'always_restart.txt removed'",
             "remove always_restart.txt"
         )
     else:
         print("❌ ERROR: Server did not come up within 200s after deploy!")
         import sys; sys.exit(1)
 
-sh(f"curl -s http://staging.offerscity.co.in/api/health", "final health check")
+sh(f"PORT=$(cat {PORT_FILE} 2>/dev/null || echo 5008); curl -s http://localhost:$PORT/api/health", "final health check")
 
 c.close()
 print("=== Deploy complete ===")
