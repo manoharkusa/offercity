@@ -69,7 +69,7 @@ router.get('/owner/mine', protect, requireRole('shop_owner', 'admin'), async (re
 router.get('/slug/:slug', async (req, res) => {
   const cacheKey = `shops:slug:${req.params.slug}`;
   const cached = cache.get(cacheKey);
-  if (cached) return res.json(cached);
+  if (cached) return res.set('X-Cache', 'HIT').json(cached);
   try {
     const pool = getPool();
     const [rows] = await pool.query('SELECT id FROM shops WHERE slug = ?', [req.params.slug]);
@@ -88,7 +88,7 @@ router.get('/', async (req, res) => {
   const { lat, lng, radius = 10, category, city } = req.query;
   const cacheKey = `shops:list:${city||''}:${category||''}:${lat||''}:${lng||''}:${radius}`;
   const cached = cache.get(cacheKey);
-  if (cached) return res.json(cached);
+  if (cached) return res.set('X-Cache', 'HIT').json(cached);
   try {
     const pool = getPool();
     let query, params;
@@ -127,7 +127,7 @@ router.get('/', async (req, res) => {
 router.get('/:id', async (req, res) => {
   const cacheKey = `shops:id:${req.params.id}`;
   const cached = cache.get(cacheKey);
-  if (cached) return res.json(cached);
+  if (cached) return res.set('X-Cache', 'HIT').json(cached);
   try {
     const pool = getPool();
     const detail = await shopDetail(pool, req.params.id);

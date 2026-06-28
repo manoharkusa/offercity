@@ -66,7 +66,7 @@ router.get('/', async (req, res) => {
   const { lat, lng, radius = 10, category, city } = req.query;
   const cacheKey = `offers:list:${city||''}:${category||''}:${lat||''}:${lng||''}:${radius}`;
   const cached = cache.get(cacheKey);
-  if (cached) return res.json(cached);
+  if (cached) return res.set('X-Cache', 'HIT').json(cached);
   try {
     const pool = getPool();
     let query, params;
