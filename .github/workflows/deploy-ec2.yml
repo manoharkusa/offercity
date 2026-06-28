@@ -27,17 +27,20 @@ jobs:
           DEPLOY_SECRET: ${{ secrets.DEPLOY_SECRET }}
           EC2_HOST: ${{ secrets.EC2_HOST }}
         run: |
+          echo "EC2_HOST length: ${#EC2_HOST} | DEPLOY_SECRET length: ${#DEPLOY_SECRET}"
           echo "Packaging dist..."
           tar -czf /tmp/dist.tar.gz -C client/dist .
-          echo "Uploading dist ($(du -sh /tmp/dist.tar.gz | cut -f1))..."
-          HTTP_CODE=$(curl -s -o /tmp/upload_resp.txt -w "%{http_code}" \
+          echo "Uploading dist ($(du -sh /tmp/dist.tar.gz | cut -f1)) to http://${EC2_HOST}/api/deploy-dist ..."
+          HTTP_CODE=$(curl -v -o /tmp/upload_resp.txt -w "%{http_code}" \
             -X POST \
             -H "x-deploy-secret: ${DEPLOY_SECRET}" \
             -H "Content-Type: application/octet-stream" \
             --data-binary @/tmp/dist.tar.gz \
             "http://${EC2_HOST}/api/deploy-dist" \
-            --max-time 60)
-          echo "HTTP: $HTTP_CODE — $(cat /tmp/upload_resp.txt)"
+            --max-time 60 2>/tmp/curl_debug.txt)
+          echo "HTTP: $HTTP_CODE"
+          echo "Response: $(cat /tmp/upload_resp.txt)"
+          echo "Curl debug: $(grep -E 'Connected|HTTP|error' /tmp/curl_debug.txt | head -10)"
           [ "$HTTP_CODE" = "200" ] || exit 1
 
       - name: Restart server via webhook
