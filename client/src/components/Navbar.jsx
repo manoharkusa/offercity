@@ -19,7 +19,6 @@ export default function Navbar() {
       </button>
 
       <nav className={open ? 'nav-open' : ''}>
-        <Link to="/" onClick={close}>Nearby Offers</Link>
         {user && <Link to="/saved" onClick={close}>Saved</Link>}
         {user?.role === 'shop_owner' && <Link to="/shop-dashboard" onClick={close}>My Shop</Link>}
         {user?.role === 'admin' && <Link to="/admin" onClick={close}>Admin</Link>}

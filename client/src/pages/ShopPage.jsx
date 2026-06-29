@@ -4,6 +4,7 @@ import api from '../services/api';
 import { useAuth } from '../context/AuthContext';
 import OfferCard from '../components/OfferCard';
 import { PUSH_BANNER_VARIANTS } from '../components/PushBanners';
+import BackButton from '../components/BackButton';
 
 const CATEGORY_EMOJI = { Food: '🍔', Fashion: '👗', Electronics: '📱', Beauty: '💄', Grocery: '🛒', Health: '💊', Travel: '✈️', Other: '🏷️' };
 
@@ -181,6 +182,8 @@ export default function ShopPage() {
 
   return (
     <div className="page" style={{ maxWidth: 900, margin: '0 auto', paddingBottom: pushState === 'soft-ask' ? 170 : undefined }}>
+
+      <BackButton />
 
       {/* Shop Header Banner */}
       <div style={{

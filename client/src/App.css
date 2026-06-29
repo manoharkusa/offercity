@@ -541,6 +541,17 @@ a { text-decoration: none; color: inherit; }
 .photo-btn.camera  { border-color:#ffcc80; }
 .photo-btn.gallery { border-color:#90caf9; }
 
+/* Back button for detail pages */
+.back-btn {
+  display: inline-flex; align-items: center; gap: 6px;
+  background: #fff; border: 1.5px solid #e8ddcf; color: #555;
+  font-size: 14px; font-weight: 600; cursor: pointer;
+  padding: 8px 16px; border-radius: 10px; margin-bottom: 16px;
+  transition: all .15s; min-height: 40px;
+}
+.back-btn:hover { border-color: #e65100; color: #e65100; background: #fff7f0; }
+.back-btn span { font-size: 17px; line-height: 1; }
+
 /* Chat logs — table on desktop, cards on mobile */
 .chatlog-cards { display: none; }
 .chatlog-card {

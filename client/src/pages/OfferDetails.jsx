@@ -3,6 +3,7 @@ import { useParams } from 'react-router-dom';
 import api from '../services/api';
 import { useAuth } from '../context/AuthContext';
 import ChatWidget from '../components/ChatWidget';
+import BackButton from '../components/BackButton';
 
 const MapView = lazy(() => import('../components/MapView'));
 
@@ -89,6 +90,7 @@ export default function OfferDetails() {
 
   return (
     <div className="page">
+      <BackButton />
       <div style={{ display: 'flex', gap: 24, flexWrap: 'wrap' }}>
         <div style={{ flex: 1, minWidth: 280 }}>
           {offer.image && <img src={offer.image} alt={offer.title} style={{ width: '100%', borderRadius: 12, marginBottom: 16 }} />}
