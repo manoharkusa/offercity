@@ -195,7 +195,7 @@ router.post('/', protect, requireRole('shop_owner', 'admin'), upload.single('ima
   if (!shop_id || !title) return res.status(400).json({ message: 'shop_id and title required' });
   try {
     const pool = getPool();
-    const [shopRows] = await pool.query('SELECT id, name, city, slug FROM shops WHERE id = ? AND owner_id = ?', [shop_id, req.user.id]);
+    const [shopRows] = await pool.query('SELECT id, name, city, slug, category FROM shops WHERE id = ? AND owner_id = ?', [shop_id, req.user.id]);
     if (shopRows.length === 0 && req.user.role !== 'admin')
       return res.status(403).json({ message: 'Not your shop' });
 
@@ -217,6 +217,30 @@ router.post('/', protect, requireRole('shop_owner', 'admin'), upload.single('ima
     cache.del(`shops:id:${shop_id}`);
     cache.del(`shops:slug:${shopRows[0].slug}`);
     res.status(201).json(rows[0]);
+
+    // No image provided — auto-generate an innovative AI image in the background
+    // so every offer has a visual (don't block the create response on it).
+    if (!image) {
+      (async () => {
+        try {
+          const shopCat = shopRows[0]?.category;
+          const prompt = buildImagePrompt({ category: shopCat || 'Other', title, discount, shop_name: shopRows[0]?.name });
+          const seed = Math.floor(Math.random() * 99999);
+          const url = `https://image.pollinations.ai/prompt/${encodeURIComponent(prompt)}?width=1024&height=1024&model=flux&nologo=true&seed=${seed}`;
+          const buffer = await downloadImage(url);
+          if (buffer && buffer.length > 2000) {
+            const filename = `ai_${Date.now()}.jpg`;
+            await fs.promises.writeFile(path.join(__dirname, '../uploads', filename), buffer);
+            await pool.query('UPDATE offers SET image = ? WHERE id = ?', [`/uploads/${filename}`, result.insertId]);
+            cache.del('offers:list:');
+            cache.del(`offers:shop:${shop_id}`);
+            log.info(`[offers] auto-generated AI image for offer ${result.insertId}`);
+          }
+        } catch (e) {
+          log.error('[offers] auto-image error:', e.message);
+        }
+      })();
+    }
 
     // Fire-and-forget push — flash sales get urgent title
     const [shopFull] = await getPool().query('SELECT * FROM shops WHERE id = ?', [shop_id]);
