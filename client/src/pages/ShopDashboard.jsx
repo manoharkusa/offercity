@@ -1232,6 +1232,7 @@ export default function ShopDashboard() {
                     <h3>Add a Product Photo</h3>
                     <p>Offers with photos get <strong>3× more views</strong></p>
                   </div>
+                  {/* Primary: upload your own photo */}
                   <div className="photo-pick-btns">
                     <button className="photo-btn camera" onClick={openCamera}>
                       <span>📷</span><strong>Take Photo</strong><small>Open camera</small>
@@ -1239,18 +1240,25 @@ export default function ShopDashboard() {
                     <button className="photo-btn gallery" onClick={() => { setCameraMsg(''); galleryRef.current?.click(); }}>
                       <span>🖼</span><strong>Gallery</strong><small>Choose existing</small>
                     </button>
-                    <button className="photo-btn" onClick={generateAiImage} disabled={aiGenerating}
-                      style={{ background: aiGenerating ? '#f3e8ff' : 'linear-gradient(135deg,#7c3aed,#a855f7)', color:'#fff', border:'none', opacity: aiGenerating ? 0.8 : 1 }}>
-                      <span>{aiGenerating ? '⏳' : '✨'}</span>
-                      <strong>{aiGenerating ? 'Generating…' : 'AI Generate'}</strong>
-                      <small>{aiGenerating ? 'Please wait' : 'Free · Instant'}</small>
-                    </button>
                   </div>
                   {cameraMsg && (
                     <div style={{ margin:'10px auto', padding:'10px 16px', background:'#fff3cd', border:'1px solid #ffc107', borderRadius:8, color:'#7a5700', fontSize:13, maxWidth:340, textAlign:'center' }}>
                       ⚠️ {cameraMsg}
                     </div>
                   )}
+
+                  {/* OR divider */}
+                  <div className="photo-or"><span>or</span></div>
+
+                  {/* Alternative: generate with AI for owners who don't want to upload */}
+                  <button className="photo-ai-alt" onClick={generateAiImage} disabled={aiGenerating}>
+                    <span className="photo-ai-alt-icon">{aiGenerating ? '⏳' : '✨'}</span>
+                    <span className="photo-ai-alt-text">
+                      <strong>{aiGenerating ? 'Generating your image…' : "No photo? Generate one with AI"}</strong>
+                      <small>{aiGenerating ? 'Please wait a few seconds' : 'Free · Instant · Made from your offer details'}</small>
+                    </span>
+                  </button>
+
                   <input ref={cameraRef}  type="file" accept="image/*" capture="environment" style={{ display:'none' }} onChange={e => handleImage(e.target.files[0])} />
                   <input ref={galleryRef} type="file" accept="image/*"                        style={{ display:'none' }} onChange={e => { setAiImagePath(null); handleImage(e.target.files[0]); }} />
                   <button className="photo-skip-btn" onClick={() => setPhotoStep('details')}>Skip photo, just add details →</button>
