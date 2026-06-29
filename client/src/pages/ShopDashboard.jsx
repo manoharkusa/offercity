@@ -1286,7 +1286,14 @@ export default function ShopDashboard() {
                             : <span className="compress-badge">📸 Current photo</span>
                           }
                         </div>
-                        <button className="photo-bar-change" onClick={() => { setImageFile(null); setImagePreview(null); setAiImagePath(null); setCompressStats(null); setPhotoStep('pick'); }}>🔄 Change</button>
+                        <div style={{ display:'flex', gap:8, flexWrap:'wrap' }}>
+                          <button type="button" className="photo-bar-change" onClick={generateAiImage} disabled={aiGenerating}
+                            style={{ background: aiGenerating ? '#f3e8ff' : 'linear-gradient(135deg,#7c3aed,#a855f7)', color:'#fff', borderColor:'transparent', opacity: aiGenerating ? 0.85 : 1 }}
+                            title="Turn this into a polished AI image based on your offer details">
+                            {aiGenerating ? '⏳ Creating…' : '✨ AI Version'}
+                          </button>
+                          <button type="button" className="photo-bar-change" onClick={() => { setImageFile(null); setImagePreview(null); setAiImagePath(null); setCompressStats(null); setPhotoStep('pick'); }}>🔄 Change</button>
+                        </div>
                       </div>
                     )}
 
