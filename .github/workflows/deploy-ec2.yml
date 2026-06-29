@@ -6,6 +6,9 @@ on:
 
 env:
   EC2_IP: 3.110.190.182
+  # Use HTTPS via the domain — nginx now 301-redirects HTTP->HTTPS, which breaks
+  # POST webhooks if we hit plain http://IP. The cert is for the domain, not the IP.
+  BASE_URL: https://offerscity.co.in
 
 jobs:
   deploy:
@@ -30,13 +33,13 @@ jobs:
           DEPLOY_SECRET: ${{ secrets.DEPLOY_SECRET }}
         run: |
           tar -czf /tmp/dist.tar.gz -C client/dist .
-          echo "Uploading $(du -sh /tmp/dist.tar.gz | cut -f1) to http://${{ env.EC2_IP }}/api/deploy-dist"
+          echo "Uploading $(du -sh /tmp/dist.tar.gz | cut -f1) to ${{ env.BASE_URL }}/api/deploy-dist"
           HTTP_CODE=$(curl -s -o /tmp/resp.txt -w "%{http_code}" \
             -X POST \
             -H "x-deploy-secret: ${DEPLOY_SECRET}" \
             -H "Content-Type: application/octet-stream" \
             --data-binary @/tmp/dist.tar.gz \
-            "http://${{ env.EC2_IP }}/api/deploy-dist" \
+            "${{ env.BASE_URL }}/api/deploy-dist" \
             --max-time 60)
           echo "HTTP: $HTTP_CODE — $(cat /tmp/resp.txt)"
           [ "$HTTP_CODE" = "200" ] || exit 1
@@ -48,7 +51,7 @@ jobs:
           HTTP_CODE=$(curl -s -o /tmp/resp.txt -w "%{http_code}" -X POST \
             -H "x-deploy-secret: ${DEPLOY_SECRET}" \
             -H "Content-Type: application/json" \
-            "http://${{ env.EC2_IP }}/api/deploy-restart" \
+            "${{ env.BASE_URL }}/api/deploy-restart" \
             --max-time 15)
           echo "HTTP: $HTTP_CODE — $(cat /tmp/resp.txt)"
           [ "$HTTP_CODE" = "200" ] || exit 1
@@ -57,7 +60,7 @@ jobs:
         run: |
           sleep 30
           for i in $(seq 1 6); do
-            STATUS=$(curl -sf "http://${{ env.EC2_IP }}/api/health" --max-time 10 2>/dev/null || echo "")
+            STATUS=$(curl -sf "${{ env.BASE_URL }}/api/health" --max-time 10 2>/dev/null || echo "")
             if [ -n "$STATUS" ]; then
               echo "EC2 healthy: $STATUS"
               exit 0

@@ -6,6 +6,8 @@ on:
 
 env:
   EC2_IP: 3.110.190.182
+  # nginx now 301-redirects HTTP->HTTPS, so test over HTTPS via the domain.
+  BASE_URL: https://offerscity.co.in
 
 jobs:
   smoke-test:
@@ -15,14 +17,14 @@ jobs:
       - name: Health check
         run: |
           HTTP=$(curl -sf -o /tmp/health.json -w "%{http_code}" \
-            "http://${{ env.EC2_IP }}/api/health" --max-time 15 || echo "000")
+            "${{ env.BASE_URL }}/api/health" --max-time 15 || echo "000")
           echo "HTTP: $HTTP — $(cat /tmp/health.json 2>/dev/null)"
           [ "$HTTP" = "200" ] || (echo "FAIL: health check returned $HTTP"; exit 1)
 
       - name: API — offers endpoint
         run: |
           HTTP=$(curl -sf -o /tmp/offers.json -w "%{http_code}" \
-            "http://${{ env.EC2_IP }}/api/offers" --max-time 15 || echo "000")
+            "${{ env.BASE_URL }}/api/offers" --max-time 15 || echo "000")
           COUNT=$(cat /tmp/offers.json 2>/dev/null | python3 -c "import sys,json; print(len(json.load(sys.stdin)))" 2>/dev/null || echo 0)
           echo "HTTP: $HTTP — $COUNT offers"
           [ "$HTTP" = "200" ] || (echo "FAIL: offers endpoint returned $HTTP"; exit 1)
@@ -30,7 +32,7 @@ jobs:
       - name: API — auth endpoint responds
         run: |
           HTTP=$(curl -s -o /tmp/auth.json -w "%{http_code}" \
-            -X POST "http://${{ env.EC2_IP }}/api/auth/login" \
+            -X POST "${{ env.BASE_URL }}/api/auth/login" \
             -H "Content-Type: application/json" \
             -d '{"email":"smoke@test.com","password":"wrongpass"}' \
             --max-time 15 || echo "000")
@@ -40,7 +42,7 @@ jobs:
       - name: Frontend — React app loads
         run: |
           HTTP=$(curl -sf -o /tmp/index.html -w "%{http_code}" \
-            "http://${{ env.EC2_IP }}/" --max-time 15 || echo "000")
+            "${{ env.BASE_URL }}/" --max-time 15 || echo "000")
           TITLE=$(grep -o '<title>[^<]*</title>' /tmp/index.html 2>/dev/null | head -1 || echo "")
           echo "HTTP: $HTTP — $TITLE"
           [ "$HTTP" = "200" ] || (echo "FAIL: homepage returned $HTTP"; exit 1)
