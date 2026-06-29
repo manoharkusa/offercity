@@ -1,0 +1,42 @@
+name: Migrate BigRock Upload Files to EC2
+
+on:
+  workflow_dispatch:
+  push:
+    branches: [migrate-uploads]
+
+jobs:
+  migrate:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Write BigRock SSH key
+        env:
+          SSH_CI_KEY: ${{ secrets.SSH_CI_KEY }}
+        run: |
+          printf '%s\n' "$SSH_CI_KEY" > /tmp/br_key
+          chmod 600 /tmp/br_key
+
+      - name: Install paramiko
+        run: pip install -q paramiko
+
+      - name: Pull uploads from BigRock
+        env:
+          SSH_HOST: ${{ secrets.SSH_HOST }}
+          SSH_USER: ${{ secrets.SSH_USER }}
+          OUT_TAR: /tmp/uploads.tar.gz
+        run: python .github/scripts/migrate_uploads.py
+
+      - name: Push uploads to EC2
+        env:
+          DEPLOY_SECRET: ${{ secrets.DEPLOY_SECRET }}
+        run: |
+          echo "Uploading $(du -sh /tmp/uploads.tar.gz | cut -f1) to EC2..."
+          HTTP=$(curl -s -o /tmp/resp.txt -w "%{http_code}" \
+            -X POST -H "x-deploy-secret: ${DEPLOY_SECRET}" \
+            -H "Content-Type: application/octet-stream" \
+            --data-binary @/tmp/uploads.tar.gz \
+            "https://offerscity.co.in/api/deploy-uploads" --max-time 120)
+          echo "HTTP: $HTTP — $(cat /tmp/resp.txt)"
+          [ "$HTTP" = "200" ] || (echo "FAIL: upload import returned $HTTP"; exit 1)

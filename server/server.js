@@ -86,7 +86,12 @@ connectDB()
 
 app.use(cors({ origin: process.env.CLIENT_URL || '*', credentials: true }));
 app.use(express.json());
-app.use('/uploads', express.static(path.join(__dirname, 'uploads')));
+
+// Ensure the uploads dir exists — multer (offers/shops/bdo) writes here and will
+// crash if it's missing (e.g. after a server migration that didn't carry it over).
+const UPLOADS_DIR = path.join(__dirname, 'uploads');
+try { fs.mkdirSync(UPLOADS_DIR, { recursive: true }); } catch (_) {}
+app.use('/uploads', express.static(UPLOADS_DIR));
 
 // ── Routes — each in try/catch so one bad file can't kill the server ──────────
 const routes = [
@@ -213,6 +218,32 @@ app.post('/api/deploy-db-import', (req, res) => {
       res.json({ ok: true, msg: 'Database imported successfully' });
     } catch (e) {
       log.error('[DB-IMPORT] error:', e.message);
+      res.status(500).json({ error: e.message });
+    }
+  });
+});
+
+// ── Uploads import webhook (one-shot migration of BigRock image files) ────────
+app.post('/api/deploy-uploads', (req, res) => {
+  const secret = process.env.DEPLOY_SECRET || 'offercity-deploy-2025';
+  if (req.headers['x-deploy-secret'] !== secret) return res.status(403).json({ error: 'forbidden' });
+
+  const tmpFile = '/tmp/uploads_migrate.tar.gz';
+  const chunks  = [];
+  req.on('data', c => chunks.push(c));
+  req.on('end', () => {
+    const { execSync } = require('child_process');
+    try {
+      fs.writeFileSync(tmpFile, Buffer.concat(chunks));
+      fs.mkdirSync(UPLOADS_DIR, { recursive: true });
+      // Merge into uploads (do NOT wipe existing files)
+      execSync(`tar -xzf "${tmpFile}" -C "${UPLOADS_DIR}"`, { stdio: 'pipe' });
+      fs.unlinkSync(tmpFile);
+      const count = fs.readdirSync(UPLOADS_DIR).length;
+      log.info(`[UPLOADS-IMPORT] extracted OK — ${count} files now in uploads`);
+      res.json({ ok: true, files: count });
+    } catch (e) {
+      log.error('[UPLOADS-IMPORT] error:', e.message);
       res.status(500).json({ error: e.message });
     }
   });
