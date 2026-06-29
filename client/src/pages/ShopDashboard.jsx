@@ -303,7 +303,8 @@ function ChatLogsTab({ shops, flash }) {
 
       {logs.length > 0 && (
         <>
-          <div style={{ overflowX: 'auto', borderRadius: 12, border: '1px solid #f0ebe4', background: '#fff' }}>
+          {/* Desktop: table */}
+          <div className="chatlog-table" style={{ overflowX: 'auto', borderRadius: 12, border: '1px solid #f0ebe4', background: '#fff' }}>
             <table style={{ width: '100%', borderCollapse: 'collapse', minWidth: 700 }}>
               <thead style={{ background: '#faf7f3' }}>
                 <tr>
@@ -347,6 +348,30 @@ function ChatLogsTab({ shops, flash }) {
                 ))}
               </tbody>
             </table>
+          </div>
+
+          {/* Mobile: stacked cards */}
+          <div className="chatlog-cards">
+            {logs.map(l => (
+              <div key={l.id} className="chatlog-card">
+                <div className="clc-top">
+                  <span style={{ padding: '3px 10px', borderRadius: 20, fontSize: 11, fontWeight: 700,
+                    background: l.channel === 'whatsapp' ? '#e8f5e9' : '#e3f2fd',
+                    color: l.channel === 'whatsapp' ? '#2e7d32' : '#1565c0' }}>
+                    {l.channel === 'whatsapp' ? '📱 WhatsApp' : '🌐 Web'}
+                  </span>
+                  <span className="clc-date">
+                    {new Date(l.created_at).toLocaleDateString('en-IN', { day: 'numeric', month: 'short' })}, {new Date(l.created_at).toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit' })}
+                  </span>
+                </div>
+                <div className="clc-cust">
+                  {l.customer_name || 'Anonymous'}
+                  {l.customer_phone && <span style={{ color: '#888', fontWeight: 400 }}> · {l.customer_phone}</span>}
+                </div>
+                <div className="clc-q"><b>Q:</b>{l.message}</div>
+                <div className="clc-a"><b>AI:</b>{l.reply || 'No reply'}</div>
+              </div>
+            ))}
           </div>
 
           {/* Pagination */}
@@ -2055,13 +2080,13 @@ export default function ShopDashboard() {
             </>
           )}
 
-        </div>
-      </div>
-
           {/* ── Chat Logs Tab ── */}
           {tab === 'chat-logs' && (
             <ChatLogsTab shops={shops} flash={flash} />
           )}
+
+        </div>
+      </div>
 
       {/* ── Mobile Bottom Navigation ── */}
       <nav className="sd-bottom-nav">

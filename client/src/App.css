@@ -541,6 +541,22 @@ a { text-decoration: none; color: inherit; }
 .photo-btn.camera  { border-color:#ffcc80; }
 .photo-btn.gallery { border-color:#90caf9; }
 
+/* Chat logs — table on desktop, cards on mobile */
+.chatlog-cards { display: none; }
+.chatlog-card {
+  background: #fff; border: 1px solid #f0ebe4; border-radius: 12px; padding: 12px 14px;
+}
+.clc-top { display: flex; justify-content: space-between; align-items: center; gap: 8px; margin-bottom: 8px; }
+.clc-date { font-size: 11px; color: #999; white-space: nowrap; }
+.clc-cust { font-size: 13px; font-weight: 600; color: #222; margin-bottom: 8px; }
+.clc-q { font-size: 13px; color: #222; margin-bottom: 8px; line-height: 1.4; }
+.clc-a { font-size: 13px; color: #555; background: #faf7f3; border-radius: 8px; padding: 8px 10px; line-height: 1.4; }
+.clc-q b, .clc-a b { color: #e65100; font-weight: 700; margin-right: 5px; }
+@media (max-width: 680px) {
+  .chatlog-table { display: none; }
+  .chatlog-cards { display: flex; flex-direction: column; gap: 10px; }
+}
+
 /* "or" divider between upload and AI generate */
 .photo-or {
   display:flex; align-items:center; gap:12px;
