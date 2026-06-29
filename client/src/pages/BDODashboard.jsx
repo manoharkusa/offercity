@@ -2,7 +2,7 @@ import { useState, useEffect } from 'react';
 import api from '../services/api';
 import { useAuth } from '../context/AuthContext';
 
-const STATUS_COLOR = { pending: '#e65100', approved: '#2e7d32', rejected: '#c62828' };
+const STATUS_COLOR = { pending: 'var(--brand)', approved: '#2e7d32', rejected: '#c62828' };
 const STATUS_BG    = { pending: '#fff3e0', approved: '#e8f5e9', rejected: '#ffebee' };
 
 const BLANK_FORM = {
@@ -81,7 +81,7 @@ export default function BDODashboard() {
 
       {/* Header */}
       <div style={{ marginBottom: 24 }}>
-        <h1 style={{ color: '#e65100', margin: 0 }}>🧑‍💼 BDO Dashboard</h1>
+        <h1 style={{ color: 'var(--brand)', margin: 0 }}>🧑‍💼 BDO Dashboard</h1>
         <p style={{ color: '#888', margin: '4px 0 0', fontSize: 14 }}>
           {user?.name} &nbsp;·&nbsp;
           {profile?.areas?.length > 0
@@ -94,7 +94,7 @@ export default function BDODashboard() {
       {stats && (
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(120px,1fr))', gap: 12, marginBottom: 24 }}>
           {[
-            ['Pending',  stats.pending,  '#fff3e0', '#e65100'],
+            ['Pending',  stats.pending,  '#fff3e0', 'var(--brand)'],
             ['Approved', stats.approved, '#e8f5e9', '#2e7d32'],
             ['Rejected', stats.rejected, '#ffebee', '#c62828'],
             ['Total',    stats.total,    '#e3f2fd', '#1565c0'],
@@ -112,7 +112,7 @@ export default function BDODashboard() {
         {TABS.map(([key, label]) => (
           <button key={key} onClick={() => { setTab(key); setMsg({ text: '', ok: true }); }}
             style={{ padding: '9px 20px', borderRadius: 20, border: 'none', cursor: 'pointer', fontWeight: 600, fontSize: 14,
-              background: tab === key ? '#e65100' : '#f0f0f0',
+              background: tab === key ? 'var(--brand)' : '#f0f0f0',
               color: tab === key ? '#fff' : '#555' }}>
             {label}
           </button>
@@ -136,7 +136,7 @@ export default function BDODashboard() {
 
           {/* Section: Shop Owner */}
           <div style={{ background: '#f8f9fa', borderRadius: 10, padding: 16, marginBottom: 20 }}>
-            <div style={{ fontWeight: 700, color: '#e65100', marginBottom: 14, fontSize: 15 }}>👤 Shop Owner Details</div>
+            <div style={{ fontWeight: 700, color: 'var(--brand)', marginBottom: 14, fontSize: 15 }}>👤 Shop Owner Details</div>
             <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px,1fr))', gap: 14 }}>
               {[
                 ['owner_name',    'Owner Full Name *', 'text', true],
@@ -167,7 +167,7 @@ export default function BDODashboard() {
 
           {/* Section: Shop Details */}
           <div style={{ background: '#f8f9fa', borderRadius: 10, padding: 16, marginBottom: 20 }}>
-            <div style={{ fontWeight: 700, color: '#e65100', marginBottom: 14, fontSize: 15 }}>🏪 Shop Details</div>
+            <div style={{ fontWeight: 700, color: 'var(--brand)', marginBottom: 14, fontSize: 15 }}>🏪 Shop Details</div>
             <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px,1fr))', gap: 14 }}>
               {[
                 ['shop_name', 'Shop Name *',  'text',  true],
@@ -263,7 +263,7 @@ export default function BDODashboard() {
           </div>
 
           <button type="submit" disabled={saving}
-            style={{ width: '100%', padding: '14px', background: saving ? '#aaa' : '#e65100',
+            style={{ width: '100%', padding: '14px', background: saving ? '#aaa' : 'var(--brand)',
               color: '#fff', border: 'none', borderRadius: 10, fontWeight: 700, fontSize: 16, cursor: saving ? 'not-allowed' : 'pointer' }}>
             {saving ? 'Submitting…' : '📤 Submit for Admin Approval'}
           </button>

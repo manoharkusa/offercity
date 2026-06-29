@@ -291,7 +291,7 @@ function ChatLogsTab({ shops, flash }) {
         <div style={{ textAlign: 'center', padding: '30px 0' }}>
           <p style={{ color: '#c62828', marginBottom: 12, fontSize: 14 }}>Could not load — server may be starting up.</p>
           <button onClick={() => load(shopId, channel, page)}
-            style={{ padding: '8px 24px', background: '#e65100', color: '#fff', border: 'none', borderRadius: 8, cursor: 'pointer', fontWeight: 700 }}>
+            style={{ padding: '8px 24px', background: 'var(--brand)', color: '#fff', border: 'none', borderRadius: 8, cursor: 'pointer', fontWeight: 700 }}>
             Retry
           </button>
         </div>
@@ -974,9 +974,9 @@ export default function ShopDashboard() {
                           }
                           <div>
                             <div style={{ display:'flex', alignItems:'center', gap:8, flexWrap:'wrap' }}>
-                              <h3 style={{ margin:'0 0 4px', color:'#e65100' }}>{s.name}</h3>
+                              <h3 style={{ margin:'0 0 4px', color:'var(--brand)' }}>{s.name}</h3>
                               {s.status === 'pending' && (
-                                <span style={{ background:'#fff3e0', color:'#e65100', border:'1px solid #ffcc80', borderRadius:12, padding:'2px 10px', fontSize:11, fontWeight:700 }}>
+                                <span style={{ background:'#fff3e0', color:'var(--brand)', border:'1px solid #ffcc80', borderRadius:12, padding:'2px 10px', fontSize:11, fontWeight:700 }}>
                                   ⏳ Pending BDO Approval
                                 </span>
                               )}
@@ -995,7 +995,7 @@ export default function ShopDashboard() {
                           </div>
                         </div>
                         <a href={shopUrl(s)} target="_blank" rel="noreferrer"
-                          style={{ padding:'6px 14px', background:'#e65100', color:'#fff', borderRadius:8, fontSize:13, textDecoration:'none', fontWeight:600 }}>
+                          style={{ padding:'6px 14px', background:'var(--brand)', color:'#fff', borderRadius:8, fontSize:13, textDecoration:'none', fontWeight:600 }}>
                           🔗 View Page
                         </a>
                       </div>
@@ -1006,7 +1006,7 @@ export default function ShopDashboard() {
                             📍 Location set — customers will get proximity alerts
                           </span>
                         ) : (
-                          <span style={{ fontSize:12, color:'#e65100', background:'#fff3e0', borderRadius:8, padding:'4px 10px', fontWeight:600 }}>
+                          <span style={{ fontSize:12, color:'var(--brand)', background:'#fff3e0', borderRadius:8, padding:'4px 10px', fontWeight:600 }}>
                             ⚠️ No location — customers won't get nearby alerts
                           </span>
                         )}
@@ -1028,9 +1028,9 @@ export default function ShopDashboard() {
                       </div>
 
                       <div className="shop-share-row" style={{ background:'#fff8f0', border:'1px solid #ffe0b2', borderRadius:8, padding:'10px 14px', marginTop:10, display:'flex', alignItems:'center', gap:10, flexWrap:'wrap' }}>
-                        <span style={{ fontSize:13, color:'#555', flex:1, wordBreak:'break-all', minWidth:0 }}>📲 <span style={{ color:'#e65100' }}>{link}</span></span>
+                        <span style={{ fontSize:13, color:'#555', flex:1, wordBreak:'break-all', minWidth:0 }}>📲 <span style={{ color:'var(--brand)' }}>{link}</span></span>
                         <button onClick={() => { navigator.clipboard.writeText(link); flash('Link copied!'); }}
-                          style={{ padding:'8px 16px', background:'#e65100', color:'#fff', border:'none', borderRadius:6, cursor:'pointer', fontSize:13, fontWeight:600 }}>📋 Copy</button>
+                          style={{ padding:'8px 16px', background:'var(--brand)', color:'#fff', border:'none', borderRadius:6, cursor:'pointer', fontSize:13, fontWeight:600 }}>📋 Copy</button>
                         <button onClick={() => window.open(`https://wa.me/?text=${encodeURIComponent(`🛍️ *${s.name}* on OfferCity!\n📍 ${s.address}, ${s.city}${s.pin_code ? ' – ' + s.pin_code : ''}\n👉 ${link}`)}`, '_blank')}
                           style={{ padding:'8px 16px', background:'#25D366', color:'#fff', border:'none', borderRadius:6, cursor:'pointer', fontSize:13, fontWeight:600 }}>💬 WhatsApp</button>
                       </div>
@@ -1066,7 +1066,7 @@ export default function ShopDashboard() {
                   {shopImagePreview
                     ? (
                       <div style={{ display:'flex', alignItems:'center', gap:12, marginBottom:8 }}>
-                        <img src={shopImagePreview} alt="" style={{ width:80, height:70, objectFit:'cover', borderRadius:10, border:'2px solid #e65100' }} />
+                        <img src={shopImagePreview} alt="" style={{ width:80, height:70, objectFit:'cover', borderRadius:10, border:'2px solid var(--brand)' }} />
                         <button type="button" onClick={() => { setShopImageFile(null); setShopImagePreview(null); }}
                           style={{ padding:'6px 12px', background:'#eee', border:'none', borderRadius:6, cursor:'pointer', fontSize:13 }}>🗑 Remove</button>
                       </div>
@@ -1075,7 +1075,7 @@ export default function ShopDashboard() {
                       <div style={{ border:'2px dashed #ffb74d', borderRadius:10, padding:'18px', textAlign:'center', cursor:'pointer', background:'#fff8f0', marginBottom:8 }}
                         onClick={() => shopImageRef.current?.click()}>
                         <div style={{ fontSize:32 }}>📸</div>
-                        <p style={{ margin:'4px 0 0', fontSize:13, color:'#e65100' }}>Tap to add shop photo</p>
+                        <p style={{ margin:'4px 0 0', fontSize:13, color:'var(--brand)' }}>Tap to add shop photo</p>
                       </div>
                     )
                   }
@@ -1116,7 +1116,7 @@ export default function ShopDashboard() {
                 {/* Location */}
                 <div style={{ background: shopForm.lat ? '#e8f5e9' : '#fff3e0', border: `2px solid ${shopForm.lat ? '#66bb6a' : '#ffb74d'}`, borderRadius:10, padding:'14px 16px', marginBottom:16 }}>
                   <div style={{ display:'flex', alignItems:'center', justifyContent:'space-between', marginBottom: shopForm.lat ? 8 : 0 }}>
-                    <span style={{ fontWeight:600, fontSize:14, color: shopForm.lat ? '#2e7d32' : '#e65100' }}>
+                    <span style={{ fontWeight:600, fontSize:14, color: shopForm.lat ? '#2e7d32' : 'var(--brand)' }}>
                       {locDetecting ? '⏳ Detecting location…' : shopForm.lat ? '📍 Location detected' : '📍 Location required *'}
                     </span>
                     <button type="button" onClick={() => getLocation(false)}
@@ -1178,7 +1178,7 @@ export default function ShopDashboard() {
                           <tr key={o.id}>
                             <td>{o.image ? <img src={o.image} alt="" style={{ width:44, height:38, objectFit:'cover', borderRadius:6 }} /> : <span>📷</span>}</td>
                             <td><strong>{o.title}</strong></td>
-                            <td style={{ color:'#e65100', fontWeight:700 }}>{o.discount}% OFF</td>
+                            <td style={{ color:'var(--brand)', fontWeight:700 }}>{o.discount}% OFF</td>
                             <td>
                               {o.original_price && <span style={{ textDecoration:'line-through', color:'#aaa', fontSize:12 }}>₹{fmt(o.original_price)}</span>}
                               {o.offer_price && <span style={{ color:'#2e7d32', fontWeight:600, marginLeft:4 }}>₹{fmt(o.offer_price)}</span>}
@@ -1188,7 +1188,7 @@ export default function ShopDashboard() {
                             <td>👁 {o.views||0}</td>
                             <td style={{ whiteSpace:'nowrap' }}>
                               <button onClick={() => startEdit(o)} style={{ color:'#1565c0', background:'none', border:'none', cursor:'pointer', marginRight:6 }}>✏️</button>
-                              <button onClick={() => toggleActive(o)} style={{ color: o.is_active?'#e65100':'#2e7d32', background:'none', border:'none', cursor:'pointer', marginRight:6 }}>{o.is_active?'⏸':'▶️'}</button>
+                              <button onClick={() => toggleActive(o)} style={{ color: o.is_active?'var(--brand)':'#2e7d32', background:'none', border:'none', cursor:'pointer', marginRight:6 }}>{o.is_active?'⏸':'▶️'}</button>
                               <button onClick={() => deleteOffer(o.id)} style={{ color:'#c62828', background:'none', border:'none', cursor:'pointer' }}>🗑</button>
                             </td>
                           </tr>
@@ -1353,7 +1353,7 @@ export default function ShopDashboard() {
                         <div className="form-group">
                           <label>Discount *</label>
                           <select value={offerForm.discount} onChange={e => setDiscount(e.target.value)} required
-                            style={{ fontWeight:700, color: offerForm.discount ? '#e65100' : '#999' }}>
+                            style={{ fontWeight:700, color: offerForm.discount ? 'var(--brand)' : '#999' }}>
                             <option value="">— % —</option>
                             {DISCOUNTS.map(d => <option key={d} value={d}>{d}% OFF</option>)}
                           </select>
@@ -1398,12 +1398,12 @@ export default function ShopDashboard() {
                         <div style={{ display:'flex', alignItems:'center', gap:10, marginBottom: offerForm.flash_hours ? 10 : 0 }}>
                           <span style={{ fontSize:20 }}>⚡</span>
                           <div style={{ flex:1 }}>
-                            <div style={{ fontWeight:700, color:'#e65100', fontSize:14 }}>Flash Sale</div>
+                            <div style={{ fontWeight:700, color:'var(--brand)', fontSize:14 }}>Flash Sale</div>
                             <div style={{ fontSize:12, color:'#888' }}>Instant push to nearby users · Offer expires automatically</div>
                           </div>
                           <select value={offerForm.flash_hours}
                             onChange={e => setOfferForm({ ...offerForm, flash_hours: e.target.value })}
-                            style={{ padding:'6px 10px', borderRadius:6, border:'1px solid #ffcc80', fontSize:13, fontWeight:600, color: offerForm.flash_hours ? '#e65100' : '#888' }}>
+                            style={{ padding:'6px 10px', borderRadius:6, border:'1px solid #ffcc80', fontSize:13, fontWeight:600, color: offerForm.flash_hours ? 'var(--brand)' : '#888' }}>
                             <option value="">Off</option>
                             <option value="1">1 hour</option>
                             <option value="2">2 hours</option>
@@ -1413,7 +1413,7 @@ export default function ShopDashboard() {
                           </select>
                         </div>
                         {offerForm.flash_hours && (
-                          <div style={{ fontSize:12, color:'#e65100', fontWeight:600 }}>
+                          <div style={{ fontSize:12, color:'var(--brand)', fontWeight:600 }}>
                             ⚡ Push notification fires immediately · Expires in {offerForm.flash_hours} hour{offerForm.flash_hours > 1 ? 's' : ''}
                           </div>
                         )}
@@ -1502,7 +1502,7 @@ export default function ShopDashboard() {
                       ➕ Post Another Offer
                     </button>
                     <button onClick={() => { setSelectedShop(String(postedOffer.shop_id)); setTab('offers'); }}
-                      style={{ padding:'12px 28px', background:'#fff', border:'2px solid #e65100', color:'#e65100', borderRadius:10, cursor:'pointer', fontWeight:700 }}>
+                      style={{ padding:'12px 28px', background:'#fff', border:'2px solid var(--brand)', color:'var(--brand)', borderRadius:10, cursor:'pointer', fontWeight:700 }}>
                       📋 View My Offers
                     </button>
                   </div>
@@ -1521,7 +1521,7 @@ export default function ShopDashboard() {
                         setCampOfferId(String(postedOffer.id));
                         setCampMsg(buildWAMessage(postedOffer));
                         setTab('campaign');
-                      }} style={{ padding:'10px 20px', background:'#e65100', color:'#fff', border:'none', borderRadius:8, cursor:'pointer', fontWeight:700, fontSize:14 }}>
+                      }} style={{ padding:'10px 20px', background:'var(--brand)', color:'#fff', border:'none', borderRadius:8, cursor:'pointer', fontWeight:700, fontSize:14 }}>
                         📣 Send to All Contacts
                       </button>
                     </div>
@@ -1981,7 +1981,7 @@ export default function ShopDashboard() {
               {/* ── QR Code Generator ── */}
               {shops.length > 0 && (
                 <div style={{ marginTop: 24 }}>
-                  <h3 style={{ color:'#e65100', marginBottom:12 }}>📱 Shop QR Codes</h3>
+                  <h3 style={{ color:'var(--brand)', marginBottom:12 }}>📱 Shop QR Codes</h3>
                   <p style={{ color:'#777', fontSize:13, marginBottom:14 }}>
                     Print on pamphlets, banners, visiting cards. Customers scan → land on your shop page → see all offers.
                   </p>
@@ -2003,7 +2003,7 @@ export default function ShopDashboard() {
                             <div style={{ fontWeight:700, color:'#333' }}>{s.name}</div>
                             <div style={{ fontSize:12, color:'#aaa', overflow:'hidden', textOverflow:'ellipsis', whiteSpace:'nowrap' }}>{fullUrl}</div>
                           </div>
-                          <span style={{ fontSize:18, color:'#e65100', flexShrink:0 }}>{isOpen ? '▲' : '▼'}</span>
+                          <span style={{ fontSize:18, color:'var(--brand)', flexShrink:0 }}>{isOpen ? '▲' : '▼'}</span>
                         </div>
 
                         {/* Expanded QR panel */}
@@ -2014,7 +2014,7 @@ export default function ShopDashboard() {
                               <img
                                 src={qrImgUrl(fullUrl)}
                                 alt="QR Code"
-                                style={{ width:200, height:200, border:'3px solid #e65100', borderRadius:12, display:'block' }}
+                                style={{ width:200, height:200, border:'3px solid var(--brand)', borderRadius:12, display:'block' }}
                               />
                               <p style={{ fontSize:11, color:'#aaa', marginTop:6 }}>Scan to open shop page</p>
                             </div>
@@ -2032,7 +2032,7 @@ export default function ShopDashboard() {
 
                               <div style={{ display:'flex', flexDirection:'column', gap:8 }}>
                                 <button onClick={() => downloadQR(fullUrl, s.name)}
-                                  style={{ padding:'10px 16px', background:'#e65100', color:'#fff', border:'none', borderRadius:8, cursor:'pointer', fontWeight:600, fontSize:14, textAlign:'left' }}>
+                                  style={{ padding:'10px 16px', background:'var(--brand)', color:'#fff', border:'none', borderRadius:8, cursor:'pointer', fontWeight:600, fontSize:14, textAlign:'left' }}>
                                   ⬇️ Download QR (PNG)
                                 </button>
                                 <button onClick={() => {

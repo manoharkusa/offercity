@@ -30,7 +30,7 @@ function AreaChips({ offers, selected, onSelect }) {
 /* ─── Desktop card ───────────────────────────────────────── */
 function OfferCard({ offer, navigate }) {
   const initial = offer.shop_name?.charAt(0)?.toUpperCase() || '?';
-  const color = CAT_COLORS[offer.category] || '#e65100';
+  const color = CAT_COLORS[offer.category] || 'var(--brand)';
   return (
     <div className="ofs-card" onClick={() => navigate(`/offers/${offer.id}`)}>
       {/* Image */}

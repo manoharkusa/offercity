@@ -6,19 +6,27 @@
     <title>OfferCity – Smart Nearby Offers & Deals</title>
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
-    <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700;800;900&family=Inter:wght@400;500;600&display=swap" rel="stylesheet" />
+    <link rel="preconnect" href="https://api.fontshare.com" crossorigin />
+    <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&family=Outfit:wght@400;500;600;700;800&display=swap" rel="stylesheet" />
+    <link href="https://api.fontshare.com/v2/css?f[]=clash-display@600,700&display=swap" rel="stylesheet" />
     <style>
       #boot-loader {
-        position: fixed; inset: 0; background: #fff8f5;
+        position: fixed; inset: 0; background: #FAF7F2;
         display: flex; flex-direction: column;
-        align-items: center; justify-content: center; gap: 14px;
+        align-items: center; justify-content: center; gap: 16px;
         z-index: 9999;
+        font-family: 'Plus Jakarta Sans', system-ui, sans-serif;
       }
-      #boot-loader .logo { font-size: 38px; }
-      #boot-loader .name { font-size: 20px; font-weight: 800; color: #e65100; letter-spacing: -0.5px; }
+      #boot-loader .logo {
+        width: 52px; height: 52px; border-radius: 15px;
+        background: linear-gradient(135deg, #E85D04, #C2410C);
+        display: flex; align-items: center; justify-content: center; font-size: 26px;
+        box-shadow: 0 8px 24px rgba(232,93,4,.3);
+      }
+      #boot-loader .name { font-size: 22px; font-weight: 800; color: #1C1714; letter-spacing: -0.5px; }
       #boot-loader .spin {
-        width: 32px; height: 32px;
-        border: 3px solid #f0e6d6; border-top-color: #e65100;
+        width: 30px; height: 30px;
+        border: 3px solid #ECE5DB; border-top-color: #E85D04;
         border-radius: 50%; animation: bl-spin 0.8s linear infinite;
       }
       @keyframes bl-spin { to { transform: rotate(360deg); } }
@@ -26,7 +34,7 @@
   </head>
   <body>
     <div id="boot-loader">
-      <div class="logo">🏪</div>
+      <div class="logo">🔥</div>
       <div class="name">OfferCity</div>
       <div class="spin"></div>
     </div>
