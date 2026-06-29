@@ -20,7 +20,7 @@ export default function SavedOffers() {
 
   return (
     <div className="page">
-      <h1 style={{ color: 'var(--brand)', marginBottom: 24 }}>❤️ Saved Offers</h1>
+      <h1 style={{ color: '#e65100', marginBottom: 24 }}>❤️ Saved Offers</h1>
       {loading ? <p className="loading">Loading...</p> :
         offers.length === 0 ? <p className="loading">No saved offers yet. Browse and save deals!</p> :
         <div className="offers-grid">

@@ -7,7 +7,7 @@ import OffersScroll from '../components/OffersScroll';
 const MapView = lazy(() => import('../components/MapView'));
 
 const CATEGORIES = [
-  { key: 'All',         label: 'All Offers',   icon: '🔥', sub: 'Everything near you',    color: 'var(--brand)' },
+  { key: 'All',         label: 'All Offers',   icon: '🔥', sub: 'Everything near you',    color: '#e65100' },
   { key: 'Food',        label: 'Food',          icon: '🍽️', sub: 'Restaurants & Eateries', color: '#d84315' },
   { key: 'Fashion',     label: 'Fashion',       icon: '👗', sub: 'Clothing & Accessories', color: '#6a1b9a' },
   { key: 'Electronics', label: 'Electronics',   icon: '📱', sub: 'Gadgets & Devices',      color: '#1565c0' },
@@ -82,7 +82,7 @@ export default function Home() {
   offers.forEach(o => {
     if (o.lat && o.lng && !seenShops.has(o.shop_id)) {
       seenShops.add(o.shop_id);
-      shopMarkers.push({ id: o.shop_id, lng: parseFloat(o.lng), lat: parseFloat(o.lat), label: o.shop_name, sublabel: `${o.category} · ${o.address}`, link: o.slug ? `/shop/${o.slug}` : null, color: 'var(--brand)' });
+      shopMarkers.push({ id: o.shop_id, lng: parseFloat(o.lng), lat: parseFloat(o.lat), label: o.shop_name, sublabel: `${o.category} · ${o.address}`, link: o.slug ? `/shop/${o.slug}` : null, color: '#e65100' });
     }
   });
 
@@ -97,17 +97,13 @@ export default function Home() {
       {/* ── HERO ── */}
       <section className="home-hero">
         <div className="home-hero-inner">
-          <span className="hero-eyebrow">
-            <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.4"><path d="M21 10c0 7-9 12-9 12s-9-5-9-12a9 9 0 0118 0z"/><circle cx="12" cy="10" r="3"/></svg>
-            Live deals near you
-          </span>
-          <h1 className="hero-tagline">Discover the Best Deals <span className="hl">Near You</span></h1>
-          <p className="hero-sub">Exclusive offers from local shops in your city, updated every day.</p>
+          <h1 className="hero-tagline">Discover the Best Deals<br />Near You — Every Day!</h1>
+          <p className="hero-sub">Exclusive offers from local shops in your city</p>
 
           {/* Location + Search bar */}
           <form className="hero-search" onSubmit={handleSearch}>
             <div className="hero-loc">
-              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="var(--brand)" strokeWidth="2.2"><path d="M21 10c0 7-9 12-9 12s-9-5-9-12a9 9 0 0118 0z"/><circle cx="12" cy="10" r="3"/></svg>
+              <span>📍</span>
               <span className="hero-loc-label">{locationLabel}</span>
               <select value={radius} onChange={e => setRadius(Number(e.target.value))} className="hero-radius">
                 <option value={1}>1 km</option>
@@ -125,9 +121,7 @@ export default function Home() {
               value={search}
               onChange={e => setSearch(e.target.value)}
             />
-            <button type="submit" className="hero-search-btn" aria-label="Search">
-              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#fff" strokeWidth="2.4"><circle cx="11" cy="11" r="7"/><path d="M21 21l-4-4"/></svg>
-            </button>
+            <button type="submit" className="hero-search-btn">🔍</button>
           </form>
         </div>
       </section>
@@ -202,7 +196,7 @@ export default function Home() {
                   <div key={m.id} onClick={() => m.link && navigate(m.link)}
                     style={{ background: '#fff', border: '1px solid #ffe0b2', borderRadius: 10, padding: '10px 14px', cursor: 'pointer', minWidth: 160, boxShadow: '0 1px 4px rgba(0,0,0,.06)' }}>
                     <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                      <span style={{ width: 10, height: 10, borderRadius: '50%', background: 'var(--brand)', display: 'inline-block' }} />
+                      <span style={{ width: 10, height: 10, borderRadius: '50%', background: '#e65100', display: 'inline-block' }} />
                       <strong style={{ fontSize: 14 }}>{m.label}</strong>
                     </div>
                     <p style={{ margin: '4px 0 0', fontSize: 12, color: '#888' }}>{m.sublabel}</p>

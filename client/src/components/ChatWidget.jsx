@@ -43,7 +43,7 @@ export default function ChatWidget({ shopId, shopName }) {
           flexDirection: 'column', marginBottom: 12, overflow: 'hidden'
         }}>
           {/* Header */}
-          <div style={{ background: 'var(--brand)', color: '#fff', padding: '12px 16px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+          <div style={{ background: '#e65100', color: '#fff', padding: '12px 16px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
             <div>
               <div style={{ fontWeight: 700, fontSize: 14 }}>💬 {shopName}</div>
               <div style={{ fontSize: 11, opacity: 0.85 }}>AI Shop Assistant</div>
@@ -57,7 +57,7 @@ export default function ChatWidget({ shopId, shopName }) {
               <div key={i} style={{ display: 'flex', justifyContent: m.role === 'user' ? 'flex-end' : 'flex-start' }}>
                 <div style={{
                   maxWidth: '80%', padding: '8px 12px', borderRadius: 12, fontSize: 13, lineHeight: 1.5,
-                  background: m.role === 'user' ? 'var(--brand)' : '#f5f5f5',
+                  background: m.role === 'user' ? '#e65100' : '#f5f5f5',
                   color: m.role === 'user' ? '#fff' : '#333',
                   borderBottomRightRadius: m.role === 'user' ? 4 : 12,
                   borderBottomLeftRadius: m.role === 'assistant' ? 4 : 12,
@@ -89,7 +89,7 @@ export default function ChatWidget({ shopId, shopName }) {
             <button
               onClick={send}
               disabled={loading || !input.trim()}
-              style={{ background: 'var(--brand)', color: '#fff', border: 'none', borderRadius: '50%', width: 36, height: 36, cursor: 'pointer', fontSize: 16, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+              style={{ background: '#e65100', color: '#fff', border: 'none', borderRadius: '50%', width: 36, height: 36, cursor: 'pointer', fontSize: 16, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
               ➤
             </button>
           </div>
@@ -100,7 +100,7 @@ export default function ChatWidget({ shopId, shopName }) {
       <button
         onClick={() => setOpen(o => !o)}
         style={{
-          width: 56, height: 56, borderRadius: '50%', background: 'var(--brand)',
+          width: 56, height: 56, borderRadius: '50%', background: '#e65100',
           color: '#fff', border: 'none', fontSize: 24, cursor: 'pointer',
           boxShadow: '0 4px 16px rgba(230,81,0,0.4)', display: 'flex',
           alignItems: 'center', justifyContent: 'center',

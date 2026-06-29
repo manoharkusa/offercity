@@ -12,9 +12,7 @@ export default function Navbar() {
 
   return (
     <header className="navbar">
-      <Link to="/" className="brand" onClick={close}>
-        <span className="brand-mark">🔥</span>OfferCity
-      </Link>
+      <Link to="/" className="brand" onClick={close}>🔥 OfferCity</Link>
 
       <button className="hamburger" onClick={() => setOpen(o => !o)} aria-label="Toggle menu">
         {open ? '✕' : '☰'}
@@ -33,7 +31,7 @@ export default function Navbar() {
         ) : (
           <>
             <Link to="/login" onClick={close}>Login</Link>
-            <Link to="/register" className="nav-cta" onClick={close}>List your shop</Link>
+            <Link to="/register" onClick={close}>Register</Link>
           </>
         )}
       </nav>

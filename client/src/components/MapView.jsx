@@ -11,7 +11,7 @@ L.Icon.Default.mergeOptions({
   shadowUrl:     'https://unpkg.com/leaflet@1.9.4/dist/images/marker-shadow.png',
 });
 
-const makeIcon = (color = 'var(--brand)') => L.divIcon({
+const makeIcon = (color = '#e65100') => L.divIcon({
   className: '',
   html: `<div style="
     width:22px;height:22px;
@@ -58,16 +58,16 @@ export default function MapView({ center, markers = [], route = null, onMarkerCl
         <Marker
           key={i}
           position={[m.lat, m.lng]}
-          icon={makeIcon(m.color || 'var(--brand)')}
+          icon={makeIcon(m.color || '#e65100')}
           eventHandlers={onMarkerClick && m.id ? { click: () => onMarkerClick(m) } : {}}
         >
           {m.label && (
             <Popup>
               <div style={{ minWidth: 140 }}>
-                <strong style={{ color: 'var(--brand)' }}>{m.label}</strong>
+                <strong style={{ color: '#e65100' }}>{m.label}</strong>
                 {m.sublabel && <p style={{ margin: '4px 0 0', fontSize: 12, color: '#666' }}>{m.sublabel}</p>}
                 {m.link && (
-                  <a href={m.link} style={{ display: 'block', marginTop: 6, color: 'var(--brand)', fontSize: 12, fontWeight: 600 }}>
+                  <a href={m.link} style={{ display: 'block', marginTop: 6, color: '#e65100', fontSize: 12, fontWeight: 600 }}>
                     View Shop →
                   </a>
                 )}
@@ -80,7 +80,7 @@ export default function MapView({ center, markers = [], route = null, onMarkerCl
       {route?.coordinates && (
         <Polyline
           positions={route.coordinates.map(([lng, lat]) => [lat, lng])}
-          color="var(--brand)"
+          color="#e65100"
           weight={4}
         />
       )}

@@ -20,8 +20,8 @@ const ShopPage        = lazy(() => import('./pages/ShopPage'));
 function PageLoader() {
   return (
     <div style={{ display:'flex', alignItems:'center', justifyContent:'center', minHeight:'60vh', flexDirection:'column', gap:12 }}>
-      <div style={{ width:36, height:36, border:'4px solid #f0e6d6', borderTopColor:'var(--brand)', borderRadius:'50%', animation:'spin 0.8s linear infinite' }} />
-      <div style={{ color:'var(--brand)', fontSize:13, fontWeight:600 }}>Loading…</div>
+      <div style={{ width:36, height:36, border:'4px solid #f0e6d6', borderTopColor:'#e65100', borderRadius:'50%', animation:'spin 0.8s linear infinite' }} />
+      <div style={{ color:'#e65100', fontSize:13, fontWeight:600 }}>Loading…</div>
       <style>{`@keyframes spin { to { transform: rotate(360deg); } }`}</style>
     </div>
   );

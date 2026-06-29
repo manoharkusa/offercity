@@ -105,7 +105,7 @@ export default function AdminDashboard() {
 
   return (
     <div className="page">
-      <h1 style={{ color:'var(--brand)', marginBottom:24 }}>🛡 Admin Dashboard</h1>
+      <h1 style={{ color:'#e65100', marginBottom:24 }}>🛡 Admin Dashboard</h1>
       <div className="dashboard">
         <aside className="sidebar">
           <h3>Manage</h3>
@@ -145,7 +145,7 @@ export default function AdminDashboard() {
 
               {/* Create form */}
               <div style={{ background:'#fff8f5', border:'1px solid #ffd0b0', borderRadius:10, padding:20, marginBottom:28 }}>
-                <h3 style={{ margin:'0 0 14px', color:'var(--brand)' }}>Create New BDO</h3>
+                <h3 style={{ margin:'0 0 14px', color:'#e65100' }}>Create New BDO</h3>
                 <form onSubmit={createBdo} style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:10 }}>
                   {[['name','Full Name'],['email','Email'],['phone','Phone'],['password','Password']].map(([field, ph]) => (
                     <input key={field} type={field === 'password' ? 'password' : 'text'}
@@ -158,7 +158,7 @@ export default function AdminDashboard() {
                     onChange={e => setBdoForm(f => ({ ...f, pincodes: e.target.value }))}
                     style={{ gridColumn:'1/-1', padding:'8px 12px', border:'1px solid #ddd', borderRadius:6, fontSize:14 }} />
                   <div style={{ gridColumn:'1/-1', display:'flex', alignItems:'center', gap:12 }}>
-                    <button type="submit" style={{ background:'var(--brand)', color:'#fff', border:'none', borderRadius:6, padding:'8px 20px', fontWeight:700, cursor:'pointer' }}>
+                    <button type="submit" style={{ background:'#e65100', color:'#fff', border:'none', borderRadius:6, padding:'8px 20px', fontWeight:700, cursor:'pointer' }}>
                       Create BDO
                     </button>
                     {bdoMsg && <span style={{ color: bdoMsg.includes('success') ? '#2e7d32' : '#c62828', fontSize:13 }}>{bdoMsg}</span>}
@@ -190,7 +190,7 @@ export default function AdminDashboard() {
                             <button onClick={() => setEditAreas({ bdoId: b.id, pincodes: b.areas.map(a => `${a.pincode}:${a.area_name}`).join(', ') })}
                               style={{ ...btn('#1565c0'), fontSize:12, marginLeft:6 }}>Edit</button>
                           </td>
-                          <td><span style={{ background:'#fff3e0', color:'var(--brand)', borderRadius:12, padding:'2px 10px', fontSize:13, fontWeight:700 }}>{b.pending_count}</span></td>
+                          <td><span style={{ background:'#fff3e0', color:'#e65100', borderRadius:12, padding:'2px 10px', fontSize:13, fontWeight:700 }}>{b.pending_count}</span></td>
                           <td>
                             <button onClick={() => deleteBdo(b.id)} style={btn('#c62828')}>Delete</button>
                           </td>
@@ -212,7 +212,7 @@ export default function AdminDashboard() {
                       style={{ width:'100%', padding:10, border:'1px solid #ddd', borderRadius:6, fontSize:14, resize:'vertical' }} />
                     <p style={{ fontSize:12, color:'#999', margin:'6px 0 16px' }}>Comma-separated. Format: pincode:area_name</p>
                     <div style={{ display:'flex', gap:10 }}>
-                      <button onClick={saveAreas} style={{ background:'var(--brand)', color:'#fff', border:'none', borderRadius:6, padding:'8px 20px', fontWeight:700, cursor:'pointer' }}>Save</button>
+                      <button onClick={saveAreas} style={{ background:'#e65100', color:'#fff', border:'none', borderRadius:6, padding:'8px 20px', fontWeight:700, cursor:'pointer' }}>Save</button>
                       <button onClick={() => setEditAreas(null)} style={{ background:'#eee', border:'none', borderRadius:6, padding:'8px 16px', cursor:'pointer' }}>Cancel</button>
                     </div>
                   </div>

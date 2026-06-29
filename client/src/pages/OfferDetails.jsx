@@ -95,7 +95,7 @@ export default function OfferDetails() {
         <div style={{ flex: 1, minWidth: 280 }}>
           {offer.image && <img src={offer.image} alt={offer.title} style={{ width: '100%', borderRadius: 12, marginBottom: 16 }} />}
           <span className="tag green">{offer.category}</span>
-          <h1 style={{ margin: '10px 0 6px', color: 'var(--brand)' }}>{offer.title}</h1>
+          <h1 style={{ margin: '10px 0 6px', color: '#e65100' }}>{offer.title}</h1>
           <p style={{ color: '#555', marginBottom: 12 }}>{offer.description}</p>
 
           <div className="price-row" style={{ marginBottom: 12 }}>
@@ -140,7 +140,7 @@ export default function OfferDetails() {
       </div>
 
       <div style={{ marginTop: 32 }}>
-        <h2 style={{ color: 'var(--brand)', marginBottom: 16 }}>Customer Reviews</h2>
+        <h2 style={{ color: '#e65100', marginBottom: 16 }}>Customer Reviews</h2>
         {user && (
           <form onSubmit={submitReview} style={{ background: '#fff', padding: 20, borderRadius: 12, marginBottom: 24, boxShadow: '0 2px 8px rgba(0,0,0,.08)' }}>
             <h3 style={{ marginBottom: 12 }}>Write a Review</h3>
