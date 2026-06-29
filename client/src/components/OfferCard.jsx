@@ -33,12 +33,12 @@ export default function OfferCard({ offer }) {
 
   return (
     <div className="offer-card" onClick={() => navigate(`/offers/${offer.id}`)}
-      style={{ position: 'relative', border: isFlash ? '2px solid #e65100' : undefined }}>
+      style={{ position: 'relative', border: isFlash ? '2px solid var(--brand)' : undefined }}>
 
       {isFlash && (
         <div style={{
           position: 'absolute', top: 8, left: 8, zIndex: 2,
-          background: '#e65100', color: '#fff', borderRadius: 6,
+          background: 'var(--brand)', color: '#fff', borderRadius: 6,
           padding: '3px 8px', fontSize: 11, fontWeight: 800,
           display: 'flex', alignItems: 'center', gap: 4,
           boxShadow: '0 2px 8px rgba(230,81,0,0.4)'
@@ -64,7 +64,7 @@ export default function OfferCard({ offer }) {
           {offer.offer_price && <span className="discounted">₹{Number(offer.offer_price).toLocaleString('en-IN')}</span>}
         </div>
         {isFlash
-          ? <p className="meta" style={{ color: '#e65100', fontWeight: 700 }}>⚡ {countdown}</p>
+          ? <p className="meta" style={{ color: 'var(--brand)', fontWeight: 700 }}>⚡ {countdown}</p>
           : <p className="meta">⏰ Valid till {expires}</p>
         }
         <p className="meta">👁 {offer.views || 0} views</p>

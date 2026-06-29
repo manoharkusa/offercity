@@ -1,6 +1,6 @@
 import { useState } from 'react';
 
-const ORANGE = 'linear-gradient(135deg, #e65100, #ff8f00)';
+const ORANGE = 'linear-gradient(135deg, var(--brand), #ff8f00)';
 
 // 1 — Classic dark bottom bar, full width
 function V1({ shopName, loading, onAllow, onDismiss }) {
@@ -18,7 +18,7 @@ function V1({ shopName, loading, onAllow, onDismiss }) {
       </div>
       <div style={{ display: 'flex', gap: 8, flex: '0 0 auto' }}>
         <button onClick={onDismiss} style={{ padding: '9px 16px', background: 'transparent', color: '#ccc', border: '1px solid #555', borderRadius: 8, cursor: 'pointer', fontSize: 13, whiteSpace: 'nowrap' }}>Not now</button>
-        <button onClick={onAllow} disabled={loading} style={{ padding: '9px 18px', background: '#e65100', color: '#fff', border: 'none', borderRadius: 8, cursor: 'pointer', fontWeight: 700, fontSize: 13, whiteSpace: 'nowrap' }}>{loading ? '...' : 'Allow'}</button>
+        <button onClick={onAllow} disabled={loading} style={{ padding: '9px 18px', background: 'var(--brand)', color: '#fff', border: 'none', borderRadius: 8, cursor: 'pointer', fontWeight: 700, fontSize: 13, whiteSpace: 'nowrap' }}>{loading ? '...' : 'Allow'}</button>
       </div>
     </div>
   );
@@ -58,7 +58,7 @@ function V3({ shopName, loading, onAllow, onDismiss }) {
       boxShadow: '0 2px 10px rgba(0,0,0,.08)', animation: 'fadeIn .3s ease-out', fontSize: 13
     }}>
       <span>🔔 Get offer alerts from <strong>{shopName}</strong></span>
-      <button onClick={onAllow} disabled={loading} style={{ padding: '6px 14px', background: '#e65100', color: '#fff', border: 'none', borderRadius: 6, cursor: 'pointer', fontWeight: 700, fontSize: 12.5 }}>{loading ? '...' : 'Allow'}</button>
+      <button onClick={onAllow} disabled={loading} style={{ padding: '6px 14px', background: 'var(--brand)', color: '#fff', border: 'none', borderRadius: 6, cursor: 'pointer', fontWeight: 700, fontSize: 12.5 }}>{loading ? '...' : 'Allow'}</button>
       <button onClick={onDismiss} style={{ background: 'none', border: 'none', color: '#a67', cursor: 'pointer', fontSize: 16, lineHeight: 1, padding: 0 }}>×</button>
     </div>
   );
@@ -85,14 +85,14 @@ function V5({ shopName, loading, onAllow, onDismiss }) {
     <div style={{
       position: 'fixed', right: 16, bottom: 16, zIndex: 999, width: 'min(320px, calc(100vw - 32px))',
       background: '#fff', borderRadius: 14, padding: 16, boxShadow: '0 10px 28px rgba(0,0,0,.2)',
-      animation: 'slideUp .3s ease-out', borderLeft: '4px solid #e65100'
+      animation: 'slideUp .3s ease-out', borderLeft: '4px solid var(--brand)'
     }}>
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
         <strong style={{ fontSize: 14, color: '#222' }}>🔔 {shopName}</strong>
         <button onClick={onDismiss} style={{ background: 'none', border: 'none', color: '#bbb', cursor: 'pointer', fontSize: 16, padding: 0 }}>×</button>
       </div>
       <p style={{ margin: '6px 0 12px', fontSize: 12.5, color: '#777' }}>Want a heads-up on new deals here?</p>
-      <button onClick={onAllow} disabled={loading} style={{ width: '100%', padding: '9px 0', background: '#e65100', color: '#fff', border: 'none', borderRadius: 8, cursor: 'pointer', fontSize: 13, fontWeight: 700 }}>{loading ? '...' : 'Notify Me'}</button>
+      <button onClick={onAllow} disabled={loading} style={{ width: '100%', padding: '9px 0', background: 'var(--brand)', color: '#fff', border: 'none', borderRadius: 8, cursor: 'pointer', fontSize: 13, fontWeight: 700 }}>{loading ? '...' : 'Notify Me'}</button>
     </div>
   );
 }
@@ -108,7 +108,7 @@ function V6({ shopName, loading, onAllow, onDismiss }) {
     }}>
       <span style={{ fontSize: 20 }}>🔔</span>
       <span style={{ flex: 1, fontSize: 13.5, color: '#7a3b00' }}>Get notified when <strong>{shopName}</strong> posts a new offer</span>
-      <button onClick={onAllow} disabled={loading} style={{ padding: '8px 16px', background: '#e65100', color: '#fff', border: 'none', borderRadius: 8, cursor: 'pointer', fontWeight: 700, fontSize: 13 }}>{loading ? '...' : 'Allow'}</button>
+      <button onClick={onAllow} disabled={loading} style={{ padding: '8px 16px', background: 'var(--brand)', color: '#fff', border: 'none', borderRadius: 8, cursor: 'pointer', fontWeight: 700, fontSize: 13 }}>{loading ? '...' : 'Allow'}</button>
       <button onClick={onDismiss} style={{ background: 'none', border: 'none', color: '#a67', cursor: 'pointer', fontSize: 13, textDecoration: 'underline' }}>Dismiss</button>
     </div>
   );
@@ -137,7 +137,7 @@ function V7({ shopName, loading, onAllow, onDismiss }) {
       <p style={{ margin: '6px 0 12px', fontSize: 12.5, color: '#777' }}>Get notified on new offers from this shop.</p>
       <div style={{ display: 'flex', gap: 8 }}>
         <button onClick={() => { onDismiss(); setOpen(false); }} style={{ flex: 1, padding: '8px 0', background: '#f5f5f5', color: '#555', border: 'none', borderRadius: 8, cursor: 'pointer', fontSize: 12.5 }}>No</button>
-        <button onClick={onAllow} disabled={loading} style={{ flex: 1, padding: '8px 0', background: '#e65100', color: '#fff', border: 'none', borderRadius: 8, cursor: 'pointer', fontWeight: 700, fontSize: 12.5 }}>{loading ? '...' : 'Yes'}</button>
+        <button onClick={onAllow} disabled={loading} style={{ flex: 1, padding: '8px 0', background: 'var(--brand)', color: '#fff', border: 'none', borderRadius: 8, cursor: 'pointer', fontWeight: 700, fontSize: 12.5 }}>{loading ? '...' : 'Yes'}</button>
       </div>
     </div>
   );
@@ -183,7 +183,7 @@ function V9({ shopName, loading, onAllow, onDismiss }) {
       </div>
       <div style={{ display: 'flex', gap: 8 }}>
         <button onClick={onDismiss} style={{ padding: '9px 14px', background: 'rgba(255,255,255,.2)', color: '#fff', border: 'none', borderRadius: 8, cursor: 'pointer', fontSize: 13 }}>Skip</button>
-        <button onClick={onAllow} disabled={loading} style={{ padding: '9px 18px', background: '#fff', color: '#e65100', border: 'none', borderRadius: 8, cursor: 'pointer', fontWeight: 700, fontSize: 13 }}>{loading ? '...' : 'Yes, Notify Me'}</button>
+        <button onClick={onAllow} disabled={loading} style={{ padding: '9px 18px', background: '#fff', color: 'var(--brand)', border: 'none', borderRadius: 8, cursor: 'pointer', fontWeight: 700, fontSize: 13 }}>{loading ? '...' : 'Yes, Notify Me'}</button>
       </div>
     </div>
   );

@@ -189,7 +189,7 @@ export default function ShopPage() {
       <div style={{
         background: shop.image
           ? `linear-gradient(rgba(0,0,0,0.52), rgba(0,0,0,0.52)), url(${shop.image}) center/cover no-repeat`
-          : 'linear-gradient(135deg, #e65100 0%, #ff8f00 100%)',
+          : 'linear-gradient(135deg, var(--brand) 0%, #ff8f00 100%)',
         borderRadius: 16, padding: '32px 28px', marginBottom: 28,
         color: '#fff', position: 'relative', overflow: 'hidden'
       }}>
@@ -233,7 +233,7 @@ export default function ShopPage() {
           background: '#fff3e0', borderRadius: 10, padding: '10px 16px', marginBottom: 16,
           display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 10, flexWrap: 'wrap'
         }}>
-          <span style={{ fontSize: 13, color: '#e65100' }}>
+          <span style={{ fontSize: 13, color: 'var(--brand)' }}>
             📱 Add OfferCity to your Home Screen (Share → Add to Home Screen) to get offer alerts on iPhone.
           </span>
           <button onClick={dismissIosTip} style={{
@@ -252,7 +252,7 @@ export default function ShopPage() {
           🔗 <strong>Share this shop:</strong> {window.location.href}
         </span>
         <button onClick={copyLink} style={{
-          padding: '8px 18px', background: copied ? '#2e7d32' : '#e65100',
+          padding: '8px 18px', background: copied ? '#2e7d32' : 'var(--brand)',
           color: '#fff', border: 'none', borderRadius: 8, cursor: 'pointer', fontWeight: 600, fontSize: 14
         }}>
           {copied ? '✅ Copied!' : '📋 Copy Link'}
@@ -266,7 +266,7 @@ export default function ShopPage() {
       </div>
 
       {/* Active Offers */}
-      <h2 style={{ color: '#e65100', marginBottom: 16 }}>
+      <h2 style={{ color: 'var(--brand)', marginBottom: 16 }}>
         🔥 Active Offers {shop.offers?.length > 0 ? `(${shop.offers.length})` : ''}
       </h2>
       {!shop.offers?.length ? (
@@ -282,15 +282,15 @@ export default function ShopPage() {
       {/* Catalog / Services */}
       {catalog.length > 0 && (
         <>
-          <h2 style={{ color: '#e65100', marginBottom: 16 }}>📋 Services &amp; Pricing</h2>
+          <h2 style={{ color: 'var(--brand)', marginBottom: 16 }}>📋 Services &amp; Pricing</h2>
           <div style={{ background: '#fff', borderRadius: 12, overflow: 'hidden', boxShadow: '0 2px 8px rgba(0,0,0,0.07)', marginBottom: 32 }}>
             <table style={{ width: '100%', borderCollapse: 'collapse' }}>
               <thead>
                 <tr style={{ background: '#fff3e0' }}>
-                  <th style={{ padding: '10px 16px', textAlign: 'left', fontSize: 13, color: '#e65100', fontWeight: 700 }}>#</th>
-                  <th style={{ padding: '10px 16px', textAlign: 'left', fontSize: 13, color: '#e65100', fontWeight: 700 }}>Service / Item</th>
-                  <th style={{ padding: '10px 16px', textAlign: 'left', fontSize: 13, color: '#e65100', fontWeight: 700 }}>Description</th>
-                  <th style={{ padding: '10px 16px', textAlign: 'right', fontSize: 13, color: '#e65100', fontWeight: 700 }}>Price</th>
+                  <th style={{ padding: '10px 16px', textAlign: 'left', fontSize: 13, color: 'var(--brand)', fontWeight: 700 }}>#</th>
+                  <th style={{ padding: '10px 16px', textAlign: 'left', fontSize: 13, color: 'var(--brand)', fontWeight: 700 }}>Service / Item</th>
+                  <th style={{ padding: '10px 16px', textAlign: 'left', fontSize: 13, color: 'var(--brand)', fontWeight: 700 }}>Description</th>
+                  <th style={{ padding: '10px 16px', textAlign: 'right', fontSize: 13, color: 'var(--brand)', fontWeight: 700 }}>Price</th>
                 </tr>
               </thead>
               <tbody>
@@ -311,7 +311,7 @@ export default function ShopPage() {
       )}
 
       {/* Reviews */}
-      <h2 style={{ color: '#e65100', marginBottom: 16 }}>
+      <h2 style={{ color: 'var(--brand)', marginBottom: 16 }}>
         ⭐ Customer Reviews {shop.reviews?.length > 0 ? `(${shop.reviews.length})` : ''}
       </h2>
 
