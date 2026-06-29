@@ -184,47 +184,6 @@ const createTables = async () => {
     ["shops",  "owner_phone",            "VARCHAR(20) DEFAULT NULL"],
   ];
 
-  // "I'm Coming" reservations
-  await pool.query(`CREATE TABLE IF NOT EXISTS im_coming (
-    id INT AUTO_INCREMENT PRIMARY KEY,
-    offer_id INT NOT NULL,
-    user_id INT NOT NULL,
-    shop_id INT NOT NULL,
-    user_name VARCHAR(255),
-    eta_minutes INT DEFAULT 15,
-    expires_at TIMESTAMP NOT NULL,
-    status ENUM('coming','arrived','cancelled') DEFAULT 'coming',
-    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-    UNIQUE KEY one_active (offer_id, user_id),
-    FOREIGN KEY (offer_id) REFERENCES offers(id) ON DELETE CASCADE,
-    FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE,
-    FOREIGN KEY (shop_id) REFERENCES shops(id) ON DELETE CASCADE
-  ) ENGINE=InnoDB`);
-
-  // Loyalty stamp cards
-  await pool.query(`CREATE TABLE IF NOT EXISTS stamp_cards (
-    id INT AUTO_INCREMENT PRIMARY KEY,
-    shop_id INT NOT NULL,
-    title VARCHAR(255) NOT NULL,
-    required_stamps INT NOT NULL DEFAULT 5,
-    reward VARCHAR(255) NOT NULL,
-    is_active BOOLEAN DEFAULT true,
-    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-    FOREIGN KEY (shop_id) REFERENCES shops(id) ON DELETE CASCADE
-  ) ENGINE=InnoDB`);
-
-  await pool.query(`CREATE TABLE IF NOT EXISTS customer_stamps (
-    id INT AUTO_INCREMENT PRIMARY KEY,
-    card_id INT NOT NULL,
-    user_id INT NOT NULL,
-    stamps INT DEFAULT 0,
-    redeemed INT DEFAULT 0,
-    last_stamp_at TIMESTAMP NULL,
-    UNIQUE KEY one_per (card_id, user_id),
-    FOREIGN KEY (card_id) REFERENCES stamp_cards(id) ON DELETE CASCADE,
-    FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
-  ) ENGINE=InnoDB`);
-
   // Shop catalog — services/items list (max 25 per shop)
   await pool.query(`CREATE TABLE IF NOT EXISTS shop_catalog (
     id          INT AUTO_INCREMENT PRIMARY KEY,

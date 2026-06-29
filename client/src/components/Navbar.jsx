@@ -21,7 +21,6 @@ export default function Navbar() {
       <nav className={open ? 'nav-open' : ''}>
         <Link to="/" onClick={close}>Nearby Offers</Link>
         {user && <Link to="/saved" onClick={close}>Saved</Link>}
-        {user && <Link to="/my-stamps" onClick={close}>🎟 Stamps</Link>}
         {user?.role === 'shop_owner' && <Link to="/shop-dashboard" onClick={close}>My Shop</Link>}
         {user?.role === 'admin' && <Link to="/admin" onClick={close}>Admin</Link>}
         {user?.role === 'bdo' && <Link to="/bdo" onClick={close}>My Area</Link>}

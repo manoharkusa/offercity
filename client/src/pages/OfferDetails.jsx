@@ -17,8 +17,6 @@ export default function OfferDetails() {
   const [reviewForm, setReviewForm] = useState({ rating: 5, comment: '' });
   const [saved,       setSaved]       = useState(false);
   const [saveLoading, setSaveLoading] = useState(false);
-  const [coming,      setComing]      = useState(false);
-  const [comingMsg,   setComingMsg]   = useState('');
 
   const loadOffer = () => {
     setLoadError(null);
@@ -48,16 +46,6 @@ export default function OfferDetails() {
       url = `https://www.google.com/maps/dir/?api=1&destination=${sLat},${sLng}&travelmode=driving`;
     }
     window.open(url, '_blank');
-  };
-
-  const markComing = async (eta) => {
-    try {
-      await api.post('/coming', { offer_id: id, eta_minutes: eta });
-      setComing(true);
-      setComingMsg(`Shop notified! Your offer is reserved for ${eta} minutes.`);
-    } catch (err) {
-      setComingMsg(err.response?.data?.message || 'Could not notify shop');
-    }
   };
 
   const toggleSave = async () => {
@@ -129,24 +117,7 @@ export default function OfferDetails() {
               onClick={getRoute}>
               🗺 Get Directions
             </button>
-            {user && user.role === 'user' && !coming && (
-              <div style={{ position:'relative' }}>
-                <button className="btn-primary"
-                  style={{ width:'auto', padding:'10px 20px', background:'#2e7d32' }}
-                  onClick={() => markComing(15)}>
-                  🚶 I'm Coming
-                </button>
-              </div>
-            )}
           </div>
-
-          {comingMsg && (
-            <div style={{ marginTop:12, background: coming ? '#e8f5e9' : '#ffebee',
-              color: coming ? '#2e7d32' : '#c62828', borderRadius:8,
-              padding:'10px 16px', fontSize:14, fontWeight:600 }}>
-              {coming ? '✅ ' : '⚠️ '}{comingMsg}
-            </div>
-          )}
         </div>
 
         <div style={{ flex: 1, minWidth: 280 }}>

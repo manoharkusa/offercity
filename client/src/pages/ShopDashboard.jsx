@@ -448,19 +448,6 @@ export default function ShopDashboard() {
   const [pairLoading, setPairLoading]     = useState(false);
   const [pairCountdown, setPairCountdown] = useState(0);
 
-  // Incoming customers state
-  const [incoming, setIncoming]           = useState([]);
-  const [incomingLoading, setIncomingLoading] = useState(false);
-  const incomingTimer = useRef(null);
-
-  // Stamp cards state
-  const [stampCards, setStampCards]       = useState([]);
-  const [stampCardForm, setStampCardForm] = useState({ shop_id:'', title:'', required_stamps:5, reward:'' });
-  const [stampAddCode, setStampAddCode]   = useState('');
-  const [stampAddCard, setStampAddCard]   = useState('');
-  const [stampAddResult, setStampAddResult] = useState(null);
-  const [stampsLoading, setStampsLoading] = useState(false);
-
   useEffect(() => {
     api.get('/shops/owner/mine').then(r => setShops(r.data)).catch(() => {});
   }, []);
@@ -510,27 +497,6 @@ export default function ShopDashboard() {
     waTimer.current = setInterval(poll, 3000);
     api.get('/campaigns').then(r => setCampHistory(r.data)).catch(() => {});
     return () => clearInterval(waTimer.current);
-  }, [tab]);
-
-  // Poll incoming customers every 20s always (for sidebar badge) — faster when on the tab
-  useEffect(() => {
-    const load = () => {
-      if (tab === 'incoming') setIncomingLoading(true);
-      api.get('/coming/shop').then(r => setIncoming(r.data)).catch(() => {}).finally(() => setIncomingLoading(false));
-    };
-    load();
-    const interval = tab === 'incoming' ? 10000 : 20000;
-    incomingTimer.current = setInterval(load, interval);
-    return () => clearInterval(incomingTimer.current);
-  }, [tab]);
-
-  // Load stamp cards when on stamps tab
-  useEffect(() => {
-    if (tab !== 'stamps') return;
-    setStampsLoading(true);
-    api.get('/stamps/cards/mine').then(r => setStampCards(r.data)).catch(() => {}).finally(() => setStampsLoading(false));
-    if (shops.length > 0 && !stampCardForm.shop_id)
-      setStampCardForm(f => ({ ...f, shop_id: String(shops[0].id) }));
   }, [tab]);
 
   // Poll active campaign progress every 4 sec
@@ -584,33 +550,6 @@ export default function ShopDashboard() {
     setCompressStats(null);
     setPhotoStep('pick');
     setPostedOffer(null);
-  };
-
-  const markArrived = async (id) => {
-    await api.put(`/coming/${id}/arrived`).catch(() => {});
-    setIncoming(prev => prev.filter(x => x.id !== id));
-  };
-
-  const createStampCard = async (e) => {
-    e.preventDefault();
-    try {
-      const { data } = await api.post('/stamps/cards', stampCardForm);
-      setStampCards(prev => [data, ...prev]);
-      setStampCardForm(f => ({ ...f, title:'', reward:'', required_stamps:5 }));
-      flash('Stamp card created!');
-    } catch (err) { flash(err.response?.data?.message || 'Error creating card', 'err'); }
-  };
-
-  const addStamp = async (e) => {
-    e.preventDefault();
-    setStampAddResult(null);
-    try {
-      const { data } = await api.post('/stamps/add', { card_id: stampAddCard, user_code: stampAddCode });
-      setStampAddResult({ ok: true, message: data.message });
-      setStampAddCode('');
-    } catch (err) {
-      setStampAddResult({ ok: false, message: err.response?.data?.message || 'Error adding stamp' });
-    }
   };
 
   // Auto-calculate offer price when discount or original price changes
@@ -971,8 +910,6 @@ export default function ShopDashboard() {
             ['offers',   '🏷 My Offers'],
             ['add-offer', editingOffer ? '✏️ Edit Offer' : '➕ Add Offer'],
             ['campaign', '📣 Campaign'],
-            ['incoming', incoming.length > 0 ? `🚶 Incoming (${incoming.length})` : '🚶 Incoming'],
-            ['stamps',   '🎟 Stamp Cards'],
             ['chat-logs','💬 Chat Logs']
           ].map(([t, label]) => (
             <button key={t} className={tab === t ? 'active' : ''}
@@ -2103,164 +2040,6 @@ export default function ShopDashboard() {
             </>
           )}
 
-          {/* ── Incoming Customers Tab ── */}
-          {tab === 'incoming' && (
-            <>
-              <h2>🚶 Incoming Customers</h2>
-              <p style={{ color:'#888', fontSize:13, marginBottom:16 }}>
-                Customers who clicked "I'm Coming" on your offers — auto-refreshes every 15s
-              </p>
-              {incomingLoading && incoming.length === 0 && <p style={{ color:'#aaa' }}>Loading…</p>}
-              {!incomingLoading && incoming.length === 0 && (
-                <div style={{ textAlign:'center', padding:'48px 0', color:'#bbb' }}>
-                  <div style={{ fontSize:48 }}>🚶</div>
-                  <p>No one is coming right now</p>
-                </div>
-              )}
-              {incoming.map(row => {
-                const etaMins = Math.max(0, Math.round((new Date(row.expires_at) - Date.now()) / 60000));
-                return (
-                  <div key={row.id} style={{ background:'#fff', borderRadius:12, padding:16, marginBottom:12, boxShadow:'0 2px 8px rgba(0,0,0,.07)', display:'flex', alignItems:'center', gap:16, flexWrap:'wrap' }}>
-                    <div style={{ flex:1, minWidth:180 }}>
-                      <div style={{ fontWeight:700, fontSize:15 }}>{row.user_name}</div>
-                      <div style={{ color:'#e65100', fontSize:13, marginTop:2 }}>{row.offer_title} · {row.discount}% OFF</div>
-                      <div style={{ color:'#888', fontSize:12, marginTop:4 }}>
-                        ETA: {row.eta_minutes} min · {etaMins > 0 ? `~${etaMins} min left` : 'arriving any moment'}
-                      </div>
-                    </div>
-                    <button onClick={() => markArrived(row.id)}
-                      style={{ padding:'8px 18px', background:'#2e7d32', color:'#fff', border:'none', borderRadius:8, cursor:'pointer', fontWeight:700, fontSize:13, whiteSpace:'nowrap' }}>
-                      ✅ Mark Arrived
-                    </button>
-                  </div>
-                );
-              })}
-            </>
-          )}
-
-          {/* ── Stamp Cards Tab ── */}
-          {tab === 'stamps' && (
-            <>
-              <h2>🎟 Loyalty Stamp Cards</h2>
-
-              {/* Create Card Form */}
-              <div style={{ background:'#fff', borderRadius:12, padding:20, marginBottom:24, boxShadow:'0 2px 8px rgba(0,0,0,.07)' }}>
-                <h3 style={{ marginBottom:14 }}>Create New Stamp Card</h3>
-                <form onSubmit={createStampCard}>
-                  {shops.length > 1 && (
-                    <div className="form-group">
-                      <label>Shop</label>
-                      <select value={stampCardForm.shop_id} onChange={e => setStampCardForm(f => ({ ...f, shop_id: e.target.value }))}>
-                        {shops.map(s => <option key={s.id} value={s.id}>{s.name}</option>)}
-                      </select>
-                    </div>
-                  )}
-                  <div className="form-group">
-                    <label>Card Title *</label>
-                    <input required value={stampCardForm.title}
-                      onChange={e => setStampCardForm(f => ({ ...f, title: e.target.value }))}
-                      placeholder="e.g. Coffee Loyalty Card" />
-                  </div>
-                  <div style={{ display:'flex', gap:12 }}>
-                    <div className="form-group" style={{ flex:1 }}>
-                      <label>Stamps Required *</label>
-                      <select value={stampCardForm.required_stamps}
-                        onChange={e => setStampCardForm(f => ({ ...f, required_stamps: parseInt(e.target.value) }))}>
-                        {[3,4,5,6,7,8,10].map(n => <option key={n} value={n}>{n} stamps</option>)}
-                      </select>
-                    </div>
-                    <div className="form-group" style={{ flex:2 }}>
-                      <label>Reward *</label>
-                      <input required value={stampCardForm.reward}
-                        onChange={e => setStampCardForm(f => ({ ...f, reward: e.target.value }))}
-                        placeholder="e.g. 1 Free Coffee" />
-                    </div>
-                  </div>
-                  <button className="btn-post-offer" type="submit" style={{ marginTop:4 }}>
-                    ➕ Create Card
-                  </button>
-                </form>
-              </div>
-
-              {/* Add Stamp Section */}
-              {stampCards.length > 0 && (
-                <div style={{ background:'#fff3e0', borderRadius:12, padding:20, marginBottom:24, border:'2px solid #ffcc80' }}>
-                  <h3 style={{ marginBottom:14 }}>➕ Add Stamp to Customer</h3>
-                  <form onSubmit={addStamp} style={{ display:'flex', gap:12, flexWrap:'wrap', alignItems:'flex-end' }}>
-                    <div className="form-group" style={{ flex:1, minWidth:160, marginBottom:0 }}>
-                      <label>Select Card</label>
-                      <select required value={stampAddCard} onChange={e => { setStampAddCard(e.target.value); setStampAddResult(null); }}>
-                        <option value="">— pick card —</option>
-                        {stampCards.map(c => <option key={c.id} value={c.id}>{c.title} ({c.shop_name})</option>)}
-                      </select>
-                    </div>
-                    <div className="form-group" style={{ flex:1, minWidth:140, marginBottom:0 }}>
-                      <label>Customer Code</label>
-                      <input required value={stampAddCode}
-                        onChange={e => { setStampAddCode(e.target.value); setStampAddResult(null); }}
-                        placeholder="6-digit code" maxLength={6} style={{ fontFamily:'monospace', fontSize:18, letterSpacing:4, textAlign:'center' }} />
-                    </div>
-                    <button type="submit" style={{ padding:'10px 20px', background:'#e65100', color:'#fff', border:'none', borderRadius:8, cursor:'pointer', fontWeight:700, height:44 }}>
-                      Give Stamp
-                    </button>
-                  </form>
-                  {stampAddResult && (
-                    <div style={{ marginTop:12, padding:'10px 14px', borderRadius:8, fontWeight:600, fontSize:14,
-                      background: stampAddResult.ok ? '#e8f5e9' : '#ffebee',
-                      color: stampAddResult.ok ? '#2e7d32' : '#c62828' }}>
-                      {stampAddResult.message}
-                    </div>
-                  )}
-                </div>
-              )}
-
-              {/* Cards List */}
-              <h3 style={{ marginBottom:12 }}>My Cards</h3>
-              {stampsLoading && <p style={{ color:'#aaa' }}>Loading…</p>}
-              {!stampsLoading && stampCards.length === 0 && (
-                <div style={{ textAlign:'center', padding:'32px 0', color:'#bbb' }}>
-                  <div style={{ fontSize:40 }}>🎟</div>
-                  <p>No stamp cards yet — create one above</p>
-                </div>
-              )}
-              {stampCards.map(card => {
-                const pct = Math.min(100, Math.round((card.total_customers || 0) / Math.max(1, card.total_customers || 1) * 100));
-                return (
-                  <div key={card.id} style={{ background:'#fff', borderRadius:12, padding:16, marginBottom:12, boxShadow:'0 2px 8px rgba(0,0,0,.07)' }}>
-                    <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center', marginBottom:8 }}>
-                      <div>
-                        <div style={{ fontWeight:700, fontSize:15 }}>{card.title}</div>
-                        <div style={{ fontSize:12, color:'#888' }}>{card.shop_name}</div>
-                      </div>
-                      <div style={{ textAlign:'right' }}>
-                        <div style={{ fontSize:13, fontWeight:700, color:'#e65100' }}>🎁 {card.reward}</div>
-                        <div style={{ fontSize:12, color:'#888' }}>after {card.required_stamps} stamps</div>
-                      </div>
-                    </div>
-                    <div style={{ display:'flex', gap:24 }}>
-                      <div style={{ textAlign:'center' }}>
-                        <div style={{ fontSize:22, fontWeight:800, color:'#e65100' }}>{card.total_customers || 0}</div>
-                        <div style={{ fontSize:11, color:'#888' }}>customers</div>
-                      </div>
-                      <div style={{ textAlign:'center' }}>
-                        <div style={{ fontSize:22, fontWeight:800, color:'#2e7d32' }}>{card.total_redeemed || 0}</div>
-                        <div style={{ fontSize:11, color:'#888' }}>redeemed</div>
-                      </div>
-                    </div>
-                    <div style={{ display:'flex', gap:6, marginTop:10, flexWrap:'wrap' }}>
-                      {Array.from({ length: card.required_stamps }).map((_, i) => (
-                        <div key={i} style={{ width:28, height:28, borderRadius:'50%', border:'2px solid #e65100',
-                          background: i < (card.required_stamps / 2) ? '#e65100' : 'transparent',
-                          display:'flex', alignItems:'center', justifyContent:'center', fontSize:12, color:'#fff' }}>
-                          {i < Math.round(card.required_stamps / 2) ? '★' : ''}
-                        </div>
-                      ))}
-                    </div>
-                  </div>
-                );
-              })}
-            </>
-          )}
         </div>
       </div>
 
@@ -2277,8 +2056,7 @@ export default function ShopDashboard() {
           ['offers',    '🏷', 'Offers'],
           ['add-offer', '✨', editingOffer ? 'Edit' : 'Add Offer'],
           ['campaign',  '📣', 'Campaign'],
-          ['incoming',  '🚶', 'Incoming'],
-          ['stamps',    '🎟', 'Stamps'],
+          ['chat-logs', '💬', 'Chat'],
         ].map(([t, icon, label]) => (
           <button key={t}
             className={`sd-btab${tab === t ? ' active' : ''}`}
@@ -2287,9 +2065,6 @@ export default function ShopDashboard() {
             <span className="sd-btab-lbl">{label}</span>
             {t === 'campaign' && waStatus.status === 'connected' && (
               <span className="sd-btab-dot" />
-            )}
-            {t === 'incoming' && incoming.length > 0 && (
-              <span className="sd-btab-dot" style={{ background:'#2e7d32' }} />
             )}
           </button>
         ))}

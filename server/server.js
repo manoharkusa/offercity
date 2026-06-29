@@ -101,8 +101,6 @@ const routes = [
   ['/api/reviews',   './routes/reviews'],
   ['/api/admin',     './routes/admin'],
   ['/api/bdo',       './routes/bdo'],
-  ['/api/coming',    './routes/coming'],
-  ['/api/stamps',    './routes/stamps'],
   ['/api/leads',     './routes/leads'],
   ['/api/campaigns', './routes/campaigns'],
   ['/api/push',      './routes/push'],
