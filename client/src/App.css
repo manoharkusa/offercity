@@ -49,6 +49,10 @@ a { text-decoration: none; color: inherit; }
   padding: 4px 6px;
   line-height: 1;
   flex-shrink: 0;
+  min-width: 44px;
+  min-height: 44px;
+  align-items: center;
+  justify-content: center;
 }
 
 /* Full-screen backdrop when mobile menu is open */
@@ -2088,7 +2092,7 @@ a { text-decoration: none; color: inherit; }
   .hero-loc-label { font-size: 13px; }
 
   .home-cats-strip { padding: 10px 14px; gap: 6px; }
-  .cat-pill { padding: 7px 12px 7px 10px; }
+  .cat-pill { padding: 7px 12px 7px 10px; min-height: 44px; }
   .cat-pill-icon { font-size: 18px; }
   .cat-pill-name { font-size: 13px; }
 
@@ -2098,4 +2102,36 @@ a { text-decoration: none; color: inherit; }
 
   .site-footer-inner { grid-template-columns: 1fr 1fr; gap: 24px; }
   .footer-brand { grid-column: 1 / -1; }
+}
+
+/* Mobile: stack the hero search so the location sits on its own row and the
+   input + search button get a full second row (was overflowing off-screen). */
+@media (max-width: 480px) {
+  .hero-search {
+    flex-wrap: wrap;
+    height: auto;
+    padding: 8px;
+    gap: 8px;
+    overflow: visible;
+  }
+  .hero-loc {
+    flex: 1 1 100%;
+    min-width: 0;
+    padding: 4px 8px;
+  }
+  .hero-search-divider { display: none; }
+  .hero-search-input {
+    flex: 1 1 auto;
+    min-width: 0;
+    height: 46px;
+    border: 1.5px solid #eee;
+    border-radius: 10px;
+    padding: 0 12px;
+  }
+  .hero-search-btn {
+    flex: 0 0 auto;
+    width: 56px;
+    height: 46px;
+    border-radius: 10px;
+  }
 }
