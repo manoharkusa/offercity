@@ -223,6 +223,18 @@ const createTables = async () => {
     INDEX idx_created (created_at)
   ) ENGINE=InnoDB`);
 
+  // visitors — anonymous visitor tracking (soft login/skip gate). Links to a
+  // user once they sign in; otherwise stays anonymous (skip = no change to UX).
+  await pool.query(`CREATE TABLE IF NOT EXISTS visitors (
+    id           INT AUTO_INCREMENT PRIMARY KEY,
+    visitor_uuid VARCHAR(64) NOT NULL UNIQUE,
+    user_id      INT DEFAULT NULL,
+    visits       INT DEFAULT 1,
+    user_agent   VARCHAR(255) DEFAULT NULL,
+    first_seen   TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    last_seen    TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
+  ) ENGINE=InnoDB`);
+
   // push_subscriptions — location-based, no shop dependency
   await pool.query(`CREATE TABLE IF NOT EXISTS push_subscriptions (
     id INT AUTO_INCREMENT PRIMARY KEY,

@@ -2187,3 +2187,41 @@ a { text-decoration: none; color: inherit; }
     border-radius: 10px;
   }
 }
+
+/* ── Welcome gate (soft login/skip for new visitors) ── */
+.wg-overlay {
+  position: fixed; inset: 0; z-index: 4000;
+  background: rgba(28,23,20,.55);
+  display: flex; align-items: center; justify-content: center;
+  padding: 20px; animation: wg-fade .2s ease;
+}
+@keyframes wg-fade { from { opacity: 0; } to { opacity: 1; } }
+.wg-card {
+  background: #fff; border-radius: 18px; max-width: 380px; width: 100%;
+  padding: 28px 26px 22px; text-align: center;
+  box-shadow: 0 20px 60px rgba(0,0,0,.3); animation: wg-pop .22s ease;
+}
+@keyframes wg-pop { from { transform: scale(.94); opacity: 0; } to { transform: scale(1); opacity: 1; } }
+.wg-icon {
+  width: 56px; height: 56px; margin: 0 auto 14px; border-radius: 16px;
+  background: linear-gradient(135deg, #e65100, #bf360c);
+  display: flex; align-items: center; justify-content: center; font-size: 28px;
+}
+.wg-card h3 { font-size: 20px; margin-bottom: 8px; color: #1a1a1a; }
+.wg-card p { font-size: 14px; color: #777; line-height: 1.5; margin-bottom: 20px; }
+.wg-actions { display: flex; flex-direction: column; gap: 10px; }
+.wg-primary {
+  background: #e65100; color: #fff; border: none; border-radius: 10px;
+  padding: 12px; font-size: 15px; font-weight: 700; cursor: pointer; font-family: inherit;
+}
+.wg-primary:hover { background: #bf360c; }
+.wg-secondary {
+  background: #fff; color: #e65100; border: 1.5px solid #e65100; border-radius: 10px;
+  padding: 12px; font-size: 15px; font-weight: 700; cursor: pointer; font-family: inherit;
+}
+.wg-secondary:hover { background: #fff3e0; }
+.wg-skip {
+  background: none; border: none; color: #aaa; font-size: 13px;
+  margin-top: 14px; cursor: pointer; text-decoration: underline; font-family: inherit;
+}
+.wg-skip:hover { color: #666; }

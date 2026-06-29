@@ -4,6 +4,7 @@ import { AuthProvider, useAuth } from './context/AuthContext';
 import useNearbyAlerts from './hooks/useNearbyAlerts';
 import Navbar from './components/Navbar';
 import LoginNudge from './components/LoginNudge';
+import WelcomeGate from './components/WelcomeGate';
 import Footer from './components/Footer';
 import Home from './pages/Home';
 import Login from './pages/Login';
@@ -46,6 +47,7 @@ export default function App() {
         <NearbyAlerts />
         <Navbar />
         <LoginNudge />
+        <WelcomeGate />
         <Suspense fallback={<PageLoader />}>
           <Routes>
             <Route path="/"              element={<Home />} />

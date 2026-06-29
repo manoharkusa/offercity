@@ -3,20 +3,9 @@ import { useNavigate } from 'react-router-dom';
 import api from '../services/api';
 import { useAuth } from '../context/AuthContext';
 import OffersScroll from '../components/OffersScroll';
+import { HOME_CATEGORIES as CATEGORIES } from '../constants/categories';
 
 const MapView = lazy(() => import('../components/MapView'));
-
-const CATEGORIES = [
-  { key: 'All',         label: 'All Offers',   icon: '🔥', sub: 'Everything near you',    color: '#e65100' },
-  { key: 'Food',        label: 'Food',          icon: '🍽️', sub: 'Restaurants & Eateries', color: '#d84315' },
-  { key: 'Fashion',     label: 'Fashion',       icon: '👗', sub: 'Clothing & Accessories', color: '#6a1b9a' },
-  { key: 'Electronics', label: 'Electronics',   icon: '📱', sub: 'Gadgets & Devices',      color: '#1565c0' },
-  { key: 'Beauty',      label: 'Beauty',        icon: '💄', sub: 'Salons & Wellness',      color: '#ad1457' },
-  { key: 'Grocery',     label: 'Grocery',       icon: '🛒', sub: 'Daily Essentials',       color: '#2e7d32' },
-  { key: 'Health',      label: 'Health',        icon: '💊', sub: 'Pharmacy & Clinics',     color: '#00695c' },
-  { key: 'Travel',      label: 'Travel',        icon: '✈️', sub: 'Tours & Stays',          color: '#0277bd' },
-  { key: 'Other',       label: 'More',          icon: '🏷️', sub: 'Other Deals',            color: '#4e342e' },
-];
 
 const VISITOR_KEY = 'offercity_visitor';
 

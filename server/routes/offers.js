@@ -81,7 +81,8 @@ router.get('/', async (req, res) => {
       const latDelta = r / 111.0;
       const lngDelta = r / (111.0 * Math.cos(parseFloat(lat) * Math.PI / 180));
       query = `
-        SELECT o.*, s.name AS shop_name, s.slug, s.city, s.area, s.address, s.category, s.lat, s.lng,
+        SELECT o.*, COALESCE(o.category, s.category) AS category,
+          s.name AS shop_name, s.slug, s.city, s.area, s.address, s.category AS shop_category, s.lat, s.lng,
           (6371 * ACOS(LEAST(1, COS(RADIANS(?)) * COS(RADIANS(s.lat)) *
             COS(RADIANS(s.lng) - RADIANS(?)) +
             SIN(RADIANS(?)) * SIN(RADIANS(s.lat))))) AS distance
@@ -89,20 +90,23 @@ router.get('/', async (req, res) => {
         WHERE ${activeClause}
           AND s.lat BETWEEN ? AND ?
           AND s.lng BETWEEN ? AND ?
+          ${category ? 'AND COALESCE(o.category, s.category) = ?' : ''}
         HAVING distance <= ?
         ORDER BY o.flash_expires_at IS NULL ASC, distance ASC
         LIMIT 50
       `;
       params = [lat, lng, lat,
         parseFloat(lat) - latDelta, parseFloat(lat) + latDelta,
-        parseFloat(lng) - lngDelta, parseFloat(lng) + lngDelta,
-        r];
+        parseFloat(lng) - lngDelta, parseFloat(lng) + lngDelta];
+      if (category) params.push(category);
+      params.push(r);
     } else {
       query = `
-        SELECT o.*, s.name AS shop_name, s.slug, s.city, s.area, s.address, s.category, s.lat, s.lng
+        SELECT o.*, COALESCE(o.category, s.category) AS category,
+          s.name AS shop_name, s.slug, s.city, s.area, s.address, s.category AS shop_category, s.lat, s.lng
         FROM offers o JOIN shops s ON s.id = o.shop_id
         WHERE ${activeClause}
-        ${category ? 'AND s.category = ?' : ''}
+        ${category ? 'AND COALESCE(o.category, s.category) = ?' : ''}
         ${city ? 'AND s.city LIKE ?' : ''}
         ORDER BY o.flash_expires_at IS NULL ASC, o.created_at DESC LIMIT 50
       `;
@@ -191,7 +195,7 @@ router.post('/generate-image', protect, requireRole('shop_owner', 'admin'), asyn
 
 // POST /api/offers  (shop_owner)
 router.post('/', protect, requireRole('shop_owner', 'admin'), upload.single('image'), async (req, res) => {
-  const { shop_id, title, description, discount, original_price, offer_price, valid_until, flash_hours } = req.body;
+  const { shop_id, title, description, discount, original_price, offer_price, valid_until, flash_hours, category } = req.body;
   if (!shop_id || !title) return res.status(400).json({ message: 'shop_id and title required' });
   try {
     const pool = getPool();
@@ -208,8 +212,8 @@ router.post('/', protect, requireRole('shop_owner', 'admin'), upload.single('ima
       : null;
 
     const [result] = await pool.query(
-      'INSERT INTO offers (shop_id, title, description, discount, original_price, offer_price, valid_until, image, flash_expires_at) VALUES (?,?,?,?,?,?,?,?,?)',
-      [shop_id, title, description, discount || 0, original_price, offer_price, valid_until || null, image, flash_expires_at]
+      'INSERT INTO offers (shop_id, title, description, discount, original_price, offer_price, valid_until, image, flash_expires_at, category) VALUES (?,?,?,?,?,?,?,?,?,?)',
+      [shop_id, title, description, discount || 0, original_price, offer_price, valid_until || null, image, flash_expires_at, category || null]
     );
     const [rows] = await pool.query('SELECT * FROM offers WHERE id = ?', [result.insertId]);
     cache.del('offers:list:');
@@ -223,7 +227,7 @@ router.post('/', protect, requireRole('shop_owner', 'admin'), upload.single('ima
     if (!image) {
       (async () => {
         try {
-          const shopCat = shopRows[0]?.category;
+          const shopCat = category || shopRows[0]?.category;
           const prompt = buildImagePrompt({ category: shopCat || 'Other', title, discount, shop_name: shopRows[0]?.name });
           const seed = Math.floor(Math.random() * 99999);
           const url = `https://image.pollinations.ai/prompt/${encodeURIComponent(prompt)}?width=1024&height=1024&model=flux&nologo=true&seed=${seed}`;
@@ -268,13 +272,14 @@ router.put('/:id', protect, requireRole('shop_owner', 'admin'), upload.single('i
     if (rows[0].owner_id !== req.user.id && req.user.role !== 'admin')
       return res.status(403).json({ message: 'Not authorized' });
 
-    const { title, description, discount, original_price, offer_price, valid_until, is_active } = req.body;
+    const { title, description, discount, original_price, offer_price, valid_until, is_active, category } = req.body;
     const image = req.file ? `/uploads/${req.file.filename}` : rows[0].image;
     await pool.query(
-      'UPDATE offers SET title=?, description=?, discount=?, original_price=?, offer_price=?, valid_until=?, is_active=?, image=? WHERE id=?',
+      'UPDATE offers SET title=?, description=?, discount=?, original_price=?, offer_price=?, valid_until=?, is_active=?, image=?, category=? WHERE id=?',
       [title || rows[0].title, description, discount ?? rows[0].discount,
        original_price, offer_price, valid_until || null,
-       is_active !== undefined ? is_active : rows[0].is_active, image, req.params.id]
+       is_active !== undefined ? is_active : rows[0].is_active, image,
+       category || rows[0].category, req.params.id]
     );
     const [updated] = await pool.query('SELECT * FROM offers WHERE id = ?', [req.params.id]);
     cache.del('offers:list:');

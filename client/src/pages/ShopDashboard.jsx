@@ -1,7 +1,8 @@
 import { useState, useEffect, useRef, useCallback } from 'react';
 import api from '../services/api';
+import { OFFER_CATEGORIES } from '../constants/categories';
 
-const CATEGORIES = ['Food', 'Fashion', 'Electronics', 'Beauty', 'Grocery', 'Health', 'Travel', 'Other'];
+const CATEGORIES = OFFER_CATEGORIES.map(c => c.key);
 const DISCOUNTS  = [5,10,15,20,25,30,35,40,45,50,55,60,65,70,75,80,85,90];
 
 const EMPTY_OFFER = { shop_id: '', title: '', description: '', category: 'Food', discount: '', original_price: '', offer_price: '', valid_until: '', flash_hours: '' };
@@ -1346,6 +1347,16 @@ export default function ShopDashboard() {
                         <label>Offer Title *</label>
                         <input value={offerForm.title} onChange={e => setOfferForm({ ...offerForm, title: e.target.value })}
                           required placeholder="e.g. Flat 40% Off on Sarees" />
+                      </div>
+
+                      <div className="form-group">
+                        <label>Category * <span style={{ fontWeight:400, color:'#999', fontSize:12 }}>— so it shows under the right filter</span></label>
+                        <select value={offerForm.category || 'Other'} required
+                          onChange={e => setOfferForm({ ...offerForm, category: e.target.value })}>
+                          {OFFER_CATEGORIES.map(c => (
+                            <option key={c.key} value={c.key}>{c.icon} {c.label}</option>
+                          ))}
+                        </select>
                       </div>
 
                       {/* Discount + Price row */}
