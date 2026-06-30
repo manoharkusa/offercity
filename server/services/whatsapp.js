@@ -263,7 +263,11 @@ async function connect(ownerId) {
 
   // makeWASocket is a named export in Baileys, not the default export
   const makeWASocket = mod.makeWASocket || mod.default;
-  const { useMultiFileAuthState, DisconnectReason } = mod;
+  const { useMultiFileAuthState, DisconnectReason, fetchLatestBaileysVersion } = mod;
+  // Fetch the CURRENT WhatsApp Web version — a stale version makes WhatsApp
+  // reject the handshake with code 405 (connects then closes, no QR). Live-fetch it.
+  let waVersion;
+  try { waVersion = (await fetchLatestBaileysVersion()).version; } catch (_) {}
   if (typeof makeWASocket !== 'function') {
     console.error('[WA] makeWASocket not found in Baileys exports. Keys:', Object.keys(mod).join(','));
     connStatus[ownerId] = 'unavailable';
@@ -275,6 +279,7 @@ async function connect(ownerId) {
   reconnectTry[ownerId] = reconnectTry[ownerId] || 0;
 
   const sock = makeWASocket({
+    version: waVersion,
     auth: state,
     logger: makeLidLogger(ownerId),
     printQRInTerminal: false,
@@ -559,12 +564,17 @@ async function connectWithPairingCode(ownerId, phone) {
   catch { connStatus[ownerId] = 'unavailable'; throw new Error('WhatsApp module not available on this server'); }
 
   const makeWASocket = mod.makeWASocket || mod.default;
-  const { useMultiFileAuthState, DisconnectReason } = mod;
+  const { useMultiFileAuthState, DisconnectReason, fetchLatestBaileysVersion } = mod;
+  // Fetch the CURRENT WhatsApp Web version — a stale version makes WhatsApp
+  // reject the handshake with code 405 (connects then closes, no QR). Live-fetch it.
+  let waVersion;
+  try { waVersion = (await fetchLatestBaileysVersion()).version; } catch (_) {}
   const { state, saveCreds } = await useMultiFileAuthState(sessionDir);
 
   connStatus[ownerId] = 'connecting';
 
   const sock = makeWASocket({
+    version: waVersion,
     auth: state,
     printQRInTerminal: false,
     browser: ['OfferCity', 'Chrome', '120.0'],
