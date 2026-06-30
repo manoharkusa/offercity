@@ -17,6 +17,7 @@ const btn = (color, extra = {}) => ({
 export default function AdminDashboard() {
   const [tab,     setTab]     = useState('stats');
   const [stats,   setStats]   = useState(null);
+  const [vis,     setVis]     = useState(null);
   const [pending, setPending] = useState([]);
   const [users,   setUsers]   = useState([]);
   const [offers,  setOffers]  = useState([]);
@@ -29,6 +30,7 @@ export default function AdminDashboard() {
   const [rejectMsg,   setRejectMsg]   = useState('');
 
   useEffect(() => { api.get('/admin/stats').then(r => setStats(r.data)); }, []);
+  useEffect(() => { api.get('/visitors/count').then(r => setVis(r.data)).catch(() => {}); }, []);
 
   useEffect(() => {
     if (tab === 'pending') api.get('/admin/shops/pending').then(r => setPending(r.data));
@@ -125,6 +127,8 @@ export default function AdminDashboard() {
               <div className="stats-grid">
                 {[
                   ['Total Users',    stats.users],
+                  ['Total Visitors', vis?.unique],
+                  ['Total Views',    vis?.visits],
                   ['Total Shops',    stats.shops],
                   ['Total Offers',   stats.offers],
                   ['Total Reviews',  stats.reviews],

@@ -22,6 +22,7 @@ export default function Home() {
   const [view, setView]               = useState('scroll');
   const [newOffersCount, setNewOffersCount] = useState(0);
   const [locationLabel, setLocationLabel]   = useState('Hyderabad');
+  const [siteStats,     setSiteStats]       = useState(null);
 
   useEffect(() => {
     navigator.geolocation?.getCurrentPosition(
@@ -34,6 +35,10 @@ export default function Home() {
       () => { /* keep Hyderabad default */ },
       { timeout: 6000, maximumAge: 60000 }
     );
+  }, []);
+
+  useEffect(() => {
+    api.get('/visitors/count').then(r => setSiteStats(r.data)).catch(() => {});
   }, []);
 
   useEffect(() => {
@@ -153,7 +158,12 @@ export default function Home() {
             <h2 className="offers-section-title">
               {category === 'All' ? '🔥 All Nearby Offers' : `${CATEGORIES.find(c=>c.key===category)?.icon} ${category} Offers`}
             </h2>
-            {!loading && <p className="offers-section-sub">{offers.length} offer{offers.length !== 1 ? 's' : ''} found near you</p>}
+            {!loading && (
+              <p className="offers-section-sub">
+                {offers.length} offer{offers.length !== 1 ? 's' : ''} found near you
+                {siteStats && <> · 👁 {Number(siteStats.visits || 0).toLocaleString('en-IN')} views · {Number(siteStats.unique || 0).toLocaleString('en-IN')} visitors</>}
+              </p>
+            )}
           </div>
           <button
             className="btn-map-toggle"
