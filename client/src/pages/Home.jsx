@@ -161,7 +161,7 @@ export default function Home() {
             {!loading && (
               <p className="offers-section-sub">
                 {offers.length} offer{offers.length !== 1 ? 's' : ''} found near you
-                {siteStats && <> · 👁 {Number(siteStats.visits || 0).toLocaleString('en-IN')} views · {Number(siteStats.unique || 0).toLocaleString('en-IN')} visitors</>}
+                {siteStats && <span style={{ color: '#e65100', fontWeight: 600 }}> · 👁 {Number(siteStats.visits || 0).toLocaleString('en-IN')} views · {Number(siteStats.unique || 0).toLocaleString('en-IN')} visitors</span>}
               </p>
             )}
           </div>
