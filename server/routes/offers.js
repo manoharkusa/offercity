@@ -115,7 +115,36 @@ router.get('/', async (req, res) => {
       if (city) params.push(`%${city}%`);
     }
 
-    const [offers] = await pool.query(query, params);
+    let [offers] = await pool.query(query, params);
+
+    // Fallback: if geo query returned nothing, widen to 50km then all-city
+    if (offers.length === 0 && lat && lng) {
+      const r2 = 50;
+      const latD2 = r2 / 111.0;
+      const lngD2 = r2 / (111.0 * Math.cos(parseFloat(lat) * Math.PI / 180));
+      const q2 = `
+        SELECT o.*, COALESCE(o.category, s.category) AS category,
+          s.name AS shop_name, s.slug, s.city, s.area, s.address, s.category AS shop_category, s.lat, s.lng,
+          (6371 * ACOS(LEAST(1, COS(RADIANS(?)) * COS(RADIANS(s.lat)) *
+            COS(RADIANS(s.lng) - RADIANS(?)) +
+            SIN(RADIANS(?)) * SIN(RADIANS(s.lat))))) AS distance
+        FROM offers o JOIN shops s ON s.id = o.shop_id
+        WHERE ${activeClause}
+          AND s.lat BETWEEN ? AND ?
+          AND s.lng BETWEEN ? AND ?
+          ${category ? 'AND COALESCE(o.category, s.category) = ?' : ''}
+        HAVING distance <= ?
+        ORDER BY o.flash_expires_at IS NULL ASC, distance ASC
+        LIMIT 50
+      `;
+      const p2 = [lat, lng, lat,
+        parseFloat(lat) - latD2, parseFloat(lat) + latD2,
+        parseFloat(lng) - lngD2, parseFloat(lng) + lngD2];
+      if (category) p2.push(category);
+      p2.push(r2);
+      [offers] = await pool.query(q2, p2);
+    }
+
     cache.set(cacheKey, offers);
     res.json(offers);
   } catch (err) {

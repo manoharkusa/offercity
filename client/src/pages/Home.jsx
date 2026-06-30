@@ -18,7 +18,7 @@ export default function Home() {
   const [coords, setCoords]           = useState({ lng: 78.4867, lat: 17.3850 });
   const [search, setSearch]           = useState('');
   const [category, setCategory]       = useState('All');
-  const [radius, setRadius]           = useState(10);
+  const [radius, setRadius]           = useState(25);
   const [view, setView]               = useState('scroll');
   const [newOffersCount, setNewOffersCount] = useState(0);
   const [locationLabel, setLocationLabel]   = useState('Hyderabad');
