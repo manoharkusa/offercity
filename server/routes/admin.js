@@ -12,11 +12,13 @@ router.use(protect, requireRole('admin'));
 router.get('/stats', async (req, res) => {
   try {
     const pool = getPool();
-    const [[{ users }]] = await pool.query('SELECT COUNT(*) AS users FROM users');
-    const [[{ shops }]] = await pool.query('SELECT COUNT(*) AS shops FROM shops');
-    const [[{ offers }]] = await pool.query('SELECT COUNT(*) AS offers FROM offers');
-    const [[{ reviews }]] = await pool.query('SELECT COUNT(*) AS reviews FROM reviews');
-    res.json({ users, shops, offers, reviews });
+    const [[{ users }]]      = await pool.query('SELECT COUNT(*) AS users FROM users');
+    const [[{ shops }]]      = await pool.query('SELECT COUNT(*) AS shops FROM shops');
+    const [[{ offers }]]     = await pool.query('SELECT COUNT(*) AS offers FROM offers');
+    const [[{ reviews }]]    = await pool.query('SELECT COUNT(*) AS reviews FROM reviews');
+    const [[{ shopViews }]]  = await pool.query('SELECT COALESCE(SUM(views),0) AS shopViews FROM shops');
+    const [[{ offerViews }]] = await pool.query('SELECT COALESCE(SUM(views),0) AS offerViews FROM offers');
+    res.json({ users, shops, offers, reviews, shopViews, offerViews });
   } catch (err) {
     log.error('[admin] error:', err.message, err.stack);
     res.status(500).json({ message: err.message });

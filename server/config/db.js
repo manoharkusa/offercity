@@ -182,6 +182,7 @@ const createTables = async () => {
     ["shops",  "payment_screenshot",     "VARCHAR(255) DEFAULT NULL"],
     ["shops",  "payment_amount",         "DECIMAL(10,2) DEFAULT NULL"],
     ["shops",  "owner_phone",            "VARCHAR(20) DEFAULT NULL"],
+    ["shops",  "views",                  "INT DEFAULT 0 AFTER owner_phone"],
   ];
 
   // Shop catalog — services/items list (max 25 per shop)

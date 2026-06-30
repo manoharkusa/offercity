@@ -44,8 +44,8 @@ async function notifyNearbyUsers(offer, shop) {
   if (!nearby.length) return;
 
   const shopUrl = shop.slug ? `/shop/${shop.slug}` : '/';
-  const title   = `🔥 New Offer Near You!`;
-  const body    = `${offer.discount}% OFF: ${offer.title} — ${shop.name}`;
+  const title   = shop.name;
+  const body    = 'New offer available';
   const payload = JSON.stringify({ title, body, url: shopUrl, icon: '/favicon.ico' });
 
   const expired = [];

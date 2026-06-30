@@ -395,6 +395,8 @@ export default function ShopDashboard() {
   const [tab, setTab]             = useState('shops');
   const [shops, setShops]         = useState([]);
   const [offers, setOffers]       = useState([]);
+  const [qrMap, setQrMap]         = useState({});
+  const [siteStats, setSiteStats] = useState(null);
   const [selectedShop, setSelectedShop] = useState('');
   const [shopForm, setShopForm]   = useState({ name:'', description:'', category:'Food', address:'', city:'', pin_code:'', lng:'', lat:'' });
   const [shopImageFile, setShopImageFile] = useState(null);
@@ -476,6 +478,7 @@ export default function ShopDashboard() {
 
   useEffect(() => {
     api.get('/shops/owner/mine').then(r => setShops(r.data)).catch(() => {});
+    api.get('/visitors/count').then(r => setSiteStats(r.data)).catch(() => {});
   }, []);
 
   // Auto-select first shop as default (user can change if they have multiple)
@@ -993,6 +996,7 @@ export default function ShopDashboard() {
                               )}
                             </div>
                             <p style={{ margin:0, color:'#888', fontSize:13 }}>{s.address} · {s.city}{s.pin_code ? ` – ${s.pin_code}` : ''} · {s.category}</p>
+                            <p style={{ margin:'4px 0 0', fontSize:12, color:'#7b1fa2', fontWeight:600 }}>🏪 {(s.views||0).toLocaleString('en-IN')} shop views</p>
                           </div>
                         </div>
                         <a href={shopUrl(s)} target="_blank" rel="noreferrer"
@@ -1034,6 +1038,34 @@ export default function ShopDashboard() {
                           style={{ padding:'8px 16px', background:'#e65100', color:'#fff', border:'none', borderRadius:6, cursor:'pointer', fontSize:13, fontWeight:600 }}>📋 Copy</button>
                         <button onClick={() => window.open(`https://wa.me/?text=${encodeURIComponent(`🛍️ *${s.name}* on OfferCity!\n📍 ${s.address}, ${s.city}${s.pin_code ? ' – ' + s.pin_code : ''}\n👉 ${link}`)}`, '_blank')}
                           style={{ padding:'8px 16px', background:'#25D366', color:'#fff', border:'none', borderRadius:6, cursor:'pointer', fontSize:13, fontWeight:600 }}>💬 WhatsApp</button>
+                      </div>
+
+                      {/* QR Code section */}
+                      <div style={{ marginTop:10 }}>
+                        {!qrMap[s.id] ? (
+                          <button onClick={async () => {
+                            try {
+                              const { data } = await api.get(`/shops/${s.id}/qrcode`);
+                              setQrMap(prev => ({ ...prev, [s.id]: data.dataUrl }));
+                            } catch { flash('Could not generate QR code', 'err'); }
+                          }} style={{ padding:'8px 16px', background:'#4a148c', color:'#fff', border:'none', borderRadius:6, cursor:'pointer', fontSize:13, fontWeight:600 }}>
+                            📷 Get QR Code
+                          </button>
+                        ) : (
+                          <div style={{ display:'flex', alignItems:'center', gap:16, flexWrap:'wrap', background:'#f3e5f5', border:'1px solid #ce93d8', borderRadius:8, padding:'12px 16px' }}>
+                            <img src={qrMap[s.id]} alt="Shop QR Code" style={{ width:110, height:110, borderRadius:6, background:'#fff', padding:4 }} />
+                            <div>
+                              <p style={{ margin:'0 0 8px', fontSize:13, color:'#555' }}>
+                                Print this QR and stick it at your shop.<br />
+                                Customers scan it to view your offers.
+                              </p>
+                              <a href={qrMap[s.id]} download={`${s.name}-qr.png`}
+                                style={{ padding:'8px 16px', background:'#4a148c', color:'#fff', borderRadius:6, fontSize:13, fontWeight:600, textDecoration:'none', display:'inline-block' }}>
+                                ⬇️ Download PNG
+                              </a>
+                            </div>
+                          </div>
+                        )}
                       </div>
                     </div>
                   );
@@ -1155,6 +1187,21 @@ export default function ShopDashboard() {
           {tab === 'offers' && (
             <>
               <h2>My Offers</h2>
+
+              {/* Stats summary */}
+              <div style={{ display:'flex', gap:12, marginBottom:20, flexWrap:'wrap' }}>
+                {[
+                  ['🏪 Shop Page Views',  shops.find(s => String(s.id) === selectedShop)?.views ?? 0,            '#7b1fa2', '#f3e5f5'],
+                  ['👁 Offer Views',       offers.reduce((s, o) => s + (o.views || 0), 0),                        '#e65100', '#fff3e0'],
+                  ['📊 Total App Views',   siteStats?.visits ?? '—',                                               '#2e7d32', '#e8f5e9'],
+                ].map(([label, val, color, bg]) => (
+                  <div key={label} style={{ flex:1, minWidth:120, background:bg, border:`1px solid ${color}22`, borderRadius:10, padding:'12px 16px', textAlign:'center' }}>
+                    <div style={{ fontSize:22, fontWeight:800, color }}>{typeof val === 'number' ? val.toLocaleString('en-IN') : val}</div>
+                    <div style={{ fontSize:11, color:'#666', marginTop:2 }}>{label}</div>
+                  </div>
+                ))}
+              </div>
+
               <div className="form-group" style={{ marginBottom:16 }}>
                 <select value={selectedShop} onChange={e => setSelectedShop(e.target.value)}>
                   <option value="">— Select a shop —</option>

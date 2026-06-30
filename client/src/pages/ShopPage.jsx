@@ -57,7 +57,15 @@ export default function ShopPage() {
       applicationServerKey: urlBase64ToUint8Array(data.publicKey)
     });
     const { endpoint, keys } = sub.toJSON();
-    await api.post('/push/subscribe', { shopId: shop.id, endpoint, p256dh: keys.p256dh, auth: keys.auth });
+    let lat = null, lng = null;
+    try {
+      const pos = await new Promise((resolve, reject) =>
+        navigator.geolocation.getCurrentPosition(resolve, reject, { timeout: 5000 })
+      );
+      lat = pos.coords.latitude;
+      lng = pos.coords.longitude;
+    } catch (_) {}
+    await api.post('/push/subscribe', { endpoint, p256dh: keys.p256dh, auth: keys.auth, lat, lng });
     setPushState('subscribed');
   };
 

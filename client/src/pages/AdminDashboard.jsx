@@ -126,15 +126,17 @@ export default function AdminDashboard() {
               <h2>Platform Analytics</h2>
               <div className="stats-grid">
                 {[
-                  ['Total Users',    stats.users],
-                  ['Total Visitors', vis?.unique],
-                  ['Total Views',    vis?.visits],
-                  ['Total Shops',    stats.shops],
-                  ['Total Offers',   stats.offers],
-                  ['Total Reviews',  stats.reviews],
+                  ['Total Users',       stats.users],
+                  ['Total Visitors',    vis?.unique],
+                  ['Total App Views',   vis?.visits],
+                  ['Total Shop Views',  stats.shopViews],
+                  ['Total Offer Views', stats.offerViews],
+                  ['Total Shops',       stats.shops],
+                  ['Total Offers',      stats.offers],
+                  ['Total Reviews',     stats.reviews],
                 ].map(([label, num]) => (
                   <div className="stat-card" key={label}>
-                    <div className="num">{num ?? 0}</div>
+                    <div className="num">{num != null ? Number(num).toLocaleString('en-IN') : 0}</div>
                     <div className="label">{label}</div>
                   </div>
                 ))}

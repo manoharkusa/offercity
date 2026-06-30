@@ -68,12 +68,14 @@ router.get('/owner/mine', protect, requireRole('shop_owner', 'admin'), async (re
 // GET /api/shops/slug/:slug  — public shop profile page data
 router.get('/slug/:slug', async (req, res) => {
   const cacheKey = `shops:slug:${req.params.slug}`;
-  const cached = cache.get(cacheKey);
-  if (cached) return res.set('X-Cache', 'HIT').json(cached);
   try {
     const pool = getPool();
     const [rows] = await pool.query('SELECT id FROM shops WHERE slug = ?', [req.params.slug]);
     if (rows.length === 0) return res.status(404).json({ message: 'Shop not found' });
+    // Increment shop view count on every load (fire-and-forget)
+    pool.query('UPDATE shops SET views = views + 1 WHERE id = ?', [rows[0].id]).catch(() => {});
+    const cached = cache.get(cacheKey);
+    if (cached) return res.set('X-Cache', 'HIT').json(cached);
     const detail = await shopDetail(pool, rows[0].id);
     cache.set(cacheKey, detail);
     res.json(detail);
@@ -282,6 +284,23 @@ router.put('/:id/location', protect, requireRole('shop_owner', 'admin'), async (
     res.json({ ok: true, lat, lng });
   } catch (err) {
     log.error('[shops] error:', err.message, err.stack);
+    res.status(500).json({ message: err.message });
+  }
+});
+
+// GET /api/shops/:id/qrcode — returns QR data URL for the shop's public page
+router.get('/:id/qrcode', async (req, res) => {
+  try {
+    const pool = getPool();
+    const [rows] = await pool.query('SELECT slug, name FROM shops WHERE id = ?', [req.params.id]);
+    if (!rows.length) return res.status(404).json({ message: 'Shop not found' });
+    const { slug } = rows[0];
+    const shopUrl = `${process.env.CLIENT_URL || 'https://offercity.in'}/shop/${slug}`;
+    const QRCode = require('qrcode');
+    const dataUrl = await QRCode.toDataURL(shopUrl, { margin: 1, width: 300 });
+    res.json({ dataUrl, url: shopUrl });
+  } catch (err) {
+    log.error('[shops] qrcode error:', err.message);
     res.status(500).json({ message: err.message });
   }
 });
