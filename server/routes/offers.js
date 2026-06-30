@@ -61,10 +61,10 @@ const storage = multer.diskStorage({
 });
 const upload = multer({ storage, limits: { fileSize: 5 * 1024 * 1024 } });
 
-// GET /api/offers?lat=&lng=&radius=&category=&city=
+// GET /api/offers?lat=&lng=&radius=&category=&city=&area=
 router.get('/', async (req, res) => {
-  const { lat, lng, radius = 10, category, city } = req.query;
-  const cacheKey = `offers:list:${city||''}:${category||''}:${lat||''}:${lng||''}:${radius}`;
+  const { lat, lng, radius = 10, category, city, area } = req.query;
+  const cacheKey = `offers:list:${city||''}:${area||''}:${category||''}:${lat||''}:${lng||''}:${radius}`;
   const cached = cache.get(cacheKey);
   if (cached) return res.set('X-Cache', 'HIT').json(cached);
   try {
@@ -107,12 +107,14 @@ router.get('/', async (req, res) => {
         FROM offers o JOIN shops s ON s.id = o.shop_id
         WHERE ${activeClause}
         ${category ? 'AND COALESCE(o.category, s.category) = ?' : ''}
-        ${city ? 'AND s.city LIKE ?' : ''}
+        ${city ? 'AND TRIM(s.city) = ?' : ''}
+        ${area ? 'AND TRIM(s.area) = ?' : ''}
         ORDER BY o.flash_expires_at IS NULL ASC, o.created_at DESC LIMIT 50
       `;
       params = [];
       if (category) params.push(category);
-      if (city) params.push(`%${city}%`);
+      if (city) params.push(city.trim());
+      if (area) params.push(area.trim());
     }
 
     let [offers] = await pool.query(query, params);

@@ -25,6 +25,8 @@ export default function Home() {
   const [siteStats,     setSiteStats]       = useState(null);
   const [cities,        setCities]           = useState([]);
   const [selectedCity,  setSelectedCity]     = useState('');
+  const [areas,         setAreas]            = useState([]);
+  const [selectedArea,  setSelectedArea]     = useState('');
 
   useEffect(() => {
     navigator.geolocation?.getCurrentPosition(
@@ -45,14 +47,21 @@ export default function Home() {
   }, []);
 
   useEffect(() => {
+    if (!selectedCity) { setAreas([]); setSelectedArea(''); return; }
+    api.get('/shops/areas', { params: { city: selectedCity } })
+      .then(r => { setAreas(r.data); setSelectedArea(''); })
+      .catch(() => {});
+  }, [selectedCity]);
+
+  useEffect(() => {
     fetchOffers();
-  }, [coords, category, radius, selectedCity]);
+  }, [coords, category, radius, selectedCity, selectedArea]);
 
   const fetchOffers = async () => {
     setLoading(true);
     try {
       const params = selectedCity
-        ? { city: selectedCity }
+        ? { city: selectedCity, ...(selectedArea ? { area: selectedArea } : {}) }
         : { lat: coords.lat, lng: coords.lng, radius };
       if (category !== 'All') params.category = category;
       const { data } = await api.get('/offers', { params });
@@ -102,36 +111,40 @@ export default function Home() {
           <form className="hero-search" onSubmit={handleSearch}>
             <div className="hero-loc">
               <span>📍</span>
-              {selectedCity ? (
+              {/* City selector */}
+              <select
+                value={selectedCity}
+                onChange={e => { setSelectedCity(e.target.value); setSelectedArea(''); }}
+                className="hero-radius"
+                style={{ fontWeight: selectedCity ? 600 : 400, color: selectedCity ? '#e65100' : '#555' }}
+              >
+                <option value="">{locationLabel}</option>
+                {cities.map(c => <option key={c} value={c}>{c}</option>)}
+              </select>
+
+              {/* Area selector — shown only when a city is selected and has areas */}
+              {selectedCity && areas.length > 0 && (
                 <select
-                  value={selectedCity}
-                  onChange={e => { setSelectedCity(e.target.value); if (!e.target.value) setLocationLabel('Near You'); }}
+                  value={selectedArea}
+                  onChange={e => setSelectedArea(e.target.value)}
                   className="hero-radius"
-                  style={{ fontWeight: 600, color: '#e65100' }}
+                  style={{ fontWeight: selectedArea ? 600 : 400, color: selectedArea ? '#e65100' : '#555' }}
                 >
-                  <option value="">📍 Near You</option>
-                  {cities.map(c => <option key={c} value={c}>{c}</option>)}
+                  <option value="">All Areas</option>
+                  {areas.map(a => <option key={a} value={a}>{a}</option>)}
                 </select>
-              ) : (
-                <>
-                  <select
-                    value=""
-                    onChange={e => { if (e.target.value) setSelectedCity(e.target.value); }}
-                    className="hero-radius"
-                    style={{ color: '#555' }}
-                  >
-                    <option value="">{locationLabel}</option>
-                    {cities.map(c => <option key={c} value={c}>{c}</option>)}
-                  </select>
-                  <select value={radius} onChange={e => setRadius(Number(e.target.value))} className="hero-radius">
-                    <option value={1}>1 km</option>
-                    <option value={3}>3 km</option>
-                    <option value={5}>5 km</option>
-                    <option value={10}>10 km</option>
-                    <option value={25}>25 km</option>
-                    <option value={50}>50 km</option>
-                  </select>
-                </>
+              )}
+
+              {/* Radius — only in GPS mode */}
+              {!selectedCity && (
+                <select value={radius} onChange={e => setRadius(Number(e.target.value))} className="hero-radius">
+                  <option value={1}>1 km</option>
+                  <option value={3}>3 km</option>
+                  <option value={5}>5 km</option>
+                  <option value={10}>10 km</option>
+                  <option value={25}>25 km</option>
+                  <option value={50}>50 km</option>
+                </select>
               )}
             </div>
             <div className="hero-search-divider" />

@@ -56,17 +56,39 @@ const shopDetail = async (pool, shopId) => {
 router.get('/cities', async (req, res) => {
   try {
     const [rows] = await getPool().query(
-      `SELECT DISTINCT s.city FROM shops s
+      `SELECT DISTINCT TRIM(s.city) AS city FROM shops s
        JOIN offers o ON o.shop_id = s.id
-       WHERE s.city IS NOT NULL AND s.city != ''
+       WHERE s.city IS NOT NULL AND TRIM(s.city) != ''
          AND s.status != 'rejected'
          AND o.is_active = 1
          AND (o.valid_until IS NULL OR o.valid_until >= CURDATE())
-       ORDER BY s.city ASC`
+       ORDER BY city ASC`
     );
     res.json(rows.map(r => r.city));
   } catch (err) {
     log.error('[shops] cities error:', err.message);
+    res.status(500).json({ message: err.message });
+  }
+});
+
+// GET /api/shops/areas?city=X — distinct areas/districts for a city with active offers
+router.get('/areas', async (req, res) => {
+  const { city } = req.query;
+  if (!city) return res.status(400).json({ message: 'city required' });
+  try {
+    const [rows] = await getPool().query(
+      `SELECT DISTINCT TRIM(s.area) AS area FROM shops s
+       JOIN offers o ON o.shop_id = s.id
+       WHERE TRIM(s.city) = ? AND s.area IS NOT NULL AND TRIM(s.area) != ''
+         AND s.status != 'rejected'
+         AND o.is_active = 1
+         AND (o.valid_until IS NULL OR o.valid_until >= CURDATE())
+       ORDER BY area ASC`,
+      [city.trim()]
+    );
+    res.json(rows.map(r => r.area));
+  } catch (err) {
+    log.error('[shops] areas error:', err.message);
     res.status(500).json({ message: err.message });
   }
 });
@@ -163,7 +185,7 @@ router.get('/:id', async (req, res) => {
 
 // POST /api/shops
 router.post('/', protect, requireRole('shop_owner', 'admin'), upload.single('image'), async (req, res) => {
-  const { name, description, category, address, city, pin_code, lat, lng } = req.body;
+  const { name, description, category, address, city, area: formArea, pin_code, lat, lng } = req.body;
   if (!name || !lat || !lng) return res.status(400).json({ message: 'Name, lat and lng required' });
   if (!pin_code) return res.status(400).json({ message: 'Pin code is required' });
   try {
@@ -171,12 +193,12 @@ router.post('/', protect, requireRole('shop_owner', 'admin'), upload.single('ima
     const slug = await uniqueSlug(pool, makeSlug(name));
     const image = req.file ? `/uploads/${req.file.filename}` : null;
 
-    // Auto-assign BDO and area name by pincode
+    // Auto-assign BDO by pincode; area comes from form if provided, else BDO mapping
     const [bdoRows] = await pool.query(
       'SELECT bdo_id, area_name FROM bdo_areas WHERE pincode = ? LIMIT 1', [pin_code.trim()]
     );
     const bdo_id   = bdoRows.length > 0 ? bdoRows[0].bdo_id : null;
-    const area     = bdoRows.length > 0 ? (bdoRows[0].area_name || null) : null;
+    const area     = formArea?.trim() || (bdoRows.length > 0 ? bdoRows[0].area_name : null) || null;
     const status   = req.user.role === 'admin' ? 'approved' : 'pending';
 
     const [result] = await pool.query(
@@ -200,16 +222,17 @@ router.put('/:id', protect, requireRole('shop_owner', 'admin'), upload.single('i
     if (rows[0].owner_id !== req.user.id && req.user.role !== 'admin')
       return res.status(403).json({ message: 'Not authorized' });
 
-    const { name, description, category, address, city, pin_code, lat, lng } = req.body;
+    const { name, description, category, address, city, area: formArea, pin_code, lat, lng } = req.body;
     const image = req.file ? `/uploads/${req.file.filename}` : rows[0].image;
     const newName = name || rows[0].name;
     const slug = name && name !== rows[0].name
       ? await uniqueSlug(pool, makeSlug(name), req.params.id)
       : rows[0].slug;
+    const area = formArea !== undefined ? (formArea?.trim() || null) : rows[0].area;
 
     await pool.query(
-      'UPDATE shops SET name=?, slug=?, description=?, category=?, address=?, city=?, pin_code=?, lat=?, lng=?, image=? WHERE id=?',
-      [newName, slug, description, category, address, city,
+      'UPDATE shops SET name=?, slug=?, description=?, category=?, address=?, city=?, area=?, pin_code=?, lat=?, lng=?, image=? WHERE id=?',
+      [newName, slug, description, category, address, city, area,
        pin_code !== undefined ? pin_code : rows[0].pin_code,
        lat || rows[0].lat, lng || rows[0].lng, image, req.params.id]
     );

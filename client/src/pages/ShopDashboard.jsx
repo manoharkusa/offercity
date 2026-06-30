@@ -398,7 +398,7 @@ export default function ShopDashboard() {
   const [qrMap, setQrMap]         = useState({});
   const [siteStats, setSiteStats] = useState(null);
   const [selectedShop, setSelectedShop] = useState('');
-  const [shopForm, setShopForm]   = useState({ name:'', description:'', category:'Food', address:'', city:'', pin_code:'', lng:'', lat:'' });
+  const [shopForm, setShopForm]   = useState({ name:'', description:'', category:'Food', address:'', city:'', area:'', pin_code:'', lng:'', lat:'' });
   const [shopImageFile, setShopImageFile] = useState(null);
   const [shopImagePreview, setShopImagePreview] = useState(null);
   const [locDetecting, setLocDetecting] = useState(false);
@@ -1087,7 +1087,7 @@ export default function ShopDashboard() {
                   const { data } = await api.post('/shops', fd);
                   setShops(p => [...p, data]);
                   flash('Shop registered! Your shop page is now live.');
-                  setShopForm({ name:'', description:'', category:'Food', address:'', city:'', pin_code:'', lng:'', lat:'' });
+                  setShopForm({ name:'', description:'', category:'Food', address:'', city:'', area:'', pin_code:'', lng:'', lat:'' });
                   setShopImageFile(null);
                   setShopImagePreview(null);
                 } catch (err) { flash(err.response?.data?.message || 'Error', 'err'); }
@@ -1133,6 +1133,10 @@ export default function ShopDashboard() {
                   <div className="form-group" style={{ flex:2 }}>
                     <label>City / Village *</label>
                     <input value={shopForm.city} onChange={e => setShopForm({ ...shopForm, city: e.target.value })} required placeholder="e.g. Hyderabad" />
+                  </div>
+                  <div className="form-group" style={{ flex:2 }}>
+                    <label>District / Area *</label>
+                    <input value={shopForm.area} onChange={e => setShopForm({ ...shopForm, area: e.target.value })} required placeholder="e.g. Kompally, Secunderabad" />
                   </div>
                   <div className="form-group" style={{ flex:1 }}>
                     <label>PIN Code *</label>
