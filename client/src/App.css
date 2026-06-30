@@ -2056,6 +2056,25 @@ a { text-decoration: none; color: inherit; }
   color: #aaa;
   margin: 3px 0 0;
 }
+.offers-site-stats {
+  display: flex;
+  gap: 8px;
+  margin-top: 8px;
+  flex-wrap: wrap;
+}
+.offers-site-stats .stat-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  background: #fff3e0;
+  border: 1px solid #ffcc80;
+  color: #e65100;
+  font-size: 12px;
+  font-weight: 700;
+  border-radius: 20px;
+  padding: 3px 10px;
+  white-space: nowrap;
+}
 .btn-map-toggle {
   background: #fff;
   border: 1.5px solid #e0d5ca;
@@ -2149,7 +2168,8 @@ a { text-decoration: none; color: inherit; }
   .cat-pill-name { font-size: 13px; }
 
   .offers-section-title { font-size: 19px; }
-  .offers-section-head { margin-bottom: 14px; }
+  .offers-section-head { margin-bottom: 14px; flex-wrap: wrap; }
+  .offers-site-stats .stat-badge { font-size: 11px; padding: 2px 9px; }
   .home-offers-section { padding: 18px 14px 32px; }
 
   .site-footer-inner { grid-template-columns: 1fr 1fr; gap: 24px; }

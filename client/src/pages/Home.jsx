@@ -198,10 +198,17 @@ export default function Home() {
               {category === 'All' ? '🔥 All Nearby Offers' : `${CATEGORIES.find(c=>c.key===category)?.icon} ${category} Offers`}
             </h2>
             {!loading && (
-              <p className="offers-section-sub">
-                {offers.length} offer{offers.length !== 1 ? 's' : ''} found near you
-                {siteStats && <span style={{ color: '#e65100', fontWeight: 600 }}> · 👁 {Number(siteStats.visits || 0).toLocaleString('en-IN')} views · {Number(siteStats.unique || 0).toLocaleString('en-IN')} visitors</span>}
-              </p>
+              <>
+                <p className="offers-section-sub">
+                  {offers.length} offer{offers.length !== 1 ? 's' : ''} found near you
+                </p>
+                {siteStats && (
+                  <div className="offers-site-stats">
+                    <span className="stat-badge">👁 {Number(siteStats.visits || 0).toLocaleString('en-IN')} views</span>
+                    <span className="stat-badge">👥 {Number(siteStats.unique || 0).toLocaleString('en-IN')} visitors</span>
+                  </div>
+                )}
+              </>
             )}
           </div>
           <button
