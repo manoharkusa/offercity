@@ -23,6 +23,8 @@ export default function Home() {
   const [newOffersCount, setNewOffersCount] = useState(0);
   const [locationLabel, setLocationLabel]   = useState('Hyderabad');
   const [siteStats,     setSiteStats]       = useState(null);
+  const [cities,        setCities]           = useState([]);
+  const [selectedCity,  setSelectedCity]     = useState('');
 
   useEffect(() => {
     navigator.geolocation?.getCurrentPosition(
@@ -39,17 +41,19 @@ export default function Home() {
 
   useEffect(() => {
     api.get('/visitors/count').then(r => setSiteStats(r.data)).catch(() => {});
+    api.get('/shops/cities').then(r => setCities(r.data)).catch(() => {});
   }, []);
 
   useEffect(() => {
-    if (!coords) return;
     fetchOffers();
-  }, [coords, category, radius]);
+  }, [coords, category, radius, selectedCity]);
 
   const fetchOffers = async () => {
     setLoading(true);
     try {
-      const params = { lat: coords.lat, lng: coords.lng, radius };
+      const params = selectedCity
+        ? { city: selectedCity }
+        : { lat: coords.lat, lng: coords.lng, radius };
       if (category !== 'All') params.category = category;
       const { data } = await api.get('/offers', { params });
       setOffers(data);
@@ -98,15 +102,37 @@ export default function Home() {
           <form className="hero-search" onSubmit={handleSearch}>
             <div className="hero-loc">
               <span>📍</span>
-              <span className="hero-loc-label">{locationLabel}</span>
-              <select value={radius} onChange={e => setRadius(Number(e.target.value))} className="hero-radius">
-                <option value={1}>1 km</option>
-                <option value={3}>3 km</option>
-                <option value={5}>5 km</option>
-                <option value={10}>10 km</option>
-                <option value={25}>25 km</option>
-                <option value={50}>50 km</option>
-              </select>
+              {selectedCity ? (
+                <select
+                  value={selectedCity}
+                  onChange={e => { setSelectedCity(e.target.value); if (!e.target.value) setLocationLabel('Near You'); }}
+                  className="hero-radius"
+                  style={{ fontWeight: 600, color: '#e65100' }}
+                >
+                  <option value="">📍 Near You</option>
+                  {cities.map(c => <option key={c} value={c}>{c}</option>)}
+                </select>
+              ) : (
+                <>
+                  <select
+                    value=""
+                    onChange={e => { if (e.target.value) setSelectedCity(e.target.value); }}
+                    className="hero-radius"
+                    style={{ color: '#555' }}
+                  >
+                    <option value="">{locationLabel}</option>
+                    {cities.map(c => <option key={c} value={c}>{c}</option>)}
+                  </select>
+                  <select value={radius} onChange={e => setRadius(Number(e.target.value))} className="hero-radius">
+                    <option value={1}>1 km</option>
+                    <option value={3}>3 km</option>
+                    <option value={5}>5 km</option>
+                    <option value={10}>10 km</option>
+                    <option value={25}>25 km</option>
+                    <option value={50}>50 km</option>
+                  </select>
+                </>
+              )}
             </div>
             <div className="hero-search-divider" />
             <input

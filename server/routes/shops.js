@@ -52,6 +52,25 @@ const shopDetail = async (pool, shopId) => {
   return { ...rows[0], offers, reviews, avg_rating: avg.avg_rating, review_count: avg.review_count };
 };
 
+// GET /api/shops/cities — distinct cities that have at least one active offer
+router.get('/cities', async (req, res) => {
+  try {
+    const [rows] = await getPool().query(
+      `SELECT DISTINCT s.city FROM shops s
+       JOIN offers o ON o.shop_id = s.id
+       WHERE s.city IS NOT NULL AND s.city != ''
+         AND s.status != 'rejected'
+         AND o.is_active = 1
+         AND (o.valid_until IS NULL OR o.valid_until >= CURDATE())
+       ORDER BY s.city ASC`
+    );
+    res.json(rows.map(r => r.city));
+  } catch (err) {
+    log.error('[shops] cities error:', err.message);
+    res.status(500).json({ message: err.message });
+  }
+});
+
 // GET /api/shops/owner/mine  — must come before /:id
 router.get('/owner/mine', protect, requireRole('shop_owner', 'admin'), async (req, res) => {
   try {
