@@ -171,6 +171,7 @@ const createTables = async () => {
     ["shops",  "rejection_reason",  "TEXT DEFAULT NULL AFTER area"],
     ["shops",  "approved_at",        "TIMESTAMP NULL DEFAULT NULL AFTER rejection_reason"],
     ["offers", "flash_expires_at",       "TIMESTAMP NULL DEFAULT NULL AFTER valid_until"],
+    ["offers", "category",               "VARCHAR(100) DEFAULT NULL AFTER flash_expires_at"],
     // BDO profile fields
     ["users",  "phone",                  "VARCHAR(20) DEFAULT NULL"],
     ["users",  "aadhar_number",          "VARCHAR(20) DEFAULT NULL"],
