@@ -24,7 +24,9 @@ export default function ChatWidget({ shopId, shopName }) {
     try {
       const history = updated.slice(1).map(m => ({ role: m.role, content: m.content }));
       const { data } = await api.post('/chat/ask', { shop_id: shopId, message: text, history });
-      setMessages(prev => [...prev, { role: 'assistant', content: data.reply }]);
+      if (data.reply) {
+        setMessages(prev => [...prev, { role: 'assistant', content: data.reply }]);
+      }
     } catch {
       setMessages(prev => [...prev, { role: 'assistant', content: 'Sorry, could not connect. Please try again.' }]);
     } finally {

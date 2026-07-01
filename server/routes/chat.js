@@ -75,7 +75,8 @@ router.post('/ask', async (req, res) => {
     }
 
     if (!reply || reply.trim().toUpperCase() === 'SKIP') {
-      reply = `I can only help with questions about ${shop.name}. What would you like to know about our offers or services?`;
+      log.info(`[chat] SKIP shop=${shop_id} ip=${ip}`);
+      return res.json({ reply: null });
     }
 
     log.info(`[chat] ask shop=${shop_id} ip=${ip} msgLen=${message.trim().length}`);
