@@ -184,6 +184,9 @@ const createTables = async () => {
     ["shops",  "payment_amount",         "DECIMAL(10,2) DEFAULT NULL"],
     ["shops",  "owner_phone",            "VARCHAR(20) DEFAULT NULL"],
     ["shops",  "views",                  "INT DEFAULT 0 AFTER owner_phone"],
+    // Geo-based push notifications
+    ["push_subscriptions", "lat", "FLOAT DEFAULT NULL"],
+    ["push_subscriptions", "lng", "FLOAT DEFAULT NULL"],
   ];
 
   // Shop catalog — services/items list (max 25 per shop)
