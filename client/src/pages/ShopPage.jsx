@@ -50,12 +50,7 @@ export default function ShopPage() {
     return () => clearTimeout(timeout);
   }, [slug]);
 
-  const doSubscribe = async (reg) => {
-    const { data } = await api.get('/push/vapid-key');
-    const sub = await reg.pushManager.subscribe({
-      userVisibleOnly: true,
-      applicationServerKey: urlBase64ToUint8Array(data.publicKey)
-    });
+  const syncSubscription = async (sub) => {
     const { endpoint, keys } = sub.toJSON();
     let lat = null, lng = null;
     try {
@@ -66,6 +61,15 @@ export default function ShopPage() {
       lng = pos.coords.longitude;
     } catch (_) {}
     await api.post('/push/subscribe', { endpoint, p256dh: keys.p256dh, auth: keys.auth, lat, lng });
+  };
+
+  const doSubscribe = async (reg) => {
+    const { data } = await api.get('/push/vapid-key');
+    const sub = await reg.pushManager.subscribe({
+      userVisibleOnly: true,
+      applicationServerKey: urlBase64ToUint8Array(data.publicKey)
+    });
+    await syncSubscription(sub);
     setPushState('subscribed');
   };
 
@@ -86,7 +90,11 @@ export default function ShopPage() {
 
     navigator.serviceWorker.ready.then(async (reg) => {
       const existing = await reg.pushManager.getSubscription();
-      if (existing) { setPushState('subscribed'); return; }
+      if (existing) {
+        setPushState('subscribed');
+        syncSubscription(existing).catch(() => {});
+        return;
+      }
       if (Notification.permission === 'denied') return;
 
       if (Notification.permission === 'granted') {
