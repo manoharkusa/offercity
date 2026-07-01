@@ -22,7 +22,7 @@ export default function ChatWidget({ shopId, shopName }) {
     setMessages(updated);
     setLoading(true);
     try {
-      const history = updated.slice(1).map(m => ({ role: m.role, content: m.content }));
+      const history = messages.slice(1).slice(-10).map(m => ({ role: m.role, content: m.content }));
       const { data } = await api.post('/chat/ask', { shop_id: shopId, message: text, history });
       if (data.reply) {
         setMessages(prev => [...prev, { role: 'assistant', content: data.reply }]);
