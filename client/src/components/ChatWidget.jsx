@@ -1,10 +1,12 @@
 import { useState, useRef, useEffect } from 'react';
 import api from '../services/api';
 
-export default function ChatWidget({ shopId, shopName }) {
-  const [open, setOpen] = useState(false);
+export default function ChatWidget({ shopId, shopName, offerId = null, offerTitle = null, autoOpen = false }) {
+  const [open, setOpen] = useState(autoOpen);
   const [messages, setMessages] = useState([
-    { role: 'assistant', content: `Hi! 👋 I'm the assistant for ${shopName}. Ask me about our offers, prices, or location!` }
+    { role: 'assistant', content: offerTitle
+        ? `Hi! 👋 Interested in "${offerTitle}"? Ask me anything about this offer — price, availability, timings!`
+        : `Hi! 👋 I'm the assistant for ${shopName}. Ask me about our offers, prices, or location!` }
   ]);
   const [input, setInput] = useState('');
   const [loading, setLoading] = useState(false);
@@ -23,7 +25,7 @@ export default function ChatWidget({ shopId, shopName }) {
     setLoading(true);
     try {
       const history = messages.slice(1).slice(-10).map(m => ({ role: m.role, content: m.content }));
-      const { data } = await api.post('/chat/ask', { shop_id: shopId, message: text, history });
+      const { data } = await api.post('/chat/ask', { shop_id: shopId, message: text, history, ...(offerId ? { offer_id: offerId } : {}) });
       if (data.reply) {
         setMessages(prev => [...prev, { role: 'assistant', content: data.reply }]);
       }

@@ -27,7 +27,7 @@ router.post('/ask', async (req, res) => {
   const ip = req.headers['x-forwarded-for']?.split(',')[0] || req.socket.remoteAddress || 'unknown';
   if (!checkRateLimit(ip)) return res.status(429).json({ message: 'Too many messages. Please wait a moment.' });
 
-  const { shop_id, message, history = [] } = req.body;
+  const { shop_id, message, history = [], offer_id } = req.body;
   if (!shop_id || !message?.trim()) return res.status(400).json({ message: 'shop_id and message required' });
 
   try {
@@ -40,7 +40,7 @@ router.post('/ask', async (req, res) => {
     const shop = shops[0];
 
     const [offers] = await pool.query(
-      `SELECT title, discount, offer_price, original_price, valid_until
+      `SELECT id, title, discount, offer_price, original_price, valid_until
        FROM offers WHERE shop_id = ? AND is_active = 1
        AND (valid_until IS NULL OR valid_until >= CURDATE())
        ORDER BY created_at DESC LIMIT 20`,
@@ -50,7 +50,18 @@ router.post('/ask', async (req, res) => {
     const mapsUrl = (shop.lat && shop.lng)
       ? `https://www.google.com/maps?q=${shop.lat},${shop.lng}`
       : null;
-    const systemPrompt = buildSystemPromptForShop({ shops: [shop], offers, mapsUrl }, 'auto');
+    let systemPrompt = buildSystemPromptForShop({ shops: [shop], offers, mapsUrl }, 'auto');
+
+    // SMS-link flow: customer arrived via an offer link — anchor the chat on that offer
+    if (offer_id) {
+      const focus = offers.find(o => o.id === Number(offer_id));
+      if (focus) {
+        systemPrompt += `\n\nIMPORTANT: The customer opened a link for this specific offer: "${focus.title}"`
+          + (focus.discount > 0 ? ` (${Math.round(focus.discount)}% off)` : '')
+          + (focus.offer_price ? ` at price ${focus.offer_price}` : '')
+          + `. Assume their questions are about this offer unless they say otherwise.`;
+      }
+    }
 
     const messages = [
       ...history.slice(-6).map(h => ({ role: h.role, content: h.content })),

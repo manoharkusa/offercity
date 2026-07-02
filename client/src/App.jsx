@@ -17,6 +17,7 @@ const AdminDashboard  = lazy(() => import('./pages/AdminDashboard'));
 const BDODashboard    = lazy(() => import('./pages/BDODashboard'));
 const SavedOffers     = lazy(() => import('./pages/SavedOffers'));
 const ShopPage        = lazy(() => import('./pages/ShopPage'));
+const SmsLanding      = lazy(() => import('./pages/SmsLanding'));
 
 function PageLoader() {
   return (
@@ -54,6 +55,7 @@ export default function App() {
             <Route path="/login"         element={<Login />} />
             <Route path="/register"      element={<Register />} />
             <Route path="/offers/:id"    element={<OfferDetails />} />
+            <Route path="/o/:id"         element={<SmsLanding />} />
             <Route path="/saved"         element={<PrivateRoute><SavedOffers /></PrivateRoute>} />
             <Route path="/shop-dashboard" element={<PrivateRoute roles={['shop_owner','admin']}><ShopDashboard /></PrivateRoute>} />
             <Route path="/admin"         element={<PrivateRoute roles={['admin']}><AdminDashboard /></PrivateRoute>} />

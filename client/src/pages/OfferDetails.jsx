@@ -1,5 +1,5 @@
 import { useState, useEffect, lazy, Suspense } from 'react';
-import { useParams } from 'react-router-dom';
+import { useParams, useSearchParams } from 'react-router-dom';
 import api from '../services/api';
 import { useAuth } from '../context/AuthContext';
 import ChatWidget from '../components/ChatWidget';
@@ -9,6 +9,8 @@ const MapView = lazy(() => import('../components/MapView'));
 
 export default function OfferDetails() {
   const { id } = useParams();
+  const [searchParams] = useSearchParams();
+  const chatAutoOpen = searchParams.get('chat') === '1'; // SMS-link arrivals land with chat open
   const { user } = useAuth();
   const [offer, setOffer] = useState(null);
   const [loadError, setLoadError] = useState(null);
@@ -173,7 +175,15 @@ export default function OfferDetails() {
           ))
         }
       </div>
-      {offer?.shop_id && <ChatWidget shopId={offer.shop_id} shopName={offer.shop_name} />}
+      {offer?.shop_id && (
+        <ChatWidget
+          shopId={offer.shop_id}
+          shopName={offer.shop_name}
+          offerId={offer.id}
+          offerTitle={chatAutoOpen ? offer.title : null}
+          autoOpen={chatAutoOpen}
+        />
+      )}
     </div>
   );
 }

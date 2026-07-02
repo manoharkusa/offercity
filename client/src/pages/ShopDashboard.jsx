@@ -2,6 +2,7 @@ import { useState, useEffect, useRef } from 'react';
 import api from '../services/api';
 import { OFFER_CATEGORIES } from '../constants/categories';
 import OfferForm from '../components/OfferForm';
+import SmsCampaign from '../components/SmsCampaign';
 import { compressImage, fmt } from '../utils/offerHelpers';
 
 const CATEGORIES = OFFER_CATEGORIES.map(c => c.key);
@@ -409,6 +410,7 @@ export default function ShopDashboard() {
   const [msgType, setMsgType]     = useState('ok');   // 'ok' | 'err'
 
   // Campaign / WhatsApp state
+  const [showWaDev, setShowWaDev]         = useState(false); // WhatsApp section collapsed as 'under development'
   const [waStatus, setWaStatus]           = useState({ status: 'disconnected', qr: null, contacts: 0 });
   const [activeCampaign, setActiveCampaign] = useState(null);
   const [campHistory, setCampHistory]     = useState([]);
@@ -1061,8 +1063,24 @@ export default function ShopDashboard() {
           {/* ── Campaign Tab ── */}
           {tab === 'campaign' && (
             <>
-              <h2>📣 WhatsApp Campaign</h2>
+              <h2>📣 Campaigns</h2>
 
+              {/* SMS is now the primary campaign channel */}
+              <SmsCampaign offers={offers} />
+
+              {/* WhatsApp — parked under development; SMS replaced it as primary */}
+              <div
+                onClick={() => setShowWaDev(s => !s)}
+                style={{ background:'#f7f7f7', border:'1px dashed #ccc', borderRadius:12, padding:'13px 16px',
+                  display:'flex', alignItems:'center', justifyContent:'space-between', cursor:'pointer', marginBottom:14 }}>
+                <div>
+                  <span style={{ fontWeight:700, color:'#777' }}>💬 WhatsApp Campaign</span>
+                  <span style={{ fontSize:11, background:'#fff3cd', color:'#7a5700', padding:'3px 10px', borderRadius:12, fontWeight:600, marginLeft:10 }}>🚧 UNDER DEVELOPMENT</span>
+                </div>
+                <span style={{ color:'#aaa', fontSize:16 }}>{showWaDev ? '▲' : '▼'}</span>
+              </div>
+
+              {showWaDev && (<>
               {/* WhatsApp Connection Card */}
               <div className="wa-connect-card">
 
@@ -1505,6 +1523,7 @@ export default function ShopDashboard() {
                   <p style={{ color:'#aaa', fontSize:13 }}>Messages are sent at 2–3 per minute to stay safe.</p>
                 </div>
               )}
+              </>)}
 
               {/* ── QR Code Generator ── */}
               {shops.length > 0 && (

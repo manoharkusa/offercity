@@ -69,6 +69,9 @@ connectDB()
   .then(seed)
   .then(() => {
     log.info('DB + seed done. Loading push service...');
+    // Admin-managed integration keys (MSG91/Razorpay) — cached from app_settings
+    try { require('./utils/settings').loadAll(); } catch (e) { log.error('Settings load failed:', e.message); }
+
     try {
       const push = require('./services/push');
       push.init();
@@ -106,6 +109,8 @@ const routes = [
   ['/api/push',      './routes/push'],
   ['/api/chat',      './routes/chat'],
   ['/api/visitors',  './routes/visitors'],
+  ['/api/otp',       './routes/otp'],
+  ['/api/sms',       './routes/sms'],
 ];
 
 for (const [prefix, mod] of routes) {

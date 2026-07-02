@@ -3,6 +3,7 @@ const bcrypt  = require('bcryptjs');
 const { getPool } = require('../config/db');
 const { protect, requireRole } = require('../middleware/auth');
 const log = require('../utils/log');
+const settings = require('../utils/settings');
 
 const router = express.Router();
 
@@ -259,6 +260,35 @@ router.put('/shops/:id/reject', async (req, res) => {
   } catch (err) {
     log.error('[admin] error:', err.message, err.stack);
     res.status(500).json({ message: err.message });
+  }
+});
+
+// ── Integrations: MSG91 / Razorpay keys managed from the admin panel ─────────
+
+// GET /api/admin/integrations — masked secrets + where each value comes from
+router.get('/integrations', (req, res) => {
+  res.json({ settings: settings.summary() });
+});
+
+// PUT /api/admin/integrations  { MSG91_AUTH_KEY?, RAZORPAY_KEY_ID?, ... }
+// Only sends the keys the admin actually changed; empty string clears a key
+// (falls back to .env). Masked values from GET are ignored if sent back.
+router.put('/integrations', async (req, res) => {
+  try {
+    const updates = {};
+    for (const key of settings.MANAGED_KEYS) {
+      if (!(key in req.body)) continue;
+      const val = String(req.body[key] ?? '').trim();
+      if (val.includes('••••')) continue; // masked display value echoed back — skip
+      updates[key] = val;
+    }
+    if (!Object.keys(updates).length) return res.status(400).json({ message: 'Nothing to update' });
+    await settings.setMany(updates);
+    log.info(`[admin] integrations updated by user=${req.user.id}: ${Object.keys(updates).join(', ')}`);
+    res.json({ message: 'Settings saved', settings: settings.summary() });
+  } catch (err) {
+    log.error('[admin] integrations error:', err.message, err.stack);
+    res.status(500).json({ message: 'Could not save settings' });
   }
 });
 

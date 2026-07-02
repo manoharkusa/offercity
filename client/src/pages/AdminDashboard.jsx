@@ -2,11 +2,23 @@ import { useState, useEffect } from 'react';
 import api from '../services/api';
 
 const TABS = [
-  { key: 'stats',   label: '📊 Analytics' },
-  { key: 'bdos',    label: '🧑‍💼 BDO Management' },
-  { key: 'pending', label: '⏳ Pending Shops' },
-  { key: 'users',   label: '👥 Users' },
-  { key: 'offers',  label: '🏷 Offers' },
+  { key: 'stats',        label: '📊 Analytics' },
+  { key: 'bdos',         label: '🧑‍💼 BDO Management' },
+  { key: 'pending',      label: '⏳ Pending Shops' },
+  { key: 'users',        label: '👥 Users' },
+  { key: 'offers',       label: '🏷 Offers' },
+  { key: 'integrations', label: '🔌 Integrations' },
+];
+
+// Field metadata for the Integrations tab — key order matches server MANAGED_KEYS
+const INTEGRATION_FIELDS = [
+  { key: 'MSG91_AUTH_KEY',         label: 'MSG91 Auth Key',            hint: 'MSG91 dashboard → Settings → API Keys', secret: true },
+  { key: 'MSG91_SENDER_ID',        label: 'MSG91 Sender ID',           hint: '6-letter DLT-approved header, e.g. OFRCTY' },
+  { key: 'MSG91_TEMPLATE_CAMPAIGN',label: 'MSG91 Campaign Template ID',hint: 'DLT-approved flow/template ID for offer SMS' },
+  { key: 'MSG91_TEMPLATE_OTP',     label: 'MSG91 OTP Template ID',     hint: 'DLT-approved flow/template ID for OTP SMS' },
+  { key: 'RAZORPAY_KEY_ID',        label: 'Razorpay Key ID',           hint: 'Razorpay dashboard → Account & Settings → API Keys' },
+  { key: 'RAZORPAY_KEY_SECRET',    label: 'Razorpay Key Secret',       hint: 'Shown once when generating the key pair', secret: true },
+  { key: 'SITE_URL',               label: 'Site URL (for SMS links)',  hint: 'Default: https://offerscity.co.in' },
 ];
 
 const btn = (color, extra = {}) => ({
@@ -28,6 +40,8 @@ export default function AdminDashboard() {
   const [credentials, setCredentials] = useState(null); // shown after approve
   const [rejectModal, setRejectModal] = useState(null); // { shopId, shopName, reason }
   const [rejectMsg,   setRejectMsg]   = useState('');
+  const [integ,       setInteg]       = useState({ values: {}, meta: {} }); // integrations form
+  const [integMsg,    setIntegMsg]    = useState('');
 
   useEffect(() => { api.get('/admin/stats').then(r => setStats(r.data)); }, []);
   useEffect(() => { api.get('/visitors/count').then(r => setVis(r.data)).catch(() => {}); }, []);
@@ -37,7 +51,28 @@ export default function AdminDashboard() {
     if (tab === 'users')   api.get('/admin/users').then(r => setUsers(r.data));
     if (tab === 'offers')  api.get('/admin/offers').then(r => setOffers(r.data));
     if (tab === 'bdos')    api.get('/admin/bdos').then(r => setBdos(r.data));
+    if (tab === 'integrations') loadIntegrations();
   }, [tab]);
+
+  const loadIntegrations = () =>
+    api.get('/admin/integrations').then(r => {
+      const values = {}, meta = {};
+      for (const s of r.data.settings) { values[s.key] = s.value || ''; meta[s.key] = s; }
+      setInteg({ values, meta });
+    }).catch(() => {});
+
+  const saveIntegrations = async () => {
+    setIntegMsg('');
+    try {
+      const { data } = await api.put('/admin/integrations', integ.values);
+      setIntegMsg('✅ ' + data.message);
+      const values = {}, meta = {};
+      for (const s of data.settings) { values[s.key] = s.value || ''; meta[s.key] = s; }
+      setInteg({ values, meta });
+    } catch (err) {
+      setIntegMsg('❌ ' + (err.response?.data?.message || 'Save failed'));
+    }
+  };
 
   const deleteShop = async (id) => {
     await api.delete(`/admin/shops/${id}`);
@@ -399,6 +434,48 @@ export default function AdminDashboard() {
                     ))}
                   </tbody>
                 </table>
+              </div>
+            </>
+          )}
+
+          {/* ── Integrations: MSG91 + Razorpay keys ── */}
+          {tab === 'integrations' && (
+            <>
+              <h2>🔌 Integrations</h2>
+              <p style={{ color:'#777', fontSize:13.5, marginBottom:18 }}>
+                Paste your MSG91 and Razorpay credentials here after registration. Until keys are set,
+                SMS and payments run in <strong>test mode</strong> (no real SMS or money moves).
+                Values saved here override the server .env file.
+              </p>
+
+              <div style={{ background:'#fff', borderRadius:12, padding:22, boxShadow:'0 2px 8px rgba(0,0,0,.08)', maxWidth:560 }}>
+                {INTEGRATION_FIELDS.map(f => (
+                  <div key={f.key} style={{ marginBottom:16 }}>
+                    <label style={{ display:'flex', alignItems:'center', gap:8, fontWeight:600, fontSize:13.5, marginBottom:4 }}>
+                      {f.label}
+                      {integ.meta[f.key]?.set
+                        ? <span style={{ fontSize:10.5, background:'#e8f5e9', color:'#2e7d32', padding:'2px 8px', borderRadius:10 }}>
+                            ✓ set{integ.meta[f.key]?.source === 'env' ? ' (from .env)' : ''}
+                          </span>
+                        : <span style={{ fontSize:10.5, background:'#fff3cd', color:'#7a5700', padding:'2px 8px', borderRadius:10 }}>not set</span>}
+                    </label>
+                    <input
+                      type="text"
+                      value={integ.values[f.key] || ''}
+                      onChange={e => setInteg(prev => ({ ...prev, values: { ...prev.values, [f.key]: e.target.value } }))}
+                      placeholder={f.hint}
+                      autoComplete="off"
+                      style={{ width:'100%', padding:'10px 12px', border:'1px solid #ddd', borderRadius:8, fontSize:13.5, boxSizing:'border-box',
+                        fontFamily: f.secret ? 'monospace' : 'inherit' }}
+                    />
+                    <div style={{ fontSize:11.5, color:'#aaa', marginTop:3 }}>{f.hint}</div>
+                  </div>
+                ))}
+
+                <button className="btn-primary" style={{ width:'auto', padding:'11px 28px' }} onClick={saveIntegrations}>
+                  Save Settings
+                </button>
+                {integMsg && <p style={{ marginTop:10, fontSize:13.5 }}>{integMsg}</p>}
               </div>
             </>
           )}

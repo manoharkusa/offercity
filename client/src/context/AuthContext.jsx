@@ -25,6 +25,13 @@ export function AuthProvider({ children }) {
     return data.user;
   };
 
+  // OTP/SMS-link flow: server already issued the token — just store it
+  const loginWithToken = (token, userData) => {
+    localStorage.setItem('oc_token', token);
+    localStorage.setItem('oc_user', JSON.stringify(userData));
+    setUser(userData);
+  };
+
   const logout = () => {
     localStorage.removeItem('oc_token');
     localStorage.removeItem('oc_user');
@@ -36,7 +43,7 @@ export function AuthProvider({ children }) {
   };
 
   return (
-    <AuthContext.Provider value={{ user, login, register, logout, updateLocation }}>
+    <AuthContext.Provider value={{ user, login, register, loginWithToken, logout, updateLocation }}>
       {children}
     </AuthContext.Provider>
   );

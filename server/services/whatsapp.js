@@ -1,5 +1,6 @@
 const path = require('path');
 const fs   = require('fs');
+const log  = require('../utils/log');
 
 const SESSION_BASE   = process.env.WA_SESSION_DIR
   || (process.platform === 'linux' ? '/home1/a1751tyi/whatsapp_sessions' : path.join(__dirname, '../whatsapp_sessions'));
@@ -72,7 +73,7 @@ function loadLidMap(ownerId) {
     if (fs.existsSync(f)) {
       const data = JSON.parse(fs.readFileSync(f, 'utf8'));
       lidToPhone[ownerId] = Object.assign(lidToPhone[ownerId] || {}, data);
-      console.log(`[WA] Loaded ${Object.keys(data).length} LID→phone from disk for owner ${ownerId}`);
+      log.info(`[WA] Loaded ${Object.keys(data).length} LID→phone from disk for owner ${ownerId}`);
     }
   } catch {}
 }
@@ -85,7 +86,7 @@ function recordLidPhone(ownerId, lid, phone) {
   if (!lid || !phone) return;
   if (!lidToPhone[ownerId]) lidToPhone[ownerId] = {};
   if (lidToPhone[ownerId][lid]) return;
-  console.log(`[WA] LID→phone: ${lid} → ${phone}`);
+  log.info(`[WA] LID→phone: ${lid} → ${phone}`);
   lidToPhone[ownerId][lid] = phone;
   saveLidMap(ownerId);
 }
@@ -102,12 +103,12 @@ function makeLidLogger(ownerId) {
     info: (obj, msg) => {
       const m = typeof msg === 'string' ? msg : (typeof obj === 'string' ? obj : '');
       if (m && /connect|open|close|session|cred|auth|qr/i.test(m)) {
-        console.log(`[WA-B info] ${m}`);
+        log.info(`[WA-B info] ${m}`);
       }
     },
     warn: (obj, msg) => {
       const m = typeof msg === 'string' ? msg : (typeof obj === 'string' ? obj : '');
-      if (m) console.log(`[WA-B warn] ${m}`);
+      if (m) log.warn(`[WA-B warn] ${m}`);
     },
     error: (obj, msg) => {
       try {
@@ -116,13 +117,13 @@ function makeLidLogger(ownerId) {
 
         if (!attrs) {
           // Non-node errors — log them so we can see real problems
-          if (errMsg) console.log(`[WA-B err] ${errMsg}`);
+          if (errMsg) log.warn(`[WA-B err] ${errMsg}`);
           return;
         }
 
         // Log every raw attrs snapshot so we can see what fields WhatsApp sends
         const attrKeys = Object.keys(attrs).join(',');
-        console.log(`[WA-B node] err="${errMsg}" attrKeys=${attrKeys}`);
+        log.info(`[WA-B node] err="${errMsg}" attrKeys=${attrKeys}`);
 
         let captured = false;
 
@@ -130,7 +131,7 @@ function makeLidLogger(ownerId) {
         if (attrs.peer_recipient_pn && attrs.recipient) {
           const lid   = attrs.recipient.split('@')[0].replace(/_\d+$/, '');
           const phone = attrs.peer_recipient_pn.split('@')[0];
-          console.log(`[WA-B] peer_recipient: lid=${lid} phone=${phone}`);
+          log.info(`[WA-B] peer_recipient: lid=${lid} phone=${phone}`);
           if (lid.length > 13 && /^\d{7,13}$/.test(phone)) {
             recordLidPhone(ownerId, lid, phone);
             captured = true;
@@ -141,7 +142,7 @@ function makeLidLogger(ownerId) {
         if (attrs.peer_sender_pn && attrs.from) {
           const lid   = attrs.from.split('@')[0].replace(/_\d+$/, '');
           const phone = attrs.peer_sender_pn.split('@')[0];
-          console.log(`[WA-B] peer_sender: lid=${lid} phone=${phone}`);
+          log.info(`[WA-B] peer_sender: lid=${lid} phone=${phone}`);
           if (lid.length > 13 && /^\d{7,13}$/.test(phone)) {
             recordLidPhone(ownerId, lid, phone);
             captured = true;
@@ -152,7 +153,7 @@ function makeLidLogger(ownerId) {
           // Log remaining attrs so we can discover new fields WhatsApp may provide
           const interesting = ['from', 'recipient', 'notify', 'type'];
           const snap = interesting.filter(k => attrs[k]).map(k => `${k}=${attrs[k]}`).join(' ');
-          if (snap) console.log(`[WA-B] no phone field — attrs: ${snap}`);
+          if (snap) log.warn(`[WA-B] no phone field — attrs: ${snap}`);
         }
       } catch {}
     },
@@ -172,7 +173,7 @@ function mergeContacts(ownerId, incoming) {
   if (incoming.length && !mergeContacts._logged) {
     mergeContacts._logged = true;
     const sample = incoming[0];
-    console.log(`[WA CONTACT FIELDS] keys=${Object.keys(sample).join(',')} sample=${JSON.stringify(sample).slice(0, 200)}`);
+    log.info(`[WA CONTACT FIELDS] keys=${Object.keys(sample).join(',')} sample=${JSON.stringify(sample).slice(0, 200)}`);
   }
   for (const c of incoming) {
     if (!c.id) continue;
@@ -207,11 +208,11 @@ function resolvePhoneJid(ownerId, jid, pushName) {
   if (/^\d+$/.test(user) && user.length <= 13) return jid;
   // LID → phone from lidToPhone map (built from contacts.set pn/lid fields)
   const phone = lidToPhone[ownerId]?.[user];
-  if (phone) { console.log(`[WA] LID ${user} → ${phone} (map)`); return `${phone}@s.whatsapp.net`; }
+  if (phone) { log.info(`[WA] LID ${user} → ${phone} (map)`); return `${phone}@s.whatsapp.net`; }
   // JID-based lookup — only useful if the stored phone is a real phone (≤13 digits)
   const contact = (contactMap[ownerId] || []).find(c => c.jid === jid);
   if (contact?.phone && contact.phone.length <= 13) {
-    console.log(`[WA] LID ${user} → ${contact.phone} (contact jid)`);
+    log.info(`[WA] LID ${user} → ${contact.phone} (contact jid)`);
     return `${contact.phone}@s.whatsapp.net`;
   }
   // Name-based lookup: find an older phone-JID entry for the same person
@@ -221,10 +222,10 @@ function resolvePhoneJid(ownerId, jid, pushName) {
       c.name && c.name.toLowerCase() === nl &&
       /^\d+$/.test(c.phone) && c.phone.length <= 13
     );
-    if (byName) { console.log(`[WA] LID ${user} → ${byName.phone} (name:${pushName})`); return byName.jid; }
+    if (byName) { log.info(`[WA] LID ${user} → ${byName.phone} (name:${pushName})`); return byName.jid; }
   }
   const cmap = contactMap[ownerId] || [];
-  console.log(`[WA] LID ${user} unresolved name="${pushName}" contacts=${cmap.length} phoneJids=${cmap.filter(c=>/^\d+$/.test(c.phone)&&c.phone.length<=13).length}`);
+  log.warn(`[WA] LID ${user} unresolved name="${pushName}" contacts=${cmap.length} phoneJids=${cmap.filter(c=>/^\d+$/.test(c.phone)&&c.phone.length<=13).length}`);
   return jid;
 }
 
@@ -236,7 +237,7 @@ async function connect(ownerId) {
 
   // If another live process already holds the lock, stand down — let it own WhatsApp
   if (checkLock(ownerId)) {
-    console.log(`[WA] Owner ${ownerId} — pid ${MY_PID} standing down, another process holds the lock`);
+    log.info(`[WA] Owner ${ownerId} — pid ${MY_PID} standing down, another process holds the lock`);
     connStatus[ownerId] = 'connected'; // show connected in UI (the other proc is handling it)
     return;
   }
@@ -256,7 +257,7 @@ async function connect(ownerId) {
 
   let mod;
   try { mod = await import('@whiskeysockets/baileys'); }
-  catch (e) { connStatus[ownerId] = 'unavailable'; console.error('[WA] Baileys missing:', e.message); return; }
+  catch (e) { connStatus[ownerId] = 'unavailable'; log.error('[WA] Baileys missing:', e.message, e.stack); return; }
 
   let QRCode;
   try { QRCode = require('qrcode'); } catch { QRCode = null; }
@@ -269,7 +270,7 @@ async function connect(ownerId) {
   let waVersion;
   try { waVersion = (await fetchLatestBaileysVersion()).version; } catch (_) {}
   if (typeof makeWASocket !== 'function') {
-    console.error('[WA] makeWASocket not found in Baileys exports. Keys:', Object.keys(mod).join(','));
+    log.error('[WA] makeWASocket not found in Baileys exports. Keys:', Object.keys(mod).join(','));
     connStatus[ownerId] = 'unavailable';
     return;
   }
@@ -309,7 +310,7 @@ async function connect(ownerId) {
       connStatus[ownerId] = 'connected';
       reconnectTry[ownerId] = 0;
       delete qrCodes[ownerId];
-      console.log(`[WA] Owner ${ownerId} connected (pid ${MY_PID})`);
+      log.info(`[WA] Owner ${ownerId} connected (pid ${MY_PID})`);
 
       startLockRefresh(ownerId); // keep lock fresh every 15s so other pids stay out
 
@@ -327,9 +328,9 @@ async function connect(ownerId) {
           name: g.subject || 'Unnamed Group',
           size: g.participants?.length || 0,
         }));
-        console.log(`[WA] Owner ${ownerId} — ${groupMap[ownerId].length} groups loaded`);
+        log.info(`[WA] Owner ${ownerId} — ${groupMap[ownerId].length} groups loaded`);
       } catch (e) {
-        console.warn(`[WA] Could not fetch groups for ${ownerId}:`, e.message);
+        log.warn(`[WA] Could not fetch groups for ${ownerId}:`, e.message, e.stack);
         groupMap[ownerId] = [];
       }
 
@@ -341,7 +342,7 @@ async function connect(ownerId) {
       stopLockRefresh(ownerId);
       releaseLock(ownerId);
       delete sockets[ownerId];
-      console.log(`[WA] Owner ${ownerId} closed — code ${code} (pid ${MY_PID})`);
+      log.warn(`[WA] Owner ${ownerId} closed — code ${code} (pid ${MY_PID})`);
       if (code === DisconnectReason.loggedOut) {
         connStatus[ownerId] = 'disconnected';
         reconnectTry[ownerId] = 0;
@@ -352,14 +353,14 @@ async function connect(ownerId) {
         connStatus[ownerId] = 'reconnecting';
         const attempt = ++(reconnectTry[ownerId]);
         const delay = Math.min(15_000 * attempt, 120_000); // 15s, 30s, 45s … max 120s
-        console.log(`[WA] Owner ${ownerId} init timeout — retry #${attempt} in ${delay / 1000}s`);
+        log.warn(`[WA] Owner ${ownerId} init timeout — retry #${attempt} in ${delay / 1000}s`);
         setTimeout(() => connect(ownerId), delay);
       } else {
         connStatus[ownerId] = 'reconnecting';
         // Exponential backoff for other errors: 5s, 10s, 20s, 40s — max 60s
         const attempt = reconnectTry[ownerId]++ || 0;
         const delay = Math.min(5000 * Math.pow(2, attempt), 60_000);
-        console.log(`[WA] Owner ${ownerId} retry #${attempt + 1} in ${delay / 1000}s`);
+        log.warn(`[WA] Owner ${ownerId} retry #${attempt + 1} in ${delay / 1000}s`);
         setTimeout(() => connect(ownerId), delay);
       }
     }
@@ -403,7 +404,7 @@ async function connect(ownerId) {
           || msg.message?.imageMessage?.caption
           || '';
         const replyJid = resolvePhoneJid(ownerId, remoteJid, msg.pushName || '');
-        console.log(`[WA MSG] jid=${remoteJid} replyJid=${replyJid} name="${msg.pushName || ''}" age=${Math.round(age)}s text="${text.slice(0, 40)}"`);
+        log.info(`[WA MSG] jid=${remoteJid} replyJid=${replyJid} name="${msg.pushName || ''}" age=${Math.round(age)}s text="${text.slice(0, 40)}"`);
         if (age > 300) continue;
         if (!text.trim()) continue;
         await new Promise(r => setTimeout(r, 1000 + Math.random() * 1000));
@@ -413,9 +414,9 @@ async function connect(ownerId) {
             sock.sendMessage(replyJid, { text: reply }).then(() => true),
             new Promise(r => setTimeout(() => r(false), 12000))
           ]);
-          console.log(`[AI] Send ${sent ? 'OK' : 'TIMEOUT'} → ${replyJid}`);
+          log.info(`[AI] Send ${sent ? 'OK' : 'TIMEOUT'} → ${replyJid}`);
         }
-      } catch (e) { console.error('[WA] message handler error:', e.message); }
+      } catch (e) { log.error('[WA] message handler error:', e.message, e.stack); }
     }
   });
 }
@@ -477,11 +478,11 @@ async function resumePendingCampaigns(ownerId) {
     );
     for (const r of rows) {
       if (!activeCamps[r.id]) {
-        console.log(`[WA] Resuming campaign ${r.id} for owner ${ownerId}`);
+        log.info(`[WA] Resuming campaign ${r.id} for owner ${ownerId}`);
         runCampaign(r.id);
       }
     }
-  } catch (e) { console.error('[WA] resumePendingCampaigns:', e.message); }
+  } catch (e) { log.error('[WA] resumePendingCampaigns:', e.message, e.stack); }
 }
 
 // 2-3 messages per minute: 1 msg every 20-30 sec with random jitter
@@ -499,24 +500,24 @@ async function runCampaign(campaignId) {
     [campaignId]
   );
 
-  for (const log of pending) {
+  for (const row of pending) {
     const [[cur]] = await pool.query('SELECT status FROM campaigns WHERE id = ?', [campaignId]);
     if (!activeCamps[campaignId]?.running || cur.status !== 'running') break;
 
     let sent = false;
     for (let attempt = 0; attempt < 2 && !sent; attempt++) {
       try {
-        await sendWAMessage(camp.owner_id, log.phone, camp.message);
-        await pool.query('UPDATE campaign_logs SET status="sent", sent_at=NOW() WHERE id=?', [log.id]);
+        await sendWAMessage(camp.owner_id, row.phone, camp.message);
+        await pool.query('UPDATE campaign_logs SET status="sent", sent_at=NOW() WHERE id=?', [row.id]);
         await pool.query('UPDATE campaigns SET sent_count=sent_count+1, updated_at=NOW() WHERE id=?', [campaignId]);
         sent = true;
       } catch (e) {
-        console.error(`[Camp ${campaignId}] attempt ${attempt+1} failed for ${log.phone}:`, e.message);
+        log.error(`[Camp ${campaignId}] attempt ${attempt+1} failed for ${row.phone}:`, e.message, e.stack);
         if (attempt === 0) await new Promise(r => setTimeout(r, 5000)); // brief wait before retry
       }
     }
     if (!sent) {
-      await pool.query('UPDATE campaign_logs SET status="failed" WHERE id=?', [log.id]);
+      await pool.query('UPDATE campaign_logs SET status="failed" WHERE id=?', [row.id]);
       await pool.query('UPDATE campaigns SET failed_count=failed_count+1, updated_at=NOW() WHERE id=?', [campaignId]);
     }
 
@@ -646,9 +647,9 @@ async function connectWithPairingCode(ownerId, phone) {
             sock.sendMessage(replyJid2, { text: reply }).then(() => true),
             new Promise(r => setTimeout(() => r(false), 12000))
           ]);
-          console.log(`[AI] Send ${sent2 ? 'OK' : 'TIMEOUT'} → ${replyJid2}`);
+          log.info(`[AI] Send ${sent2 ? 'OK' : 'TIMEOUT'} → ${replyJid2}`);
         }
-      } catch (e) { console.error('[WA] message handler error:', e.message); }
+      } catch (e) { log.error('[WA] message handler error:', e.message, e.stack); }
     }
   });
   sock.ev.on('contacts.set',      ({ contacts }) => mergeContacts(ownerId, contacts));
@@ -673,12 +674,12 @@ async function autoReconnectAll() {
         loadLidMap(ownerId);
         // Restore chatbot toggle from disk so it survives server restarts
         require('./aichatbot').loadEnabled(ownerId);
-        console.log(`[WA] Auto-reconnecting owner ${ownerId} from saved session`);
-        connect(ownerId).catch(err => console.error(`[WA] Auto-reconnect failed for ${ownerId}:`, err.message));
+        log.info(`[WA] Auto-reconnecting owner ${ownerId} from saved session`);
+        connect(ownerId).catch(err => log.error(`[WA] Auto-reconnect failed for ${ownerId}:`, err.message, err.stack));
       }
     }
   } catch (e) {
-    console.error('[WA] autoReconnectAll error:', e.message);
+    log.error('[WA] autoReconnectAll error:', e.message, e.stack);
   }
 }
 
@@ -694,7 +695,7 @@ function startWatchdog() {
         const status  = connStatus[ownerId];
         const hasCreds = fs.existsSync(path.join(SESSION_BASE, ownerId, 'creds.json'));
         if (hasCreds && status !== 'connected' && status !== 'connecting' && status !== 'reconnecting') {
-          console.log(`[WA] Watchdog: reconnecting owner ${ownerId} (was: ${status})`);
+          log.info(`[WA] Watchdog: reconnecting owner ${ownerId} (was: ${status})`);
           connect(ownerId).catch(() => {});
         }
       }

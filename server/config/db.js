@@ -187,6 +187,8 @@ const createTables = async () => {
     // Geo-based push notifications
     ["push_subscriptions", "lat", "FLOAT DEFAULT NULL"],
     ["push_subscriptions", "lng", "FLOAT DEFAULT NULL"],
+    // SMS-link user capture: area targeting by pincode
+    ["users",  "pin_code",               "VARCHAR(10) DEFAULT NULL"],
   ];
 
   // Shop catalog — services/items list (max 25 per shop)
@@ -250,6 +252,80 @@ const createTables = async () => {
     lng FLOAT DEFAULT NULL,
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     UNIQUE KEY unique_endpoint (endpoint(200))
+  ) ENGINE=InnoDB`);
+
+  // ── SMS system: wallet per shop owner, transactions, send logs, contact lists, OTPs ──
+
+  // sms_wallets — one row per shop owner; balance = SMS credits remaining
+  await pool.query(`CREATE TABLE IF NOT EXISTS sms_wallets (
+    owner_id INT PRIMARY KEY,
+    balance INT NOT NULL DEFAULT 0,
+    total_purchased INT NOT NULL DEFAULT 0,
+    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+    FOREIGN KEY (owner_id) REFERENCES users(id) ON DELETE CASCADE
+  ) ENGINE=InnoDB`);
+
+  // sms_transactions — every wallet movement (pack purchase, campaign debit, refund, admin credit)
+  await pool.query(`CREATE TABLE IF NOT EXISTS sms_transactions (
+    id INT AUTO_INCREMENT PRIMARY KEY,
+    owner_id INT NOT NULL,
+    type ENUM('purchase','debit','refund','admin_credit') NOT NULL,
+    sms_count INT NOT NULL,
+    amount_rupees DECIMAL(10,2) DEFAULT NULL,
+    razorpay_order_id VARCHAR(64) DEFAULT NULL,
+    razorpay_payment_id VARCHAR(64) DEFAULT NULL,
+    campaign_id INT DEFAULT NULL,
+    note VARCHAR(255) DEFAULT NULL,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    INDEX idx_owner_created (owner_id, created_at),
+    UNIQUE KEY unique_rzp_payment (razorpay_payment_id)
+  ) ENGINE=InnoDB`);
+
+  // sms_logs — every SMS sent (or mocked), for audit + delivery troubleshooting
+  await pool.query(`CREATE TABLE IF NOT EXISTS sms_logs (
+    id INT AUTO_INCREMENT PRIMARY KEY,
+    owner_id INT DEFAULT NULL,
+    campaign_id INT DEFAULT NULL,
+    phone VARCHAR(20) NOT NULL,
+    kind ENUM('campaign','otp') NOT NULL DEFAULT 'campaign',
+    message TEXT,
+    status ENUM('sent','failed','mock') NOT NULL,
+    provider_msg_id VARCHAR(100) DEFAULT NULL,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    INDEX idx_owner (owner_id),
+    INDEX idx_campaign (campaign_id)
+  ) ENGINE=InnoDB`);
+
+  // sms_contacts — shop owner's customer phone list (manual add / CSV import / auto-captured)
+  await pool.query(`CREATE TABLE IF NOT EXISTS sms_contacts (
+    id INT AUTO_INCREMENT PRIMARY KEY,
+    owner_id INT NOT NULL,
+    phone VARCHAR(20) NOT NULL,
+    name VARCHAR(255) DEFAULT NULL,
+    source ENUM('manual','import','captured') DEFAULT 'manual',
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    UNIQUE KEY unique_owner_phone (owner_id, phone),
+    FOREIGN KEY (owner_id) REFERENCES users(id) ON DELETE CASCADE
+  ) ENGINE=InnoDB`);
+
+  // app_settings — admin-managed integration keys (MSG91, Razorpay) with .env fallback
+  await pool.query(`CREATE TABLE IF NOT EXISTS app_settings (
+    setting_key VARCHAR(64) PRIMARY KEY,
+    setting_value TEXT,
+    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
+  ) ENGINE=InnoDB`);
+
+  // otp_codes — SMS OTP verification (link landing, login, signup)
+  await pool.query(`CREATE TABLE IF NOT EXISTS otp_codes (
+    id INT AUTO_INCREMENT PRIMARY KEY,
+    phone VARCHAR(20) NOT NULL,
+    code VARCHAR(6) NOT NULL,
+    purpose VARCHAR(30) NOT NULL DEFAULT 'verify',
+    attempts INT NOT NULL DEFAULT 0,
+    verified BOOLEAN NOT NULL DEFAULT 0,
+    expires_at TIMESTAMP NOT NULL,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    INDEX idx_phone_purpose (phone, purpose)
   ) ENGINE=InnoDB`);
   for (const [tbl, col, def] of migrations) {
     const [cols] = await pool.query(
