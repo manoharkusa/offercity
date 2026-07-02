@@ -76,6 +76,9 @@ export default function LoginNudge() {
     if (user) { acceptCookies(); return; }
     if (localStorage.getItem(COOKIE_KEY) === 'true') return;
     if (AUTH_PAGES.includes(pathname)) return;
+    // SMS-link landing has its own capture flow (OTP → profile → push) —
+    // popping this nudge over it double-prompts the visitor and kills conversion
+    if (pathname.startsWith('/o/')) return;
     const t = setTimeout(() => setShow(true), NUDGE_DELAY);
     return () => clearTimeout(t);
   }, [user, pathname]);
