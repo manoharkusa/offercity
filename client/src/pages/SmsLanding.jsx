@@ -25,7 +25,10 @@ export default function SmsLanding() {
 
   useEffect(() => {
     api.get(`/offers/${id}`).then(r => setOffer(r.data)).catch(() => {});
-    if (user) navigate(offerUrl, { replace: true });
+    // Redirect only visitors who arrive already logged in — NOT mid-flow logins
+    // (verifyOtp sets user while step is 'code'; redirecting then would skip
+    // the profile-capture and notification steps entirely)
+    if (user && step === 'phone') navigate(offerUrl, { replace: true });
   }, [id, user]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const sendOtp = async () => {
